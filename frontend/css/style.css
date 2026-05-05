@@ -1,0 +1,301 @@
+/* Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    transition: all 0.3s ease;
+    min-height: 100vh;
+}
+
+body.dark-theme {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    color: #f8fafc;
+}
+
+body.light-theme {
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+    color: #0f172a;
+}
+
+/* Glass Card Effect */
+.glass-card {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    transition: all 0.3s ease;
+}
+
+body.light-theme .glass-card {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-glass {
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(12px);
+    border-right: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+body.light-theme .sidebar-glass {
+    background: rgba(255, 255, 255, 0.95);
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    border-radius: 1rem;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Sidebar Drawer */
+.sidebar-drawer {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+    z-index: 100;
+}
+
+.sidebar-drawer.open {
+    transform: translateX(0);
+}
+
+@media (min-width: 1024px) {
+    .sidebar-drawer {
+        transform: translateX(0) !important;
+        position: relative !important;
+    }
+    .mobile-menu-btn {
+        display: none !important;
+    }
+    .sidebar-drawer .lg\\:hidden {
+        display: none !important;
+    }
+}
+
+@media (max-width: 1023px) {
+    .main-content {
+        margin-left: 0 !important;
+    }
+    .mobile-menu-btn {
+        display: flex !important;
+    }
+}
+
+/* Drawer Overlay */
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 90;
+    display: none;
+}
+
+.drawer-overlay.open {
+    display: block;
+}
+
+/* Close button inside drawer */
+#closeDrawerBtn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+#closeDrawerBtn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+/* Tabs */
+.tab-btn {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.tab-btn.active {
+    color: #4f46e5;
+    border-bottom: 2px solid #4f46e5;
+}
+
+.tab-pane {
+    display: block;
+}
+
+.tab-pane.hidden {
+    display: none;
+}
+
+/* Admin Tabs */
+.admin-tab {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-tab.active {
+    color: #4f46e5;
+    border-bottom: 2px solid #4f46e5;
+}
+
+.admin-tab-pane {
+    display: block;
+}
+
+.admin-tab-pane.hidden {
+    display: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1e293b;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4f46e5;
+    border-radius: 10px;
+}
+
+body.light-theme ::-webkit-scrollbar-track {
+    background: #cbd5e1;
+}
+
+body.light-theme ::-webkit-scrollbar-thumb {
+    background: #6366f1;
+}
+
+/* Hover Effects */
+.hover-card:hover {
+    transform: translateY(-2px);
+    transition: all 0.2s ease;
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* Button Disabled State */
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Animations */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Toast Notifications */
+.toast {
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(8px);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    min-width: 250px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast-success {
+    border-left: 4px solid #22c55e;
+}
+
+.toast-error {
+    border-left: 4px solid #ef4444;
+}
+
+.toast-info {
+    border-left: 4px solid #4f46e5;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Loading Spinner */
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(99, 102, 241, 0.3);
+    border-top-color: #4f46e5;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive Tables */
+@media (max-width: 768px) {
+    .overflow-x-auto {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    table {
+        min-width: 600px;
+    }
+    
+    .p-4 {
+        padding: 0.75rem;
+    }
+}
+
+/* All links should be clickable */
+a, button, .nav-link, #openApiKeys, #openSettings, #adminLink, .tf-btn, .tab-btn, .admin-tab {
+    cursor: pointer;
+}
+
+/* Ensure no invisible overlays blocking clicks */
+.drawer-overlay {
+    pointer-events: auto;
+}
+
+.sidebar-drawer nav a {
+    pointer-events: auto;
+    z-index: 101;
+}

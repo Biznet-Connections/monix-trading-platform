@@ -1,0 +1,46 @@
+[01;34m.[0m
+├── [01;34mbackend[0m
+│   ├── [01;34mconfig[0m
+│   │   ├── [00mconstants.js[0m
+│   │   └── [00mdatabase.js[0m
+│   ├── [01;34mmiddleware[0m
+│   │   ├── [00madmin.js[0m
+│   │   ├── [00mauth.js[0m
+│   │   └── [00mrateLimit.js[0m
+│   ├── [01;34mmodels[0m
+│   │   ├── [00mPattern.js[0m
+│   │   ├── [00mTrade.js[0m
+│   │   ├── [00mUser.js[0m
+│   │   └── [00mVoucher.js[0m
+│   ├── [01;34mroutes[0m
+│   │   ├── [00madmin.js[0m
+│   │   ├── [00mauth.js[0m
+│   │   ├── [00msignals.js[0m
+│   │   ├── [00mtrades.js[0m
+│   │   └── [00muser.js[0m
+│   ├── [01;34mservices[0m
+│   │   ├── [00mdeepseekService.js[0m
+│   │   ├── [00mderivService.js[0m
+│   │   └── [00memailService.js[0m
+│   ├── [01;34mutils[0m
+│   │   ├── [00mhelpers.js[0m
+│   │   ├── [00mlogger.js[0m
+│   │   └── [00mwebsocket.js[0m
+│   └── [00mserver.js[0m
+├── [01;34mfrontend[0m
+│   ├── [01;34mcss[0m
+│   │   └── [00mstyle.css[0m
+│   ├── [01;34mjs[0m
+│   │   ├── [00madmin.js[0m
+│   │   ├── [00mapi.js[0m
+│   │   ├── [00mapp.js[0m
+│   │   ├── [00mchart.js[0m
+│   │   ├── [00mtrading.js[0m
+│   │   └── [00mwebsocket.js[0m
+│   └── [00mindex.html[0m
+├── [00mREADME.md[0m
+├── [00mmonix_structure.txt[0m
+├── [00mpackage.json[0m
+└── [00mstructure_with_colors.txt[0m
+
+11 directories, 33 files

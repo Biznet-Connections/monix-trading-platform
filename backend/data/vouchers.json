@@ -1,0 +1,10 @@
+[
+  {
+    "id": 1,
+    "code": "MONIX-ADMIN-DEFAULT",
+    "days_valid": 365,
+    "trades_limit": 999999,
+    "created_by": "system",
+    "created_at": "2026-05-02T22:13:37.003Z"
+  }
+]

@@ -1,0 +1,45 @@
+[3.4K]  .
+├── [3.4K]  backend
+│   ├── [3.4K]  config
+│   │   ├── [1.6K]  constants.js
+│   │   └── [8.6K]  database.js
+│   ├── [3.4K]  middleware
+│   │   ├── [ 667]  admin.js
+│   │   ├── [1.4K]  auth.js
+│   │   └── [ 726]  rateLimit.js
+│   ├── [3.4K]  models
+│   │   ├── [4.8K]  Pattern.js
+│   │   ├── [6.7K]  Trade.js
+│   │   ├── [7.5K]  User.js
+│   │   └── [3.2K]  Voucher.js
+│   ├── [3.4K]  routes
+│   │   ├── [8.4K]  admin.js
+│   │   ├── [8.5K]  auth.js
+│   │   ├── [6.6K]  signals.js
+│   │   ├── [7.5K]  trades.js
+│   │   └── [5.3K]  user.js
+│   ├── [3.4K]  services
+│   │   ├── [9.8K]  deepseekService.js
+│   │   ├── [7.0K]  derivService.js
+│   │   └── [8.3K]  emailService.js
+│   ├── [3.4K]  utils
+│   │   ├── [1.7K]  helpers.js
+│   │   ├── [1.2K]  logger.js
+│   │   └── [1.1K]  websocket.js
+│   └── [4.1K]  server.js
+├── [3.4K]  frontend
+│   ├── [3.4K]  css
+│   │   └── [4.4K]  style.css
+│   ├── [3.4K]  js
+│   │   ├── [ 11K]  admin.js
+│   │   ├── [5.5K]  api.js
+│   │   ├── [ 26K]  app.js
+│   │   ├── [6.7K]  chart.js
+│   │   ├── [ 16K]  trading.js
+│   │   └── [7.2K]  websocket.js
+│   └── [ 32K]  index.html
+├── [ 709]  README.md
+├── [   0]  monix_structure.txt
+└── [ 900]  package.json
+
+11 directories, 32 files
