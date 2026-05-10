@@ -145,6 +145,47 @@ async function getAIInsights() {
     return apiRequest('/api/signals/insights');
 }
 
+// AI Trader endpoints (NEW)
+async function changeAISymbol(symbol) {
+    return apiRequest('/api/ai/symbol', {
+        method: 'POST',
+        body: JSON.stringify({ symbol })
+    });
+}
+
+async function getAISymbol() {
+    return apiRequest('/api/ai/symbol');
+}
+
+async function getAIAnalysis() {
+    return apiRequest('/api/ai/analysis');
+}
+
+async function setAIMode(mode) {
+    return apiRequest('/api/ai/mode', {
+        method: 'POST',
+        body: JSON.stringify({ mode })
+    });
+}
+
+async function setConfidenceThreshold(threshold) {
+    return apiRequest('/api/ai/threshold', {
+        method: 'POST',
+        body: JSON.stringify({ threshold })
+    });
+}
+
+async function startAITrader(symbol = 'R_75', mode = 'AUTO') {
+    return apiRequest('/api/ai/start', {
+        method: 'POST',
+        body: JSON.stringify({ symbol, mode })
+    });
+}
+
+async function stopAITrader() {
+    return apiRequest('/api/ai/stop', { method: 'POST' });
+}
+
 // Leaderboard
 async function getLeaderboard() {
     return apiRequest('/api/user/leaderboard');
@@ -200,12 +241,14 @@ async function adminRevokeVoucher(code) {
     return apiRequest(`/api/admin/vouchers/${code}`, { method: 'DELETE' });
 }
 
+// Logout
 function logout() {
     localStorage.removeItem('monix_token');
     authToken = null;
     window.location.reload();
 }
 
+// Export for use in other files
 window.api = {
     login,
     register,
@@ -223,6 +266,13 @@ window.api = {
     getSignalHistory,
     getAIInsights,
     getLeaderboard,
+    changeAISymbol,
+    getAISymbol,
+    getAIAnalysis,
+    setAIMode,
+    setConfidenceThreshold,
+    startAITrader,
+    stopAITrader,
     adminGenerateVoucher,
     adminGetVouchers,
     adminGetUsers,

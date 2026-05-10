@@ -21,13 +21,11 @@ const symbolSelect = document.getElementById('symbolSelect');
 const refreshTradesBtn = document.getElementById('refreshTradesBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 
-// Change button text and behavior
 if (getSignalBtn) {
     getSignalBtn.innerHTML = '🧠 AI REASONING';
     getSignalBtn.title = 'View current AI market analysis (No automatic trade)';
 }
 
-// Sound functions
 function playSound(type) {
     try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -80,16 +78,14 @@ function playSound(type) {
     } catch(e) { console.log('Audio not supported'); }
 }
 
-// Desktop notification
 function sendNotification(title, body, tag = 'trade') {
     if (Notification.permission === 'granted') {
         new Notification(title, { body, tag, icon: '/favicon.ico' });
     }
 }
 
-// Show AI Reason Modal (NO trade execution)
 function showAIReasonModal(signal) {
-    console.log('📱 Opening AI Reason Modal for:', signal.symbol);
+    console.log(`📱 [Trading] Opening AI Reason Modal for symbol: ${signal.symbol}, action: ${signal.action}`);
     const modal = document.getElementById('aiReasonModal');
     if (!modal) {
         console.error('Modal element not found!');
@@ -99,34 +95,54 @@ function showAIReasonModal(signal) {
     const isAutoMode = autoModeToggle && autoModeToggle.checked;
     const isWaiting = signal.is_waiting;
     
-    document.getElementById('modalAction').innerHTML = signal.action === 'BUY' ? '📈 BUY (Price will go UP)' : (signal.action === 'SELL' ? '📉 SELL (Price will go DOWN)' : '⏳ WAITING FOR SETUP');
-    document.getElementById('modalAction').className = `text-2xl font-bold ${signal.action === 'BUY' ? 'text-emerald-400' : signal.action === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`;
-    document.getElementById('modalSymbol').innerHTML = signal.symbol || 'R_75';
-    document.getElementById('modalPrice').innerHTML = `$${signal.entry_price?.toFixed(2) || signal.support?.toFixed(2) || '0.00'}`;
-    document.getElementById('modalMarketFeeling').innerHTML = signal.market_feeling || (signal.rsi > 65 ? 'Price is high' : (signal.rsi < 35 ? 'Price is low' : 'Market is stable'));
-    document.getElementById('modalPattern').innerHTML = signal.pattern || 'Pattern detected';
-    document.getElementById('modalEntryTime').innerHTML = signal.entry_time || 'Waiting...';
-    document.getElementById('modalExitTime').innerHTML = signal.exit_time || '5 minutes after entry';
-    
-    const defaultStake = parseFloat(stakeSlider ? stakeSlider.value : 0.35);
-    const profitDollars = (defaultStake * (signal.confidence / 100) * 0.85).toFixed(2);
-    const lossDollars = defaultStake.toFixed(2);
-    
-    document.getElementById('modalTakeProfit').innerHTML = signal.take_profit ? `$${signal.take_profit.toFixed(2)} (make +$${profitDollars})` : 'Calculating...';
-    document.getElementById('modalStopLoss').innerHTML = signal.stop_loss ? `$${signal.stop_loss.toFixed(2)} (lose -$${lossDollars})` : 'Calculating...';
-    document.getElementById('modalReason').innerHTML = signal.simple_reason || signal.reasoning || 'AI analysis complete';
-    document.getElementById('modalConfidence').innerHTML = `${signal.confidence}%`;
-    
-    const confidenceBar = document.getElementById('modalConfidenceBar');
-    if (confidenceBar) confidenceBar.style.width = `${signal.confidence}%`;
-    
+    const modalAction = document.getElementById('modalAction');
+    const modalSymbol = document.getElementById('modalSymbol');
+    const modalPrice = document.getElementById('modalPrice');
+    const modalMarketFeeling = document.getElementById('modalMarketFeeling');
+    const modalPattern = document.getElementById('modalPattern');
+    const modalEntryTime = document.getElementById('modalEntryTime');
+    const modalExitTime = document.getElementById('modalExitTime');
+    const modalTakeProfit = document.getElementById('modalTakeProfit');
+    const modalStopLoss = document.getElementById('modalStopLoss');
+    const modalReason = document.getElementById('modalReason');
+    const modalConfidence = document.getElementById('modalConfidence');
+    const modalConfidenceBar = document.getElementById('modalConfidenceBar');
     const buttonsDiv = document.getElementById('modalButtons');
     const autoModeNote = document.getElementById('autoModeNote');
+    
+    if (modalAction) {
+        modalAction.innerHTML = signal.action === 'BUY' ? '📈 BUY (Price will go UP)' : (signal.action === 'SELL' ? '📉 SELL (Price will go DOWN)' : '⏳ WAITING FOR SETUP');
+        modalAction.className = `text-2xl font-bold ${signal.action === 'BUY' ? 'text-emerald-400' : signal.action === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`;
+    }
+    
+    // CRITICAL FIX: Use signal.symbol from the API response
+    if (modalSymbol) {
+        const displaySymbol = signal.symbol || 'R_75';
+        modalSymbol.innerHTML = displaySymbol;
+        console.log(`📱 [Trading] Modal symbol set to: ${displaySymbol}`);
+    }
+    
+    if (modalPrice) modalPrice.innerHTML = `$${signal.entry_price?.toFixed(2) || signal.support?.toFixed(2) || '0.00'}`;
+    if (modalMarketFeeling) modalMarketFeeling.innerHTML = signal.market_feeling || (signal.rsi > 65 ? 'Price is high' : (signal.rsi < 35 ? 'Price is low' : 'Market is stable'));
+    if (modalPattern) modalPattern.innerHTML = signal.pattern || 'Pattern detected';
+    if (modalEntryTime) modalEntryTime.innerHTML = signal.entry_time || 'Waiting...';
+    if (modalExitTime) modalExitTime.innerHTML = signal.exit_time || '5 minutes after entry';
+    
+    const defaultStake = parseFloat(stakeSlider ? stakeSlider.value : 0.35);
+    const profitDollars = (defaultStake * (signal.confidence / 100) * 1.0).toFixed(2);
+    const lossDollars = defaultStake.toFixed(2);
+    
+    if (modalTakeProfit) modalTakeProfit.innerHTML = signal.take_profit ? `$${signal.take_profit.toFixed(2)} (make +$${profitDollars})` : 'Calculating...';
+    if (modalStopLoss) modalStopLoss.innerHTML = signal.stop_loss ? `$${signal.stop_loss.toFixed(2)} (lose -$${lossDollars})` : 'Calculating...';
+    if (modalReason) modalReason.innerHTML = signal.simple_reason || signal.reasoning || 'AI analysis complete';
+    if (modalConfidence) modalConfidence.innerHTML = `${signal.confidence}%`;
+    if (modalConfidenceBar) modalConfidenceBar.style.width = `${signal.confidence}%`;
     
     if (isWaiting || signal.action === 'WAIT') {
         if (buttonsDiv) buttonsDiv.classList.add('hidden');
         if (autoModeNote) {
-            autoModeNote.innerHTML = '⏳ No active setup. AI is watching the market...';
+            const watchSymbol = signal.symbol || 'R_75';
+            autoModeNote.innerHTML = `⏳ No active setup. AI watching ${watchSymbol}... Need ${signal.confidence_threshold || 55}%+ confidence.`;
             autoModeNote.classList.remove('hidden');
         }
     } else if (isAutoMode) {
@@ -266,18 +282,212 @@ function showActiveTradePanel(contractId, entryPrice, action, stake, exitTimesta
     }, 1000);
 }
 
-// NEW: Just show analysis, NO forced trade
+function displaySignal(signal) {
+    currentSignal = signal;
+    console.log(`📊 [Trading] Signal: ${signal.action} ${signal.confidence}% on ${signal.symbol}`);
+
+    const signalAction = document.getElementById('signalAction');
+    const signalConfidence = document.getElementById('signalConfidence');
+    const signalPattern = document.getElementById('signalPattern');
+    const signalEntry = document.getElementById('signalEntry');
+    const signalTP = document.getElementById('signalTP');
+    const signalSL = document.getElementById('signalSL');
+    const signalReasoning = document.getElementById('signalReasoning');
+    const supportLevel = document.getElementById('supportLevel');
+    const resistanceLevel = document.getElementById('resistanceLevel');
+    const rsiValue = document.getElementById('rsiValue');
+    const signalExit = document.getElementById('signalExit');
+
+    if (signalAction) {
+        signalAction.innerHTML = signal.action === 'BUY' ? '📈 BUY (Price will go UP)' : '🔻 SELL (Price will go DOWN)';
+        signalAction.className = `text-4xl font-black ${signal.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}`;
+    }
+    if (signalConfidence) signalConfidence.innerHTML = `${signal.confidence}%`;
+    if (signalPattern) signalPattern.innerHTML = signal.pattern || '—';
+    if (signalEntry) signalEntry.innerHTML = `$${signal.entry_price.toFixed(2)}`;
+    if (signalTP) signalTP.innerHTML = `$${signal.take_profit?.toFixed(2) || '—'}`;
+    if (signalSL) signalSL.innerHTML = `$${signal.stop_loss?.toFixed(2) || '—'}`;
+    
+    if (signalReasoning) {
+        const reasonText = signal.simple_reason || signal.reasoning || 'AI analysis complete';
+        signalReasoning.innerHTML = reasonText;
+        signalReasoning.style.cursor = 'pointer';
+        signalReasoning.style.textDecoration = 'underline';
+        signalReasoning.onclick = () => window.showAIReasonModal(signal);
+    }
+    
+    if (supportLevel && signal.support) supportLevel.innerHTML = `$${signal.support.toFixed(2)}`;
+    if (resistanceLevel && signal.resistance) resistanceLevel.innerHTML = `$${signal.resistance.toFixed(2)}`;
+    if (rsiValue && signal.rsi) rsiValue.innerHTML = signal.rsi;
+    if (signalExit && signal.exit_time) signalExit.innerHTML = signal.exit_time;
+
+    if (window.updateConfidenceBars) window.updateConfidenceBars(signal.confidence);
+
+    if (yesBtn) {
+        yesBtn.disabled = false;
+        yesBtn.classList.remove('cursor-not-allowed', 'bg-emerald-500/50');
+        yesBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+        yesBtn.innerHTML = '💰 BUY';
+    }
+    if (noBtn) {
+        noBtn.disabled = false;
+        noBtn.classList.remove('cursor-not-allowed');
+        noBtn.classList.add('cursor-pointer');
+        noBtn.innerHTML = '🔻 SELL';
+    }
+
+    playSound('signal');
+    sendNotification('New AI Signal', `${signal.action} ${signal.symbol || 'signal'} with ${signal.confidence}% confidence`);
+
+    if (autoModeToggle && autoModeToggle.checked) {
+        console.log('🤖 [Auto Mode] Auto-executing trade...');
+        setTimeout(() => executeTrade(), 2000);
+    }
+}
+
+function clearSignal() {
+    currentSignal = null;
+
+    const signalAction = document.getElementById('signalAction');
+    const signalConfidence = document.getElementById('signalConfidence');
+    const signalPattern = document.getElementById('signalPattern');
+    const signalEntry = document.getElementById('signalEntry');
+    const signalTP = document.getElementById('signalTP');
+    const signalSL = document.getElementById('signalSL');
+    const signalReasoning = document.getElementById('signalReasoning');
+    const signalExit = document.getElementById('signalExit');
+
+    if (signalAction) signalAction.innerHTML = '—';
+    if (signalConfidence) signalConfidence.innerHTML = '0%';
+    if (signalPattern) signalPattern.innerHTML = '—';
+    if (signalEntry) signalEntry.innerHTML = '$0.00';
+    if (signalTP) signalTP.innerHTML = '$0.00';
+    if (signalSL) signalSL.innerHTML = '$0.00';
+    if (signalReasoning) {
+        signalReasoning.innerHTML = 'Click AI REASONING to view market analysis';
+        signalReasoning.style.cursor = 'pointer';
+        signalReasoning.style.textDecoration = 'underline';
+        signalReasoning.style.color = '';
+        signalReasoning.style.fontWeight = 'normal';
+    }
+    if (signalExit) signalExit.innerHTML = '5 min';
+
+    if (window.updateConfidenceBars) window.updateConfidenceBars(0);
+
+    if (yesBtn) {
+        yesBtn.disabled = false;
+        yesBtn.classList.remove('cursor-not-allowed', 'bg-emerald-500/50');
+        yesBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+        yesBtn.innerHTML = '💰 BUY';
+    }
+    if (noBtn) {
+        noBtn.disabled = false;
+        noBtn.classList.remove('cursor-not-allowed');
+        noBtn.classList.add('bg-red-500/20', 'hover:bg-red-500/30', 'cursor-pointer');
+        noBtn.innerHTML = '🔻 SELL';
+    }
+}
+
+async function executeTrade() {
+    if (!currentSignal || isProcessingTrade) return;
+    
+    if (currentSignal.action === 'WAIT') {
+        if (window.showToast) window.showToast('No Setup', 'AI is waiting for market conditions. No active trade setup.', 'info');
+        return;
+    }
+
+    isProcessingTrade = true;
+    if (yesBtn) {
+        yesBtn.disabled = true;
+        yesBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>EXECUTING...';
+    }
+
+    let stake = stakeSlider ? parseFloat(stakeSlider.value) : 0.35;
+    if (stake < 0.35) {
+        stake = 0.35;
+        if (stakeSlider) stakeSlider.value = 0.35;
+        if (stakeValue) stakeValue.innerText = '$0.35';
+    }
+
+    try {
+        const result = await window.api.executeTrade({
+            symbol: symbolSelect ? symbolSelect.value : 'R_75',
+            action: currentSignal.action,
+            stake: stake,
+            entry_price: currentSignal.entry_price,
+            take_profit: currentSignal.take_profit,
+            stop_loss: currentSignal.stop_loss,
+            confidence: currentSignal.confidence,
+            pattern: currentSignal.pattern,
+            reasoning: currentSignal.reasoning,
+            rsi: currentSignal.rsi,
+            macd: currentSignal.macd,
+            is_auto: autoModeToggle && autoModeToggle.checked ? 1 : 0
+        });
+
+        if (result.success) {
+            playSound('execute');
+            sendNotification('Trade Executed', `${currentSignal.action} on ${symbolSelect?.value}`);
+            if (window.showToast) window.showToast('Trade Executed', `Contract ID: ${String(result.contract_id).substring(0, 8)}...`, 'success');
+
+            const exitTime = Date.now() + (5 * 60 * 1000);
+            showActiveTradePanel(result.contract_id, currentSignal.entry_price, currentSignal.action, stake, exitTime);
+
+            clearSignal();
+            await loadRecentTrades();
+            await refreshUserData();
+            await updateLockedBalance();
+        } else {
+            if (window.showToast) window.showToast('Trade Failed', result.error || 'Unknown error', 'error');
+        }
+    } catch (error) {
+        if (window.showToast) window.showToast('Trade Failed', error.message, 'error');
+    } finally {
+        isProcessingTrade = false;
+        if (yesBtn) {
+            yesBtn.disabled = false;
+            yesBtn.innerHTML = '💰 BUY';
+        }
+    }
+}
+
+async function changeSymbol(symbol) {
+    console.log(`🔄 [Trading] Changing symbol to: ${symbol}`);
+    try {
+        const response = await fetch('/api/ai/symbol', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('monix_token')}`
+            },
+            body: JSON.stringify({ symbol: symbol })
+        });
+        const data = await response.json();
+        if (data.success) {
+            console.log(`✅ [Trading] Symbol changed to: ${symbol}`);
+            if (window.showToast) window.showToast('Symbol Changed', `AI now analyzing ${symbol}`, 'success');
+            setTimeout(() => fetchAIAnalysis(), 1000);
+        } else {
+            console.error('Failed to change symbol:', data.error);
+        }
+    } catch (error) {
+        console.error('Error changing symbol:', error);
+    }
+}
+
 async function fetchAIAnalysis() {
     if (!getSignalBtn) return;
 
     const symbol = symbolSelect ? symbolSelect.value : 'R_75';
+    console.log(`🔍 [Trading] Fetching AI analysis for symbol: ${symbol}`);
     getSignalBtn.disabled = true;
     getSignalBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>FETCHING ANALYSIS...';
 
     try {
         const result = await window.api.generateSignal(symbol);
         if (result.success && result.signal) {
-            // Just show the modal with analysis - NO auto trade
+            console.log(`🔍 [Trading] Analysis received for symbol: ${result.signal.symbol}`);
+            // Pass the full signal object to the modal
             showAIReasonModal(result.signal);
         } else if (result.success === false) {
             if (window.showToast) window.showToast('AI Analysis', result.message, 'info');
@@ -293,7 +503,6 @@ async function fetchAIAnalysis() {
 function startLiveMonitoring() {
     if (liveMonitoringInterval) clearInterval(liveMonitoringInterval);
     liveMonitoringInterval = setInterval(() => {
-        // Just fetch analysis, don't trade
         fetchAIAnalysis();
     }, 30000);
 }
@@ -454,12 +663,11 @@ function initTrading() {
         });
     }
 
-    // NEW: Button shows AI analysis, does NOT force trade
     if (getSignalBtn) {
         getSignalBtn.innerHTML = '🧠 AI REASONING';
         getSignalBtn.addEventListener('click', (e) => { 
             e.preventDefault(); 
-            fetchAIAnalysis();  // Just shows analysis, no trade
+            fetchAIAnalysis();
         });
     }
     
@@ -496,10 +704,11 @@ function initTrading() {
 
     if (symbolSelect) {
         symbolSelect.addEventListener('change', () => {
+            const newSymbol = symbolSelect.value;
+            console.log(`🔄 [Trading] Symbol changed to: ${newSymbol}`);
             clearSignal();
-            if (window.showToast) window.showToast('Symbol Changed', `AI analyzing ${symbolSelect.value}...`, 'info');
-            // Reset the AI analysis for new symbol (backend handles this)
-            setTimeout(() => fetchAIAnalysis(), 2000);
+            if (window.showToast) window.showToast('Symbol Changed', `AI analyzing ${newSymbol}...`, 'info');
+            changeSymbol(newSymbol);
         });
     }
 
@@ -520,113 +729,6 @@ function initTrading() {
     setInterval(() => { if (currentActiveTrade) updateLockedBalance(); }, 10000);
 }
 
-// Keep executeTrade function but only called from YES button or AUTO mode
-async function executeTrade() {
-    if (!currentSignal || isProcessingTrade) return;
-    
-    if (currentSignal.action === 'WAIT') {
-        if (window.showToast) window.showToast('No Setup', 'AI is waiting for market conditions. No active trade setup.', 'info');
-        return;
-    }
-
-    isProcessingTrade = true;
-    if (yesBtn) {
-        yesBtn.disabled = true;
-        yesBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>EXECUTING...';
-    }
-
-    let stake = stakeSlider ? parseFloat(stakeSlider.value) : 0.35;
-    if (stake < 0.35) {
-        stake = 0.35;
-        if (stakeSlider) stakeSlider.value = 0.35;
-        if (stakeValue) stakeValue.innerText = '$0.35';
-    }
-
-    try {
-        const result = await window.api.executeTrade({
-            symbol: symbolSelect ? symbolSelect.value : 'R_75',
-            action: currentSignal.action,
-            stake: stake,
-            entry_price: currentSignal.entry_price,
-            take_profit: currentSignal.take_profit,
-            stop_loss: currentSignal.stop_loss,
-            confidence: currentSignal.confidence,
-            pattern: currentSignal.pattern,
-            reasoning: currentSignal.reasoning,
-            rsi: currentSignal.rsi,
-            macd: currentSignal.macd,
-            is_auto: autoModeToggle && autoModeToggle.checked ? 1 : 0
-        });
-
-        if (result.success) {
-            playSound('execute');
-            sendNotification('Trade Executed', `${currentSignal.action} on ${symbolSelect?.value}`);
-            if (window.showToast) window.showToast('Trade Executed', `Contract ID: ${String(result.contract_id).substring(0, 8)}...`, 'success');
-
-            const exitTime = Date.now() + (5 * 60 * 1000);
-            showActiveTradePanel(result.contract_id, currentSignal.entry_price, currentSignal.action, stake, exitTime);
-
-            clearSignal();
-            await loadRecentTrades();
-            await refreshUserData();
-            await updateLockedBalance();
-        } else {
-            if (window.showToast) window.showToast('Trade Failed', result.error || 'Unknown error', 'error');
-        }
-    } catch (error) {
-        if (window.showToast) window.showToast('Trade Failed', error.message, 'error');
-    } finally {
-        isProcessingTrade = false;
-        if (yesBtn) {
-            yesBtn.disabled = false;
-            yesBtn.innerHTML = '💰 BUY';
-        }
-    }
-}
-
-function clearSignal() {
-    currentSignal = null;
-
-    const signalAction = document.getElementById('signalAction');
-    const signalConfidence = document.getElementById('signalConfidence');
-    const signalPattern = document.getElementById('signalPattern');
-    const signalEntry = document.getElementById('signalEntry');
-    const signalTP = document.getElementById('signalTP');
-    const signalSL = document.getElementById('signalSL');
-    const signalReasoning = document.getElementById('signalReasoning');
-    const signalExit = document.getElementById('signalExit');
-
-    if (signalAction) signalAction.innerHTML = '—';
-    if (signalConfidence) signalConfidence.innerHTML = '0%';
-    if (signalPattern) signalPattern.innerHTML = '—';
-    if (signalEntry) signalEntry.innerHTML = '$0.00';
-    if (signalTP) signalTP.innerHTML = '$0.00';
-    if (signalSL) signalSL.innerHTML = '$0.00';
-    if (signalReasoning) {
-        signalReasoning.innerHTML = 'Click AI REASONING to view market analysis';
-        signalReasoning.style.cursor = 'pointer';
-        signalReasoning.style.textDecoration = 'underline';
-        signalReasoning.style.color = '';
-        signalReasoning.style.fontWeight = 'normal';
-    }
-    if (signalExit) signalExit.innerHTML = '5 min';
-
-    if (window.updateConfidenceBars) window.updateConfidenceBars(0);
-
-    if (yesBtn) {
-        yesBtn.disabled = false;
-        yesBtn.classList.remove('cursor-not-allowed', 'bg-emerald-500/50');
-        yesBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
-        yesBtn.innerHTML = '💰 BUY';
-    }
-    if (noBtn) {
-        noBtn.disabled = false;
-        noBtn.classList.remove('cursor-not-allowed');
-        noBtn.classList.add('bg-red-500/20', 'hover:bg-red-500/30', 'cursor-pointer');
-        noBtn.innerHTML = '🔻 SELL';
-    }
-}
-
 window.initTrading = initTrading;
 window.loadRecentTrades = loadRecentTrades;
 window.refreshUserData = refreshUserData;
@@ -638,3 +740,4 @@ window.clearSignal = clearSignal;
 window.showAIReasonModal = showAIReasonModal;
 window.closeAIReasonModal = closeAIReasonModal;
 window.acceptTradeFromModal = acceptTradeFromModal;
+window.changeSymbol = changeSymbol;

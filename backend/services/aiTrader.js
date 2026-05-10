@@ -19,6 +19,7 @@ class AITrader {
         this.currentWatchState = {
             status: 'INITIALIZING',
             action: 'WAIT',
+            symbol: 'R_75',
             entry_price: null,
             entry_condition: null,
             estimated_entry_time: null,
@@ -35,6 +36,7 @@ class AITrader {
         this.mode = 'AUTO';
         this.lastSetupNotified = false;
         this.currentSetupId = null;
+        this.confidenceThreshold = 55; // Changed from 50 to 55 to prevent instant entry
     }
     
     async start(userId, symbol = 'R_75', mode = 'AUTO') {
@@ -82,7 +84,7 @@ class AITrader {
                 }
             }
             
-            if (shouldEnter && !this.activeTrade) {
+            if (shouldEnter && !this.activeTrade && this.currentWatchState.confidence >= this.confidenceThreshold) {
                 this.executeEntry();
             }
         }
@@ -99,6 +101,8 @@ class AITrader {
             const marketState = marketData.getMarketState();
             const currentPrice = marketState.price;
             
+            console.log(`🔍 [AI Trader] Analyzing ${this.symbol} - Price: $${currentPrice.toFixed(2)}, RSI: ${marketState.rsi}`);
+            
             const recentTrades = await Trade.getUserTrades(this.userId, 10);
             const patterns = await Pattern.getTopPatterns(5);
             
@@ -112,9 +116,25 @@ class AITrader {
                 patterns
             );
             
+            console.log(`📊 [AI Trader] DeepSeek response - Action: ${analysis.action}, Confidence: ${analysis.confidence}%, Pattern: ${analysis.pattern}`);
+            
             const action = analysis.action === 'CALL' ? 'BUY' : (analysis.action === 'PUT' ? 'SELL' : 'WAIT');
-            const takeProfit = analysis.take_profit || (action === 'BUY' ? currentPrice * 1.004 : currentPrice * 0.996);
-            const stopLoss = analysis.stop_loss || (action === 'BUY' ? currentPrice * 0.998 : currentPrice * 1.002);
+            
+            // 1:2 Risk/Reward ratio - TP is 2x SL distance
+            const riskPercent = 0.004; // 0.4% stop loss
+            const rewardPercent = 0.008; // 0.8% take profit (2x risk)
+            
+            let takeProfit, stopLoss;
+            if (action === 'BUY') {
+                stopLoss = currentPrice * (1 - riskPercent);
+                takeProfit = currentPrice * (1 + rewardPercent);
+            } else if (action === 'SELL') {
+                stopLoss = currentPrice * (1 + riskPercent);
+                takeProfit = currentPrice * (1 - rewardPercent);
+            } else {
+                takeProfit = analysis.take_profit || currentPrice * 1.004;
+                stopLoss = analysis.stop_loss || currentPrice * 0.996;
+            }
             
             let watchAction = 'WAIT';
             let entryCondition = null;
@@ -122,47 +142,46 @@ class AITrader {
             let entryPrice = null;
             let isNewSetup = false;
             
-            if (action === 'BUY' && marketState.nearSupport) {
+            // Check for support/resistance setups
+            if (action === 'BUY' && (marketState.nearSupport || marketState.rsi < 40)) {
                 watchAction = 'WAIT_BUY';
-                entryCondition = `Price hits support at $${marketState.support.toFixed(2)}`;
+                entryCondition = marketState.nearSupport ? `Price at support $${marketState.support.toFixed(2)}` : `Price is low (RSI ${marketState.rsi})`;
                 estimatedTime = '~1-2 minutes';
-                entryPrice = marketState.support;
-                if (analysis.confidence >= 50) isNewSetup = true;
-            } else if (action === 'SELL' && marketState.nearResistance) {
+                entryPrice = marketState.nearSupport ? marketState.support : currentPrice;
+                if (analysis.confidence >= this.confidenceThreshold - 5) isNewSetup = true;
+            } else if (action === 'SELL' && (marketState.nearResistance || marketState.rsi > 60)) {
                 watchAction = 'WAIT_SELL';
-                entryCondition = `Price hits resistance at $${marketState.resistance.toFixed(2)}`;
+                entryCondition = marketState.nearResistance ? `Price at resistance $${marketState.resistance.toFixed(2)}` : `Price is high (RSI ${marketState.rsi})`;
                 estimatedTime = '~1-2 minutes';
-                entryPrice = marketState.resistance;
-                if (analysis.confidence >= 50) isNewSetup = true;
-            } else if (analysis.confidence > 70) {
+                entryPrice = marketState.nearResistance ? marketState.resistance : currentPrice;
+                if (analysis.confidence >= this.confidenceThreshold - 5) isNewSetup = true;
+            } else if (analysis.confidence >= this.confidenceThreshold && action !== 'WAIT') {
                 watchAction = action;
-                entryCondition = 'Market conditions are optimal now';
+                entryCondition = 'Market conditions are favorable';
                 estimatedTime = 'Now';
                 entryPrice = currentPrice;
-                if (analysis.confidence >= 50) isNewSetup = true;
+                isNewSetup = true;
             } else {
                 watchAction = 'WAIT';
-                entryCondition = 'Waiting for better setup';
+                entryCondition = `Waiting for setup (confidence ${analysis.confidence}% needs ${this.confidenceThreshold}%)`;
                 estimatedTime = 'Unknown';
                 entryPrice = null;
                 this.lastSetupNotified = false;
             }
             
-            // Check if this is a new valid setup (50%+ confidence and not notified yet)
             const setupKey = `${watchAction}_${entryPrice}_${analysis.confidence}`;
             if (isNewSetup && !this.activeTrade && setupKey !== this.currentSetupId) {
                 this.currentSetupId = setupKey;
                 this.lastSetupNotified = false;
             }
             
-            if (isNewSetup && !this.lastSetupNotified && !this.activeTrade && watchAction !== 'WAIT') {
+            if (isNewSetup && !this.lastSetupNotified && !this.activeTrade && watchAction !== 'WAIT' && analysis.confidence >= this.confidenceThreshold) {
                 this.lastSetupNotified = true;
                 
-                // Broadcast new setup alert
                 broadcastNewSetup({
                     symbol: this.symbol,
                     action: watchAction,
-                    action_display: watchAction === 'BUY' ? 'BUY (Price will go UP)' : 'SELL (Price will go DOWN)',
+                    action_display: watchAction === 'BUY' ? 'BUY (Price will go UP)' : (watchAction === 'SELL' ? 'SELL (Price will go DOWN)' : 'WAITING'),
                     entry_price: entryPrice,
                     take_profit: takeProfit,
                     stop_loss: stopLoss,
@@ -178,17 +197,17 @@ class AITrader {
                     market_resistance: marketState.resistance
                 });
                 
-                console.log(`🔔 [AI Trader] NEW SETUP DETECTED! ${watchAction} at $${entryPrice} with ${analysis.confidence}% confidence`);
+                console.log(`🔔 [AI Trader] NEW SETUP DETECTED! ${watchAction} on ${this.symbol} at $${entryPrice?.toFixed(2)} with ${analysis.confidence}% confidence`);
             }
             
-            // For AUTO mode, execute immediately if setup is valid and not waiting
-            if (this.mode === 'AUTO' && watchAction !== 'WAIT' && watchAction !== 'WAIT_BUY' && watchAction !== 'WAIT_SELL' && !this.activeTrade && analysis.confidence >= 50) {
-                console.log(`🤖 [AI Trader] AUTO MODE: Executing trade immediately`);
+            if (this.mode === 'AUTO' && watchAction !== 'WAIT' && watchAction !== 'WAIT_BUY' && watchAction !== 'WAIT_SELL' && !this.activeTrade && analysis.confidence >= this.confidenceThreshold) {
+                console.log(`🤖 [AI Trader] AUTO MODE: Executing trade on ${this.symbol} with ${analysis.confidence}% confidence`);
                 await this.executeEntry();
             }
             
             this.currentWatchState = {
                 status: this.activeTrade ? 'IN_TRADE' : 'WATCHING',
+                symbol: this.symbol,
                 action: watchAction,
                 action_display: watchAction === 'BUY' ? 'BUY (Price will go UP)' : (watchAction === 'SELL' ? 'SELL (Price will go DOWN)' : 'WAITING'),
                 entry_price: entryPrice,
@@ -207,10 +226,11 @@ class AITrader {
                 trend: marketState.trend,
                 lastUpdate: Date.now(),
                 is_auto_mode: this.mode === 'AUTO',
-                is_new_setup: isNewSetup && !this.activeTrade
+                is_new_setup: isNewSetup && !this.activeTrade,
+                confidence_threshold: this.confidenceThreshold
             };
             
-            console.log(`🤖 [AI Trader] Analysis: ${watchAction} | Confidence: ${analysis.confidence}% | ${entryCondition || ''}`);
+            console.log(`🤖 [AI Trader] Analysis on ${this.symbol}: ${watchAction} | Confidence: ${analysis.confidence}% | Threshold: ${this.confidenceThreshold}% | ${entryCondition || ''}`);
             
         } catch (error) {
             console.error('❌ [AI Trader] Analysis error:', error.message);
@@ -372,7 +392,7 @@ class AITrader {
                     status: status
                 });
                 
-                console.log(`✅ [AI Trader] Trade ${tradeId} result: ${status} $${profit.toFixed(2)}`);
+                console.log(`✅ [AI Trader] Trade ${tradeId} on ${this.symbol} result: ${status} $${profit.toFixed(2)}`);
                 
                 this.activeTrade = null;
                 this.currentWatchState.status = 'WATCHING';
@@ -425,11 +445,13 @@ class AITrader {
     
     setSymbol(symbol) {
         this.symbol = symbol;
-        console.log(`🤖 [AI Trader] Symbol changed to ${symbol}`);
+        console.log(`🔄 [AI Trader] Symbol changed to ${symbol}`);
+        // Resubscribe to new symbol ticks
         derivService.subscribeToTicks(symbol);
         this.lastSetupNotified = false;
         this.currentSetupId = null;
         this.currentWatchState.status = 'ANALYZING_NEW_SYMBOL';
+        this.currentWatchState.symbol = symbol;
         this.currentWatchState.reason = `Analyzing ${symbol}... Please wait 10-15 seconds`;
         broadcastAIUpdate(this.getCurrentAnalysis());
     }
@@ -439,11 +461,17 @@ class AITrader {
         console.log(`🤖 [AI Trader] User changed to ${userId}`);
     }
     
+    setConfidenceThreshold(threshold) {
+        this.confidenceThreshold = threshold;
+        console.log(`🤖 [AI Trader] Confidence threshold changed to ${threshold}%`);
+    }
+    
     getCurrentSetup() {
         if (this.currentWatchState.action === 'WAIT' || this.currentWatchState.action === 'WAIT_BUY' || this.currentWatchState.action === 'WAIT_SELL') {
             return null;
         }
         return {
+            symbol: this.currentWatchState.symbol,
             action: this.currentWatchState.action,
             entry_price: this.currentWatchState.entry_price,
             take_profit: this.currentWatchState.take_profit,

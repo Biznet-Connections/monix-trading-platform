@@ -26,19 +26,27 @@ class DeepSeekService {
             simpleReason = `Price is low right now. `;
         } else if (marketCondition === 'overbought') {
             simpleReason = `Price is high right now. `;
+        } else if (rsi && rsi < 40) {
+            simpleReason = `Price is getting low. `;
+        } else if (rsi && rsi > 60) {
+            simpleReason = `Price is getting high. `;
         } else {
             simpleReason = `Market is stable. `;
         }
         
-        if (pattern && (pattern.toLowerCase().includes('bullish') || pattern.toLowerCase().includes('hammer'))) {
+        if (pattern && (pattern.toLowerCase().includes('bullish') || pattern.toLowerCase().includes('hammer') || pattern.toLowerCase().includes('support'))) {
             simpleReason += `Price looks like it's about to go UP. `;
-        } else if (pattern && (pattern.toLowerCase().includes('bearish') || pattern.toLowerCase().includes('shooting'))) {
+        } else if (pattern && (pattern.toLowerCase().includes('bearish') || pattern.toLowerCase().includes('shooting') || pattern.toLowerCase().includes('resistance'))) {
             simpleReason += `Price looks like it's about to go DOWN. `;
+        } else if (action === 'CALL' || action === 'BUY') {
+            simpleReason += `Price is likely to go UP. `;
+        } else if (action === 'PUT' || action === 'SELL') {
+            simpleReason += `Price is likely to go DOWN. `;
         } else {
-            simpleReason += action === 'CALL' ? `Price is likely to go UP. ` : `Price is likely to go DOWN. `;
+            simpleReason += `Waiting for clearer signal. `;
         }
         
-        simpleReason += `Similar pattern worked before.`;
+        simpleReason += `Risk/reward ratio is favorable (1:2).`;
         
         return simpleReason;
     }
@@ -55,6 +63,8 @@ class DeepSeekService {
         if (rsi) {
             if (rsi < 35) marketCondition = 'oversold';
             else if (rsi > 65) marketCondition = 'overbought';
+            else if (rsi < 45) marketCondition = 'approaching_oversold';
+            else if (rsi > 55) marketCondition = 'approaching_overbought';
         }
 
         let patternsText = '';
@@ -76,12 +86,18 @@ Session: ${session}
 ${patternsText}
 ${userHistoryText}
 
+IMPORTANT: 
+- Risk/Reward should be at least 1:2 (Take Profit = 2x Stop Loss distance)
+- Take Profit target should be DOUBLE the Stop Loss distance
+- Confidence threshold for entry is 55% or higher
+- In ranging markets, trade bounces off support/resistance
+
 Based on this data, tell me:
-1. Should I BUY (price will go UP), SELL (price will go DOWN), or WAIT?
-2. How confident are you? (0-100%)
+1. Should I BUY (CALL - price will go UP), SELL (PUT - price will go DOWN), or WAIT?
+2. How confident are you? (0-100%) - Be honest, 55%+ is enough to trade
 3. What pattern do you see in simple words?
-4. What should be my Take Profit price?
-5. What should be my Stop Loss price?
+4. What should be my Take Profit price? (aim for 0.8-1.0% move)
+5. What should be my Stop Loss price? (0.4-0.5% move)
 6. Simple 1-sentence reason anyone can understand.
 
 Return ONLY valid JSON:
@@ -103,7 +119,7 @@ If WAIT, explain what you're waiting for in the simple_reason.`;
                     messages: [
                         {
                             role: 'system',
-                            content: 'You are a professional trader. Provide accurate, concise analysis. Return ONLY valid JSON.'
+                            content: 'You are a professional trader. Provide accurate, concise analysis. Risk/Reward should be at least 1:2. Confidence 55%+ is acceptable for trade entry. Return ONLY valid JSON.'
                         },
                         {
                             role: 'user',
@@ -135,28 +151,41 @@ If WAIT, explain what you're waiting for in the simple_reason.`;
 
     normalizeAnalysis(analysis, symbol, currentPrice, marketCondition) {
         if (!analysis.action || !['CALL', 'PUT', 'WAIT'].includes(analysis.action)) {
-            analysis.action = Math.random() > 0.5 ? 'CALL' : 'PUT';
+            analysis.action = 'WAIT';
         }
 
         analysis.confidence = Math.min(100, Math.max(0, analysis.confidence || 50));
 
         if (!analysis.pattern) {
-            const patterns = ['Price bounce', 'Support level', 'Resistance break', 'Trend continues', 'Reversal pattern'];
+            const patterns = ['Price at support', 'Price at resistance', 'RSI signal', 'Trend continuation', 'Range bounce'];
             analysis.pattern = patterns[Math.floor(Math.random() * patterns.length)];
         }
 
-        if (!analysis.take_profit || isNaN(analysis.take_profit)) {
-            const movePercent = analysis.confidence > 75 ? 0.005 : (analysis.confidence > 60 ? 0.004 : 0.003);
-            analysis.take_profit = analysis.action === 'CALL' ? currentPrice * (1 + movePercent) : currentPrice * (1 - movePercent);
-        }
-
-        if (!analysis.stop_loss || isNaN(analysis.stop_loss)) {
-            const movePercent = analysis.confidence > 75 ? 0.0025 : 0.002;
-            analysis.stop_loss = analysis.action === 'CALL' ? currentPrice * (1 - movePercent) : currentPrice * (1 + movePercent);
+        // NEW: Force 1:2 Risk/Reward ratio
+        // Risk = 0.4% (stop loss), Reward = 0.8% (take profit)
+        const riskPercent = 0.004; // 0.4% stop loss
+        const rewardPercent = 0.008; // 0.8% take profit (2x risk)
+        
+        if (analysis.action === 'CALL') {
+            analysis.stop_loss = currentPrice * (1 - riskPercent);
+            analysis.take_profit = currentPrice * (1 + rewardPercent);
+        } else if (analysis.action === 'PUT') {
+            analysis.stop_loss = currentPrice * (1 + riskPercent);
+            analysis.take_profit = currentPrice * (1 - rewardPercent);
+        } else {
+            // For WAIT, use reasonable defaults
+            analysis.stop_loss = currentPrice * 0.996;
+            analysis.take_profit = currentPrice * 1.004;
         }
 
         if (!analysis.simple_reason) {
-            analysis.simple_reason = analysis.action === 'CALL' ? 'Price is likely to go UP.' : 'Price is likely to go DOWN.';
+            if (analysis.action === 'CALL') {
+                analysis.simple_reason = `Price at good level. Risk $0.40 to make $0.80 (1:2 ratio).`;
+            } else if (analysis.action === 'PUT') {
+                analysis.simple_reason = `Price at good level. Risk $0.40 to make $0.80 (1:2 ratio).`;
+            } else {
+                analysis.simple_reason = `Waiting for better price level. Confidence ${analysis.confidence}% needs ${analysis.confidence >= 55 ? 'good' : 'higher'}.`;
+            }
         }
 
         analysis.take_profit = parseFloat(analysis.take_profit.toFixed(2));
@@ -166,30 +195,44 @@ If WAIT, explain what you're waiting for in the simple_reason.`;
     }
 
     getFallbackAnalysis(symbol, currentPrice, marketCondition) {
-        const actions = ['CALL', 'PUT', 'WAIT'];
-        const action = actions[Math.floor(Math.random() * actions.length)];
-        const confidence = 50 + Math.floor(Math.random() * 30);
-        const patterns = ['Price pattern detected', 'Support level identified', 'Market movement expected', 'Waiting for confirmation'];
+        // NEW: Use 1:2 risk/reward even in fallback
+        const riskPercent = 0.004;
+        const rewardPercent = 0.008;
+        
+        let action = 'WAIT';
+        let confidence = 50;
+        
+        if (marketCondition === 'oversold') {
+            action = 'CALL';
+            confidence = 60;
+        } else if (marketCondition === 'overbought') {
+            action = 'PUT';
+            confidence = 60;
+        } else if (marketCondition === 'approaching_oversold') {
+            action = 'CALL';
+            confidence = 55;
+        } else if (marketCondition === 'approaching_overbought') {
+            action = 'PUT';
+            confidence = 55;
+        }
+        
+        const patterns = ['Price pattern detected', 'Support level identified', 'Resistance level identified', 'RSI signal'];
         
         let simpleReason = '';
-        if (action === 'WAIT') {
-            simpleReason = 'Waiting for better market conditions.';
-        } else if (marketCondition === 'oversold') {
-            simpleReason = 'Price is low right now. Expected to go UP.';
-        } else if (marketCondition === 'overbought') {
-            simpleReason = 'Price is high right now. Expected to go DOWN.';
+        if (action === 'CALL') {
+            simpleReason = `Price at support level. Risk $0.40 to make $0.80 (1:2 ratio).`;
+        } else if (action === 'PUT') {
+            simpleReason = `Price at resistance level. Risk $0.40 to make $0.80 (1:2 ratio).`;
         } else {
-            simpleReason = action === 'CALL' ? 'Price is likely to go UP.' : 'Price is likely to go DOWN.';
+            simpleReason = 'Waiting for better price level or RSI signal.';
         }
 
-        const movePercent = confidence > 75 ? 0.005 : 0.003;
-        
         return {
             action: action,
             confidence: confidence,
             pattern: patterns[Math.floor(Math.random() * patterns.length)],
-            take_profit: action === 'CALL' ? currentPrice * (1 + movePercent) : currentPrice * (1 - movePercent),
-            stop_loss: action === 'CALL' ? currentPrice * (1 - 0.002) : currentPrice * (1 + 0.002),
+            take_profit: action === 'CALL' ? currentPrice * (1 + rewardPercent) : currentPrice * (1 - rewardPercent),
+            stop_loss: action === 'CALL' ? currentPrice * (1 - riskPercent) : currentPrice * (1 + riskPercent),
             simple_reason: simpleReason
         };
     }

@@ -23,27 +23,88 @@ class DerivService extends EventEmitter {
         this.heartbeatInterval = null;
 
         this.symbolMap = {
-            "R_10": "R_10", "R_25": "R_25", "R_50": "R_50", "R_75": "R_75", "R_100": "R_100",
-            "R_10_2S": "R_10_2S", "R_25_2S": "R_25_2S", "R_50_2S": "R_50_2S", "R_75_2S": "R_75_2S", "R_100_2S": "R_100_2S",
-            "Boom 300": "BOOM300", "Boom 500": "BOOM500", "Boom 1000": "BOOM1000",
-            "Crash 300": "CRASH300", "Crash 500": "CRASH500", "Crash 1000": "CRASH1000",
-            "Step 200": "STEP200", "Step 300": "STEP300", "Step 400": "STEP400", "Step 500": "STEP500",
-            "1HZ10": "1HZ10", "1HZ25": "1HZ25", "1HZ50": "1HZ50", "1HZ75": "1HZ75", "1HZ100": "1HZ100",
-            "EUR/USD": "frxEURUSD", "GBP/USD": "frxGBPUSD", "USD/JPY": "frxUSDJPY",
-            "AUD/USD": "frxAUDUSD", "USD/CAD": "frxUSDCAD", "NZD/USD": "frxNZDUSD", "USD/CHF": "frxUSDCHF",
-            "EUR/GBP": "frxEURGBP", "EUR/JPY": "frxEURJPY", "GBP/JPY": "frxGBPJPY",
-            "AUD/JPY": "frxAUDJPY", "CAD/JPY": "frxCADJPY", "CHF/JPY": "frxCHFJPY",
-            "EUR/AUD": "frxEURAUD", "GBP/AUD": "frxGBPAUD",
-            "XAU/USD (Gold)": "frxXAUUSD", "XAG/USD (Silver)": "frxXAGUSD",
-            "XPT/USD (Platinum)": "frxXPTUSD", "XPD/USD (Palladium)": "frxXPDUSD",
-            "WTI (Oil)": "frxWTI", "Brent (Oil)": "frxBrent",
-            "BTC/USD (Bitcoin)": "frxBTCUSD", "ETH/USD (Ethereum)": "frxETHUSD",
-            "LTC/USD (Litecoin)": "frxLTCUSD", "XRP/USD (Ripple)": "frxXRPUSD",
-            "ADA/USD (Cardano)": "frxADAUSD", "DOT/USD (Polkadot)": "frxDOTUSD",
-            "SOL/USD (Solana)": "frxSOLUSD", "DOGE/USD (Dogecoin)": "frxDOGEUSD",
-            "US500 (S&P 500)": "US500", "USTEC (Nasdaq)": "USTEC", "US30 (Dow Jones)": "US30",
-            "GER40 (DAX)": "GER40", "UK100 (FTSE)": "UK100", "FRA40 (CAC 40)": "FRA40",
-            "HK50 (Hang Seng)": "HK50", "JP225 (Nikkei)": "JP225", "AUS200 (ASX 200)": "AUS200"
+            // Volatility Indices
+            "R_10": "R_10",
+            "R_25": "R_25", 
+            "R_50": "R_50",
+            "R_75": "R_75",
+            "R_100": "R_100",
+            "R_10_2S": "R_10_2S",
+            "R_25_2S": "R_25_2S",
+            "R_50_2S": "R_50_2S",
+            "R_75_2S": "R_75_2S",
+            "R_100_2S": "R_100_2S",
+            
+            // Boom & Crash
+            "Boom 300": "BOOM300",
+            "Boom 500": "BOOM500",
+            "Boom 1000": "BOOM1000",
+            "Crash 300": "CRASH300",
+            "Crash 500": "CRASH500",
+            "Crash 1000": "CRASH1000",
+            
+            // Step Indices
+            "Step 200": "STEP200",
+            "Step 300": "STEP300",
+            "Step 400": "STEP400",
+            "Step 500": "STEP500",
+            
+            // Derived Indices
+            "1HZ10": "1HZ10",
+            "1HZ25": "1HZ25",
+            "1HZ50": "1HZ50",
+            "1HZ75": "1HZ75",
+            "1HZ100": "1HZ100",
+            
+            // Major Forex
+            "EUR/USD": "frxEURUSD",
+            "GBP/USD": "frxGBPUSD",
+            "USD/JPY": "frxUSDJPY",
+            "AUD/USD": "frxAUDUSD",
+            "USD/CAD": "frxUSDCAD",
+            "NZD/USD": "frxNZDUSD",
+            "USD/CHF": "frxUSDCHF",
+            
+            // Minor Forex
+            "EUR/GBP": "frxEURGBP",
+            "EUR/JPY": "frxEURJPY",
+            "GBP/JPY": "frxGBPJPY",
+            "AUD/JPY": "frxAUDJPY",
+            "CAD/JPY": "frxCADJPY",
+            "CHF/JPY": "frxCHFJPY",
+            "EUR/AUD": "frxEURAUD",
+            "GBP/AUD": "frxGBPAUD",
+            
+            // Commodities - FIXED: Gold mapping
+            "XAU/USD (Gold)": "frxXAUUSD",
+            "XAG/USD (Silver)": "frxXAGUSD",
+            "XPT/USD (Platinum)": "frxXPTUSD",
+            "XPD/USD (Palladium)": "frxXPDUSD",
+            "WTI (Oil)": "frxWTI",
+            "Brent (Oil)": "frxBrent",
+            
+            // Cryptocurrencies
+            "BTC/USD (Bitcoin)": "frxBTCUSD",
+            "ETH/USD (Ethereum)": "frxETHUSD",
+            "LTC/USD (Litecoin)": "frxLTCUSD",
+            "XRP/USD (Ripple)": "frxXRPUSD",
+            "ADA/USD (Cardano)": "frxADAUSD",
+            "DOT/USD (Polkadot)": "frxDOTUSD",
+            "SOL/USD (Solana)": "frxSOLUSD",
+            "DOGE/USD (Dogecoin)": "frxDOGEUSD",
+            
+            // Stock Indices
+            "US500 (S&P 500)": "US500",
+            "USTEC (Nasdaq)": "USTEC",
+            "US30 (Dow Jones)": "US30",
+            "GER40 (DAX)": "GER40",
+            "UK100 (FTSE)": "UK100",
+            "FRA40 (CAC 40)": "FRA40",
+            "ESP35 (IBEX 35)": "ESP35",
+            "NETH25 (AEX)": "NETH25",
+            "HK50 (Hang Seng)": "HK50",
+            "JP225 (Nikkei)": "JP225",
+            "AUS200 (ASX 200)": "AUS200"
         };
 
         this.wsUrls = [
@@ -52,9 +113,16 @@ class DerivService extends EventEmitter {
     }
 
     convertSymbol(uiSymbol) {
+        // Handle exact matches first
         const derivSymbol = this.symbolMap[uiSymbol];
-        if (!derivSymbol) return uiSymbol;
-        return derivSymbol;
+        if (derivSymbol) {
+            console.log(`🔄 [Deriv] Converting symbol: ${uiSymbol} -> ${derivSymbol}`);
+            return derivSymbol;
+        }
+        
+        // Fallback: return as-is
+        console.log(`⚠️ [Deriv] Unknown symbol: ${uiSymbol}, using as-is`);
+        return uiSymbol;
     }
 
     startHeartbeat() {
@@ -350,6 +418,7 @@ class DerivService extends EventEmitter {
 
     async getTickHistory(symbol, end = 'latest', count = 100) {
         const derivSymbol = this.convertSymbol(symbol);
+        console.log(`📊 [Deriv] Getting tick history for ${derivSymbol}`);
         return this.sendRequest({
             ticks_history: derivSymbol,
             end: end,
@@ -372,7 +441,10 @@ class DerivService extends EventEmitter {
 
     async subscribeToTicks(symbol) {
         const derivSymbol = this.convertSymbol(symbol);
-        if (this.subscriptions.has(derivSymbol)) return;
+        if (this.subscriptions.has(derivSymbol)) {
+            console.log(`📡 [Deriv] Already subscribed to ${derivSymbol}`);
+            return;
+        }
         
         this.subscriptions.add(derivSymbol);
         
@@ -406,6 +478,8 @@ class DerivService extends EventEmitter {
 
         const derivSymbol = this.convertSymbol(symbol);
         const contractType = action === 'BUY' ? 'CALL' : 'PUT';
+
+        console.log(`📊 [Deriv] Placing trade: ${action} ${derivSymbol} at $${stake}`);
 
         return this.sendRequest({
             buy: 1,

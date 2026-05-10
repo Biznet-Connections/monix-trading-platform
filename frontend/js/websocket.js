@@ -1,7 +1,6 @@
 let ws = null;
 let wsReconnectAttempts = 0;
 let wsReconnectInterval = null;
-let lastSetupAlertTime = 0;
 
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -109,46 +108,40 @@ function handleWebSocketMessage(data) {
         case 'new_setup':
             console.log('🔔 New setup detected!', data.setup);
             
-            // Play bell sound
             playBellSound();
             
-            // Send browser notification
             if (Notification.permission === 'granted') {
                 new Notification('🔔 New Trading Setup!', {
-                    body: `${data.setup.action_display} at $${data.setup.entry_price?.toFixed(2)} with ${data.setup.confidence}% confidence`,
+                    body: `${data.setup.action_display} on ${data.setup.symbol} at $${data.setup.entry_price?.toFixed(2)} with ${data.setup.confidence}% confidence`,
                     icon: '/favicon.ico',
                     tag: 'new_setup',
                     requireInteraction: true
                 });
             }
             
-            // Show toast notification
             if (window.showToast) {
                 window.showToast(
                     '🔔 New Setup Detected!',
-                    `${data.setup.action_display} at $${data.setup.entry_price?.toFixed(2)} | Confidence: ${data.setup.confidence}%`,
+                    `${data.setup.action_display} on ${data.setup.symbol} at $${data.setup.entry_price?.toFixed(2)} | Confidence: ${data.setup.confidence}%`,
                     'info'
                 );
             }
             
-            // Update UI to highlight the setup
             const signalReasoning = document.getElementById('signalReasoning');
             if (signalReasoning) {
-                signalReasoning.innerHTML = `🔔 SETUP READY! ${data.setup.action_display} at $${data.setup.entry_price?.toFixed(2)}. Click for details.`;
+                signalReasoning.innerHTML = `🔔 SETUP READY! ${data.setup.action_display} on ${data.setup.symbol} at $${data.setup.entry_price?.toFixed(2)}. Click for details.`;
                 signalReasoning.style.cursor = 'pointer';
                 signalReasoning.style.textDecoration = 'underline';
                 signalReasoning.style.fontWeight = 'bold';
                 signalReasoning.style.color = '#fbbf24';
                 
-                // Flash effect
-                signalReasoning.style.transition = 'all 0.3s ease';
                 setTimeout(() => {
                     if (signalReasoning) signalReasoning.style.color = '';
-                }, 2000);
+                }, 3000);
             }
             
-            // Store current setup for modal
             window.currentDisplaySignal = {
+                symbol: data.setup.symbol,
                 action: data.setup.action,
                 confidence: data.setup.confidence,
                 pattern: data.setup.pattern,
@@ -158,7 +151,6 @@ function handleWebSocketMessage(data) {
                 reasoning: data.setup.reason,
                 simple_reason: data.setup.reason,
                 rsi: data.setup.market_rsi,
-                symbol: data.setup.symbol,
                 support: data.setup.market_support,
                 resistance: data.setup.market_resistance,
                 market_feeling: data.setup.market_feeling,
@@ -339,6 +331,8 @@ function updateAIDisplay(aiData) {
     const watchState = aiData.watch_state;
     if (!watchState) return;
     
+    console.log(`🖥️ [Frontend] Updating display for symbol: ${watchState.symbol}, action: ${watchState.action}, confidence: ${watchState.confidence}`);
+    
     const signalReasoning = document.getElementById('signalReasoning');
     if (signalReasoning && watchState.reason) {
         let displayText = '';
@@ -346,14 +340,14 @@ function updateAIDisplay(aiData) {
             displayText = `🤖 AI: ${watchState.reason}`;
             signalReasoning.style.color = '#fbbf24';
         } else if (watchState.action === 'WAIT' || watchState.action === 'WAIT_BUY' || watchState.action === 'WAIT_SELL') {
-            displayText = `🤖 AI: ${watchState.reason} ${watchState.entry_condition ? `Entry when: ${watchState.entry_condition}` : ''}`;
+            displayText = `🤖 AI on ${watchState.symbol}: ${watchState.reason} ${watchState.entry_condition ? `Entry when: ${watchState.entry_condition}` : ''}`;
             signalReasoning.style.color = '';
         } else if (watchState.is_new_setup) {
-            displayText = `🔔 SETUP READY! ${watchState.action_display} at $${watchState.entry_price?.toFixed(2)}. Click for details.`;
+            displayText = `🔔 SETUP READY! ${watchState.action_display} on ${watchState.symbol} at $${watchState.entry_price?.toFixed(2)}. Click for details.`;
             signalReasoning.style.color = '#fbbf24';
             signalReasoning.style.fontWeight = 'bold';
         } else {
-            displayText = `🤖 AI: ${watchState.action_display} - ${watchState.reason}`;
+            displayText = `🤖 AI on ${watchState.symbol}: ${watchState.action_display} - ${watchState.reason}`;
             signalReasoning.style.color = '';
             signalReasoning.style.fontWeight = 'normal';
         }
@@ -363,27 +357,6 @@ function updateAIDisplay(aiData) {
         signalReasoning.onclick = () => {
             if (window.showAIReasonModal && window.currentDisplaySignal) {
                 window.showAIReasonModal(window.currentDisplaySignal);
-            } else if (window.showAIReasonModal && watchState) {
-                // Create signal object from watchState
-                const signalFromWatch = {
-                    action: watchState.action === 'BUY' ? 'BUY' : (watchState.action === 'SELL' ? 'SELL' : 'WAIT'),
-                    confidence: watchState.confidence,
-                    pattern: watchState.pattern,
-                    entry_price: watchState.entry_price || watchState.market_price,
-                    take_profit: watchState.take_profit,
-                    stop_loss: watchState.stop_loss,
-                    reasoning: watchState.reason,
-                    simple_reason: watchState.reason,
-                    rsi: watchState.market_rsi,
-                    support: watchState.market_support,
-                    resistance: watchState.market_resistance,
-                    market_feeling: watchState.market_feeling,
-                    entry_time: watchState.estimated_entry_time === 'Now' ? new Date().toLocaleTimeString() : watchState.estimated_entry_time,
-                    exit_time: watchState.estimated_entry_time === 'Now' ? new Date(Date.now() + 5*60000).toLocaleTimeString() : '5 min after entry',
-                    is_waiting: watchState.action === 'WAIT' || watchState.action === 'WAIT_BUY' || watchState.action === 'WAIT_SELL',
-                    entry_condition: watchState.entry_condition
-                };
-                window.showAIReasonModal(signalFromWatch);
             }
         };
     }
@@ -391,16 +364,16 @@ function updateAIDisplay(aiData) {
     const signalAction = document.getElementById('signalAction');
     if (signalAction) {
         if (watchState.status === 'ANALYZING_NEW_SYMBOL') {
-            signalAction.innerHTML = '⏳ ANALYZING...';
+            signalAction.innerHTML = '⏳ ANALYZING';
             signalAction.className = 'text-2xl font-bold text-yellow-400';
         } else if (watchState.action === 'WAIT' || watchState.action === 'WAIT_BUY' || watchState.action === 'WAIT_SELL') {
-            signalAction.innerHTML = '⏳ WAITING FOR SETUP';
+            signalAction.innerHTML = '⏳ WAITING';
             signalAction.className = 'text-2xl font-bold text-yellow-400';
         } else if (watchState.action === 'BUY') {
-            signalAction.innerHTML = '📈 BUY (Price will go UP)';
+            signalAction.innerHTML = '📈 BUY';
             signalAction.className = 'text-4xl font-black text-emerald-400';
         } else if (watchState.action === 'SELL') {
-            signalAction.innerHTML = '🔻 SELL (Price will go DOWN)';
+            signalAction.innerHTML = '🔻 SELL';
             signalAction.className = 'text-4xl font-black text-red-400';
         }
     }
@@ -445,8 +418,9 @@ function updateAIDisplay(aiData) {
         resistanceLevel.innerHTML = `$${watchState.market_resistance.toFixed(2)}`;
     }
     
-    // Store current display signal for modal
-    window.currentDisplaySignal = {
+    // CRITICAL FIX: Use watchState.symbol directly
+    const displaySignal = {
+        symbol: watchState.symbol || 'R_75',
         action: watchState.action === 'BUY' ? 'BUY' : (watchState.action === 'SELL' ? 'SELL' : 'WAIT'),
         confidence: watchState.confidence,
         pattern: watchState.pattern,
@@ -462,11 +436,15 @@ function updateAIDisplay(aiData) {
         entry_time: watchState.estimated_entry_time === 'Now' ? new Date().toLocaleTimeString() : watchState.estimated_entry_time,
         exit_time: watchState.estimated_entry_time === 'Now' ? new Date(Date.now() + 5*60000).toLocaleTimeString() : '5 min after entry',
         is_waiting: watchState.action === 'WAIT' || watchState.action === 'WAIT_BUY' || watchState.action === 'WAIT_SELL',
-        entry_condition: watchState.entry_condition
+        entry_condition: watchState.entry_condition,
+        confidence_threshold: watchState.confidence_threshold || 55
     };
+    
+    console.log(`🖥️ [Frontend] Display signal created for symbol: ${displaySignal.symbol}`);
+    
+    window.currentDisplaySignal = displaySignal;
 }
 
-// Request notification permission on page load
 if (Notification.permission === 'default') {
     Notification.requestPermission();
 }

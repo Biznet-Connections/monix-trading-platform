@@ -5,6 +5,7 @@ const aiTrader = require('../services/aiTrader');
 const Pattern = require('../models/Pattern');
 const Trade = require('../models/Trade');
 
+// Get current AI opinion (no forced trades)
 router.post('/generate', authMiddleware, async (req, res) => {
     try {
         const analysis = aiTrader.getCurrentAnalysis();
@@ -19,7 +20,12 @@ router.post('/generate', authMiddleware, async (req, res) => {
         
         const watchState = analysis.watch_state;
         
+        // CRITICAL FIX: Use the actual symbol from watchState
+        const currentSymbol = watchState.symbol || 'R_75';
+        
+        // Format signal for frontend display
         const signal = {
+            symbol: currentSymbol,  // This is the key fix
             action: watchState.action === 'BUY' ? 'BUY' : (watchState.action === 'SELL' ? 'SELL' : 'WAIT'),
             confidence: watchState.confidence,
             pattern: watchState.pattern || 'Analyzing...',
@@ -29,7 +35,6 @@ router.post('/generate', authMiddleware, async (req, res) => {
             reasoning: watchState.reason,
             simple_reason: watchState.reason,
             rsi: watchState.market_rsi,
-            symbol: 'R_75',
             support: watchState.market_support,
             resistance: watchState.market_resistance,
             market_feeling: watchState.market_feeling,
@@ -37,8 +42,11 @@ router.post('/generate', authMiddleware, async (req, res) => {
             exit_time: watchState.estimated_entry_time === 'Now' ? new Date(Date.now() + 5*60000).toLocaleTimeString() : '5 min after entry',
             confidence_bar: '█'.repeat(Math.floor(watchState.confidence / 10)) + '░'.repeat(10 - Math.floor(watchState.confidence / 10)),
             is_waiting: watchState.action === 'WAIT' || watchState.action === 'WAIT_BUY' || watchState.action === 'WAIT_SELL',
-            entry_condition: watchState.entry_condition
+            entry_condition: watchState.entry_condition,
+            confidence_threshold: watchState.confidence_threshold || 55
         };
+        
+        console.log(`📡 [API] Returning signal for symbol: ${currentSymbol}, action: ${signal.action}`);
         
         res.json({
             success: true,
@@ -51,6 +59,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
     }
 });
 
+// Get AI status (for continuous updates)
 router.get('/status', authMiddleware, async (req, res) => {
     try {
         const analysis = aiTrader.getCurrentAnalysis();
@@ -64,6 +73,7 @@ router.get('/status', authMiddleware, async (req, res) => {
     }
 });
 
+// Get signal history
 router.get('/history', authMiddleware, async (req, res) => {
     const db = require('../config/database').getDb();
     try {
@@ -76,6 +86,7 @@ router.get('/history', authMiddleware, async (req, res) => {
     }
 });
 
+// Get AI insights
 router.get('/insights', authMiddleware, async (req, res) => {
     try {
         const topPatterns = await Pattern.getTopPatterns(10);
