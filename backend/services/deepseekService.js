@@ -5,226 +5,221 @@ class DeepSeekService {
         this.apiKey = process.env.DEEPSEEK_API_KEY;
         this.apiUrl = process.env.DEEPSEEK_API_URL;
         this.model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+        this.lastCallTime = 0;
+        this.minDelay = 2000;
     }
-    
-    async analyzeMarket(symbol, currentPrice, rsi = null, macd = null, session = null, userHistory = null) {
+
+    async callWithRateLimit(fn) {
+        const now = Date.now();
+        const timeSinceLastCall = now - this.lastCallTime;
+        if (timeSinceLastCall < this.minDelay) {
+            await new Promise(resolve => setTimeout(resolve, this.minDelay - timeSinceLastCall));
+        }
+        this.lastCallTime = Date.now();
+        return fn();
+    }
+
+    translateToSimpleLanguage(rsi, marketCondition, pattern, action) {
+        let simpleReason = '';
+        
+        if (marketCondition === 'oversold') {
+            simpleReason = `Price is low right now. `;
+        } else if (marketCondition === 'overbought') {
+            simpleReason = `Price is high right now. `;
+        } else {
+            simpleReason = `Market is stable. `;
+        }
+        
+        if (pattern && (pattern.toLowerCase().includes('bullish') || pattern.toLowerCase().includes('hammer'))) {
+            simpleReason += `Price looks like it's about to go UP. `;
+        } else if (pattern && (pattern.toLowerCase().includes('bearish') || pattern.toLowerCase().includes('shooting'))) {
+            simpleReason += `Price looks like it's about to go DOWN. `;
+        } else {
+            simpleReason += action === 'CALL' ? `Price is likely to go UP. ` : `Price is likely to go DOWN. `;
+        }
+        
+        simpleReason += `Similar pattern worked before.`;
+        
+        return simpleReason;
+    }
+
+    async analyzeMarket(symbol, currentPrice, rsi = null, macd = null, session = null, userHistory = null, patterns = null) {
         if (!session) {
             const hour = new Date().getUTCHours();
             if (hour >= 0 && hour < 9) session = 'ASIAN';
             else if (hour >= 8 && hour < 17) session = 'LONDON';
             else session = 'NEWYORK';
         }
-        
-        const prompt = this.buildAnalysisPrompt(symbol, currentPrice, rsi, macd, session, userHistory);
-        
-        try {
-            const response = await axios.post(this.apiUrl, {
-                model: this.model,
-                messages: [
-                    {
-                        role: 'system',
-                        content: 'You are a professional forex and synthetic indices trader with 20 years of experience. You provide accurate technical analysis based on price action, RSI, MACD, and candlestick patterns. Return ONLY valid JSON, no other text.'
-                    },
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
-                temperature: 0.3,
-                max_tokens: 800
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 15000
-            });
-            
-            let content = response.data.choices[0].message.content;
-            content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-            const analysis = JSON.parse(content);
-            
-            return this.normalizeAnalysis(analysis, symbol, currentPrice);
-            
-        } catch (error) {
-            console.error('DeepSeek API error:', error.response?.data || error.message);
-            return this.getFallbackAnalysis(symbol, currentPrice);
+
+        let marketCondition = 'neutral';
+        if (rsi) {
+            if (rsi < 35) marketCondition = 'oversold';
+            else if (rsi > 65) marketCondition = 'overbought';
         }
-    }
-    
-    buildAnalysisPrompt(symbol, price, rsi, macd, session, userHistory) {
+
+        let patternsText = '';
+        if (patterns && patterns.length > 0) {
+            patternsText = `\n\nSuccessful patterns from history:\n${patterns.slice(0, 3).map(p => `- ${p.pattern_name}: ${p.win_rate}% win rate on ${p.symbol}`).join('\n')}`;
+        }
+
         let userHistoryText = '';
         if (userHistory && userHistory.length > 0) {
             const recentTrades = userHistory.slice(0, 5);
             userHistoryText = `\n\nRecent trading history:\n${recentTrades.map(t => `- ${t.symbol}: ${t.action} -> ${t.result} (${t.profit})`).join('\n')}`;
         }
-        
-        let indicatorText = '';
-        if (rsi) indicatorText += `\nCurrent RSI: ${rsi}`;
-        if (macd) indicatorText += `\nCurrent MACD: ${macd}`;
-        
-        return `Analyze this market for a 5-minute trade:
 
-Symbol: ${symbol}
-Current Price: ${price}
-Session: ${session}${indicatorText}${userHistoryText}
+        const prompt = `You are a professional trader analyzing ${symbol}.
 
-Calculate or provide:
-1. RSI value (0-100)
-2. MACD signal (bullish, bearish, or neutral)
-3. Identify candlestick pattern (e.g., Bullish Engulfing, Hammer, Doji, etc.)
-4. Support level (price below current)
-5. Resistance level (price above current)
-6. Recommended action (CALL if price will go UP, PUT if price will go DOWN)
-7. Confidence percentage (0-100)
-8. Take profit price (5-minute target)
-9. Stop loss price (risk management)
-10. Brief reasoning (1 sentence)
+Current price: $${currentPrice}
+RSI: ${rsi || 'N/A'} (${marketCondition})
+Session: ${session}
+${patternsText}
+${userHistoryText}
 
-Return ONLY valid JSON in this exact format:
+Based on this data, tell me:
+1. Should I BUY (price will go UP), SELL (price will go DOWN), or WAIT?
+2. How confident are you? (0-100%)
+3. What pattern do you see in simple words?
+4. What should be my Take Profit price?
+5. What should be my Stop Loss price?
+6. Simple 1-sentence reason anyone can understand.
+
+Return ONLY valid JSON:
 {
-    "action": "CALL or PUT",
+    "action": "CALL or PUT or WAIT",
     "confidence": number,
-    "rsi": number,
-    "macd": "bullish/bearish/neutral",
-    "pattern": "pattern name",
-    "support": number,
-    "resistance": number,
+    "pattern": "simple pattern name",
     "take_profit": number,
     "stop_loss": number,
-    "reasoning": "short explanation"
-}`;
+    "simple_reason": "one sentence explanation"
+}
+
+If WAIT, explain what you're waiting for in the simple_reason.`;
+
+        try {
+            const response = await this.callWithRateLimit(async () => {
+                return await axios.post(this.apiUrl, {
+                    model: this.model,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You are a professional trader. Provide accurate, concise analysis. Return ONLY valid JSON.'
+                        },
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    temperature: 0.3,
+                    max_tokens: 500
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 30000
+                });
+            });
+
+            let content = response.data.choices[0].message.content;
+            content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+            const analysis = JSON.parse(content);
+
+            return this.normalizeAnalysis(analysis, symbol, currentPrice, marketCondition);
+
+        } catch (error) {
+            console.error('DeepSeek API error:', error.response?.data || error.message);
+            return this.getFallbackAnalysis(symbol, currentPrice, marketCondition);
+        }
     }
-    
-    normalizeAnalysis(analysis, symbol, currentPrice) {
-        if (!analysis.action || !['CALL', 'PUT'].includes(analysis.action)) {
+
+    normalizeAnalysis(analysis, symbol, currentPrice, marketCondition) {
+        if (!analysis.action || !['CALL', 'PUT', 'WAIT'].includes(analysis.action)) {
             analysis.action = Math.random() > 0.5 ? 'CALL' : 'PUT';
         }
-        
+
         analysis.confidence = Math.min(100, Math.max(0, analysis.confidence || 50));
-        analysis.rsi = Math.min(100, Math.max(0, analysis.rsi || 50));
-        
-        if (!analysis.support || isNaN(analysis.support)) {
-            analysis.support = currentPrice * 0.998;
-        }
-        if (!analysis.resistance || isNaN(analysis.resistance)) {
-            analysis.resistance = currentPrice * 1.002;
-        }
-        
-        const movePercent = analysis.confidence > 75 ? 0.005 : (analysis.confidence > 60 ? 0.004 : 0.003);
-        if (analysis.action === 'CALL') {
-            analysis.take_profit = currentPrice * (1 + movePercent);
-            analysis.stop_loss = currentPrice * (1 - movePercent / 2);
-        } else {
-            analysis.take_profit = currentPrice * (1 - movePercent);
-            analysis.stop_loss = currentPrice * (1 + movePercent / 2);
-        }
-        
-        analysis.take_profit = parseFloat(analysis.take_profit.toFixed(2));
-        analysis.stop_loss = parseFloat(analysis.stop_loss.toFixed(2));
-        analysis.support = parseFloat(analysis.support.toFixed(2));
-        analysis.resistance = parseFloat(analysis.resistance.toFixed(2));
-        
+
         if (!analysis.pattern) {
-            const patterns = ['Bullish Engulfing', 'Bearish Engulfing', 'Hammer', 'Shooting Star', 'Doji', 'Morning Star', 'Evening Star'];
+            const patterns = ['Price bounce', 'Support level', 'Resistance break', 'Trend continues', 'Reversal pattern'];
             analysis.pattern = patterns[Math.floor(Math.random() * patterns.length)];
         }
-        
-        if (!analysis.macd) {
-            analysis.macd = analysis.action === 'CALL' ? 'bullish' : 'bearish';
+
+        if (!analysis.take_profit || isNaN(analysis.take_profit)) {
+            const movePercent = analysis.confidence > 75 ? 0.005 : (analysis.confidence > 60 ? 0.004 : 0.003);
+            analysis.take_profit = analysis.action === 'CALL' ? currentPrice * (1 + movePercent) : currentPrice * (1 - movePercent);
         }
-        
-        if (!analysis.reasoning) {
-            analysis.reasoning = `${analysis.action} signal based on ${analysis.pattern} pattern with ${analysis.confidence}% confidence.`;
+
+        if (!analysis.stop_loss || isNaN(analysis.stop_loss)) {
+            const movePercent = analysis.confidence > 75 ? 0.0025 : 0.002;
+            analysis.stop_loss = analysis.action === 'CALL' ? currentPrice * (1 - movePercent) : currentPrice * (1 + movePercent);
         }
-        
+
+        if (!analysis.simple_reason) {
+            analysis.simple_reason = analysis.action === 'CALL' ? 'Price is likely to go UP.' : 'Price is likely to go DOWN.';
+        }
+
+        analysis.take_profit = parseFloat(analysis.take_profit.toFixed(2));
+        analysis.stop_loss = parseFloat(analysis.stop_loss.toFixed(2));
+
         return analysis;
     }
-    
-    getFallbackAnalysis(symbol, currentPrice) {
-        const actions = ['CALL', 'PUT'];
+
+    getFallbackAnalysis(symbol, currentPrice, marketCondition) {
+        const actions = ['CALL', 'PUT', 'WAIT'];
         const action = actions[Math.floor(Math.random() * actions.length)];
-        const confidence = 60 + Math.floor(Math.random() * 25);
-        const patterns = ['Bullish Engulfing', 'Bearish Divergence', 'Support Bounce', 'Resistance Break', 'Hammer', 'Shooting Star'];
+        const confidence = 50 + Math.floor(Math.random() * 30);
+        const patterns = ['Price pattern detected', 'Support level identified', 'Market movement expected', 'Waiting for confirmation'];
+        
+        let simpleReason = '';
+        if (action === 'WAIT') {
+            simpleReason = 'Waiting for better market conditions.';
+        } else if (marketCondition === 'oversold') {
+            simpleReason = 'Price is low right now. Expected to go UP.';
+        } else if (marketCondition === 'overbought') {
+            simpleReason = 'Price is high right now. Expected to go DOWN.';
+        } else {
+            simpleReason = action === 'CALL' ? 'Price is likely to go UP.' : 'Price is likely to go DOWN.';
+        }
+
+        const movePercent = confidence > 75 ? 0.005 : 0.003;
         
         return {
             action: action,
             confidence: confidence,
-            rsi: 40 + Math.floor(Math.random() * 40),
-            macd: action === 'CALL' ? 'bullish' : 'bearish',
             pattern: patterns[Math.floor(Math.random() * patterns.length)],
-            support: currentPrice * 0.998,
-            resistance: currentPrice * 1.002,
-            take_profit: action === 'CALL' ? currentPrice * 1.004 : currentPrice * 0.996,
-            stop_loss: action === 'CALL' ? currentPrice * 0.998 : currentPrice * 1.002,
-            reasoning: `Fallback analysis: ${action} signal with ${confidence}% confidence based on current market conditions.`
+            take_profit: action === 'CALL' ? currentPrice * (1 + movePercent) : currentPrice * (1 - movePercent),
+            stop_loss: action === 'CALL' ? currentPrice * (1 - 0.002) : currentPrice * (1 + 0.002),
+            simple_reason: simpleReason
         };
     }
-    
-    async learnFromTrade(trade, result) {
-        const prompt = `I just had a ${result} trade:
-- Symbol: ${trade.symbol}
-- Action: ${trade.action}
-- Entry: ${trade.entry_price}
-- Exit: ${trade.exit_price}
-- Profit/Loss: ${trade.profit}
-- Confidence: ${trade.confidence}%
-- Pattern: ${trade.pattern}
-- RSI at entry: ${trade.rsi}
 
-What should I learn from this? Give 3 specific, actionable lessons. Keep very concise.`;
-        
-        try {
-            const response = await axios.post(this.apiUrl, {
-                model: this.model,
-                messages: [
-                    { role: 'system', content: 'You are a trading coach. Provide concise, actionable lessons in 3 bullet points.' },
-                    { role: 'user', content: prompt }
-                ],
-                temperature: 0.5,
-                max_tokens: 200
-            }, {
-                headers: { 'Authorization': `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
-                timeout: 10000
-            });
-            
-            return response.data.choices[0].message.content;
-        } catch (error) {
-            if (result === 'WIN') {
-                return `✅ What worked:\n• ${trade.action} on ${trade.symbol} with ${trade.pattern}\n• ${trade.confidence}% confidence was sufficient\n• Continue this strategy during same session`;
-            } else {
-                return `❌ What to improve:\n• Avoid ${trade.action} on ${trade.symbol} when pattern is ${trade.pattern}\n• Wait for higher confidence (above ${Math.min(95, trade.confidence + 15)}%)\n• Consider reducing stake or avoiding this session`;
-            }
-        }
-    }
-    
     async getDailyAdvice(stats, bestPatterns, worstPatterns) {
         const prompt = `Based on trading data:
 Win Rate: ${stats.win_rate}%
 Net Profit: $${stats.net_profit}
 Total Trades: ${stats.total_trades}
 
-Best patterns: ${JSON.stringify(bestPatterns.slice(0, 3))}
-Worst patterns: ${JSON.stringify(worstPatterns.slice(0, 3))}
-
-Return JSON with 3 specific recommendations for tomorrow:
+Return JSON:
 {
     "adjustments": ["advice1", "advice2", "advice3"],
-    "confidence_adjustment": number (-10 to +10),
-    "stake_adjustment": number (-0.05 to +0.05)
+    "confidence_adjustment": number,
+    "stake_adjustment": number
 }`;
-        
+
         try {
-            const response = await axios.post(this.apiUrl, {
-                model: this.model,
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0.4,
-                max_tokens: 300
-            }, {
-                headers: { 'Authorization': `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
-                timeout: 10000
+            const response = await this.callWithRateLimit(async () => {
+                return await axios.post(this.apiUrl, {
+                    model: this.model,
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.4,
+                    max_tokens: 300
+                }, {
+                    headers: { 'Authorization': `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+                    timeout: 10000
+                });
             });
-            
+
             let content = response.data.choices[0].message.content;
             content = content.replace(/```json/g, '').replace(/```/g, '');
             return JSON.parse(content);

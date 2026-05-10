@@ -20,6 +20,7 @@ class DerivService extends EventEmitter {
         this.currentCurrency = 'USD';
         this.reconnectInProgress = false;
         this.isClosing = false;
+        this.heartbeatInterval = null;
 
         this.symbolMap = {
             "R_10": "R_10", "R_25": "R_25", "R_50": "R_50", "R_75": "R_75", "R_100": "R_100",
@@ -46,9 +47,7 @@ class DerivService extends EventEmitter {
         };
 
         this.wsUrls = [
-            process.env.DERIV_WS_URL || 'wss://ws.derivws.com/websockets/v3',
-            process.env.DERIV_WS_FALLBACK_1 || 'wss://ws.binaryws.com/websockets/v3',
-            process.env.DERIV_WS_FALLBACK_2 || 'wss://frontend.binary.com/websockets/v3'
+            process.env.DERIV_WS_URL || 'wss://ws.derivws.com/websockets/v3'
         ];
     }
 
@@ -56,6 +55,28 @@ class DerivService extends EventEmitter {
         const derivSymbol = this.symbolMap[uiSymbol];
         if (!derivSymbol) return uiSymbol;
         return derivSymbol;
+    }
+
+    startHeartbeat() {
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        
+        this.heartbeatInterval = setInterval(async () => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN && this.authorized) {
+                try {
+                    await this.sendRequest({ ping: 1 });
+                    console.log('💓 [Deriv] Heartbeat sent');
+                } catch (e) {
+                    console.log('⚠️ [Deriv] Heartbeat failed:', e.message);
+                }
+            }
+        }, 30000);
+    }
+
+    stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
     }
 
     connect(token = null, forceNew = false) {
@@ -81,7 +102,7 @@ class DerivService extends EventEmitter {
                 if (!this.isConnected) {
                     console.error(`❌ [Deriv] Connection timeout`);
                     this.isConnecting = false;
-                    this.tryNextUrl(token, resolve, reject);
+                    reject(new Error('Connection timeout'));
                 }
             }, 15000);
 
@@ -95,7 +116,7 @@ class DerivService extends EventEmitter {
                     if (!this.isConnected) {
                         clearTimeout(timeout);
                         this.isConnecting = false;
-                        this.tryNextUrl(token, resolve, reject);
+                        reject(error);
                     }
                 });
 
@@ -112,10 +133,12 @@ class DerivService extends EventEmitter {
 
                     if (this.currentToken && this.currentToken.trim().length > 0) {
                         this.authorize(this.currentToken).then(() => {
+                            this.startHeartbeat();
                             this.emit('connected');
                             resolve();
                         }).catch(reject);
                     } else {
+                        this.startHeartbeat();
                         this.emit('connected');
                         resolve();
                     }
@@ -133,6 +156,7 @@ class DerivService extends EventEmitter {
                     this.isConnected = false;
                     this.isConnecting = false;
                     this.authorized = false;
+                    this.stopHeartbeat();
                     if (!this.isClosing) {
                         this.emit('disconnected');
                         this.reconnect();
@@ -142,13 +166,14 @@ class DerivService extends EventEmitter {
             } catch (error) {
                 clearTimeout(timeout);
                 this.isConnecting = false;
-                this.tryNextUrl(token, resolve, reject);
+                reject(error);
             }
         });
     }
 
     safeClose() {
         this.isClosing = true;
+        this.stopHeartbeat();
         if (this.ws) {
             try {
                 this.ws.removeAllListeners();
@@ -222,36 +247,28 @@ class DerivService extends EventEmitter {
         }
     }
 
-    tryNextUrl(token, resolve, reject) {
-        this.currentUrlIndex++;
-        if (this.currentUrlIndex < this.wsUrls.length) {
-            setTimeout(() => {
-                this.connect(token, false).then(resolve).catch(reject);
-            }, 1000);
-        } else {
-            this.isConnecting = false;
-            reject(new Error('Unable to connect to Deriv'));
-        }
-    }
-
     reconnect() {
         if (this.reconnectInterval || this.isClosing) return;
-
+        
+        let delay = 5000;
+        
         this.reconnectInterval = setInterval(() => {
             if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                 clearInterval(this.reconnectInterval);
                 this.reconnectInterval = null;
                 return;
             }
-
+            
             this.reconnectAttempts++;
-            this.currentUrlIndex = 0;
-            console.log(`🔄 [Deriv] Reconnect attempt ${this.reconnectAttempts}`);
-            this.safeClose();
+            const currentDelay = Math.min(delay * Math.pow(2, this.reconnectAttempts - 1), 60000);
+            console.log(`🔄 [Deriv] Reconnect attempt ${this.reconnectAttempts} in ${currentDelay/1000}s`);
+            
             setTimeout(() => {
+                this.currentUrlIndex = 0;
+                this.safeClose();
                 this.connect(this.currentToken, true).catch(console.error);
-            }, 2000);
-        }, 5000);
+            }, currentDelay);
+        }, delay);
     }
 
     handleMessage(response) {
@@ -289,6 +306,10 @@ class DerivService extends EventEmitter {
 
         if (msgType === 'proposal_open_contract') {
             this.emit('contract_update', response.proposal_open_contract);
+        }
+
+        if (msgType === 'pong') {
+            console.log('💓 [Deriv] Heartbeat received');
         }
 
         if (response.req_id && this.pendingRequests.has(response.req_id)) {
@@ -352,8 +373,29 @@ class DerivService extends EventEmitter {
     async subscribeToTicks(symbol) {
         const derivSymbol = this.convertSymbol(symbol);
         if (this.subscriptions.has(derivSymbol)) return;
+        
         this.subscriptions.add(derivSymbol);
-        return this.sendRequest({ ticks: derivSymbol });
+        
+        try {
+            await this.sendRequest({ ticks: derivSymbol });
+            console.log(`📡 [Deriv] Subscribed to ticks for ${derivSymbol}`);
+        } catch (error) {
+            console.error(`❌ [Deriv] Failed to subscribe to ${derivSymbol}:`, error.message);
+        }
+    }
+
+    async unsubscribeFromTicks(symbol) {
+        const derivSymbol = this.convertSymbol(symbol);
+        if (!this.subscriptions.has(derivSymbol)) return;
+        
+        this.subscriptions.delete(derivSymbol);
+        
+        try {
+            await this.sendRequest({ forget: derivSymbol });
+            console.log(`📡 [Deriv] Unsubscribed from ticks for ${derivSymbol}`);
+        } catch (error) {
+            console.error(`❌ [Deriv] Failed to unsubscribe from ${derivSymbol}:`, error.message);
+        }
     }
 
     async placeTrade(symbol, action, stake, duration = 5, durationUnit = 'm') {
@@ -386,14 +428,28 @@ class DerivService extends EventEmitter {
         return { balance: result.balance?.balance || 0, currency: result.balance?.currency || 'USD' };
     }
 
+    async getBalanceWithToken(token) {
+        const needNewConnection = !this.authorized || this.currentToken !== token;
+        
+        if (needNewConnection) {
+            const tempResult = await this.reconnectWithToken(token);
+            if (tempResult.success) {
+                return { balance: tempResult.balance, currency: tempResult.currency };
+            }
+            throw new Error('Failed to connect with token');
+        }
+        
+        return this.getBalance();
+    }
+
     async getContractInfo(contractId) {
         return this.sendRequest({ proposal_open_contract: contractId });
     }
 
-    async getPortfolio(limit = 50) {
+    async getPortfolio() {
         if (!this.authorized) throw new Error('Not authorized');
         try {
-            return await this.sendRequest({ portfolio: 1, limit: limit });
+            return await this.sendRequest({ portfolio: 1 });
         } catch (e) {
             console.log('Portfolio request failed:', e.message);
             return null;
@@ -406,13 +462,13 @@ class DerivService extends EventEmitter {
             return await this.sendRequest({ profit_table: 1, limit: limit });
         } catch (e) {
             console.log(`profit_table failed: ${e.message}`);
-            return await this.getPortfolio(limit);
+            return await this.getPortfolio();
         }
     }
 
     async getClosedContract(contractId) {
         try {
-            const portfolio = await this.getPortfolio(100);
+            const portfolio = await this.getPortfolio();
             if (portfolio && portfolio.portfolio && portfolio.portfolio.contracts) {
                 const contract = portfolio.portfolio.contracts.find(
                     c => c.contract_id === parseInt(contractId) || c.contract_id === contractId
@@ -446,6 +502,7 @@ class DerivService extends EventEmitter {
 
     disconnect() {
         this.isClosing = true;
+        this.stopHeartbeat();
         this.safeClose();
         if (this.reconnectInterval) {
             clearInterval(this.reconnectInterval);

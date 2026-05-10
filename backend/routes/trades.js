@@ -6,14 +6,12 @@ const User = require('../models/User');
 const Trade = require('../models/Trade');
 const Pattern = require('../models/Pattern');
 const derivService = require('../services/derivService');
-const emailService = require('../services/emailService');
-const deepseekService = require('../services/deepseekService');
-const { broadcastNotification, broadcastTradeResult, broadcastBalance } = require('../utils/websocket');
+const { broadcastTradeResult, broadcastBalance } = require('../utils/websocket');
 const { getCurrentSession } = require('../utils/helpers');
 
 router.post('/execute', authMiddleware, tradingLimiter, async (req, res) => {
     try {
-        const { symbol, action, stake, entry_price, take_profit, stop_loss, confidence, pattern, reasoning, rsi, macd } = req.body;
+        const { symbol, action, stake, entry_price, confidence, pattern, rsi, macd, is_auto } = req.body;
 
         if (!symbol || !action || !stake) {
             return res.status(400).json({ error: 'Missing required fields' });
@@ -56,7 +54,7 @@ router.post('/execute', authMiddleware, tradingLimiter, async (req, res) => {
             rsi: rsi || 50,
             macd: macd || 'neutral',
             session,
-            is_auto: req.body.is_auto || 0
+            is_auto: is_auto || 0
         });
 
         await User.deductTrade(req.userId);
@@ -77,7 +75,8 @@ router.post('/execute', authMiddleware, tradingLimiter, async (req, res) => {
             try {
                 const contractId = tradeResult.buy.contract_id;
                 let contractResult = null;
-                let retries = 12;
+                let retries = 10;
+                let delay = 30000;
 
                 console.log(`🔍 [Trade] Starting result check for contract ${contractId}`);
 
@@ -89,11 +88,11 @@ router.post('/execute', authMiddleware, tradingLimiter, async (req, res) => {
                             break;
                         }
                         console.log(`⏳ [Trade] Contract ${contractId} still pending, retries left: ${retries}`);
-                        await new Promise(r => setTimeout(r, 15000));
+                        await new Promise(r => setTimeout(r, delay));
                         retries--;
                     } catch (e) {
                         console.log(`⚠️ [Trade] Contract check error: ${e.message}, retries left: ${retries}`);
-                        await new Promise(r => setTimeout(r, 15000));
+                        await new Promise(r => setTimeout(r, delay));
                         retries--;
                     }
                 }
@@ -117,9 +116,11 @@ router.post('/execute', authMiddleware, tradingLimiter, async (req, res) => {
                     }
                     
                     const status = profit > 0 ? 'WIN' : 'LOSS';
+                    const profitAmount = profit !== 0 ? profit : (status === 'WIN' ? parseFloat(stake) * 0.85 : -parseFloat(stake));
+                    const finalProfit = profit !== 0 ? profit : profitAmount;
                     
-                    await Trade.updateResult(tradeId, exitPrice, profit, status);
-                    await User.updateStats(req.userId, status, profit, parseFloat(stake));
+                    await Trade.updateResult(tradeId, exitPrice, finalProfit, status);
+                    await User.updateStats(req.userId, status, finalProfit, parseFloat(stake));
                     await Pattern.recordTradeResult(pattern, symbol, action, session, status === 'WIN');
                     
                     broadcastTradeResult({
@@ -129,15 +130,19 @@ router.post('/execute', authMiddleware, tradingLimiter, async (req, res) => {
                         action,
                         entry_price: parseFloat(entry_price),
                         exit_price: exitPrice,
-                        profit: profit,
+                        profit: finalProfit,
                         stake: parseFloat(stake),
                         status: status
                     });
                     
-                    const newBalance = await derivService.getBalance();
-                    broadcastBalance(req.userId, newBalance.balance);
+                    try {
+                        const newBalance = await derivService.getBalance();
+                        broadcastBalance(req.userId, newBalance.balance);
+                    } catch (e) {
+                        console.log('Could not broadcast balance:', e.message);
+                    }
                     
-                    console.log(`✅ [Trade] ${contractId} result: ${status} $${profit.toFixed(2)}`);
+                    console.log(`✅ [Trade] ${contractId} result: ${status} $${finalProfit.toFixed(2)}`);
                     return;
                 }
 
@@ -162,7 +167,7 @@ router.post('/execute', authMiddleware, tradingLimiter, async (req, res) => {
                 console.error('❌ [Trade] Result check error:', error);
                 await Trade.updateResult(tradeId, parseFloat(entry_price), -parseFloat(stake), 'LOSS');
             }
-        }, 30000);
+        }, 330000);
 
         res.json({
             success: true,
@@ -183,6 +188,7 @@ router.get('/history', authMiddleware, async (req, res) => {
         const trades = await Trade.getUserTrades(req.userId, parseInt(limit), parseInt(offset));
         res.json(trades);
     } catch (error) {
+        console.error('Get trades error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -202,6 +208,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
             by_session: sessionStats
         });
     } catch (error) {
+        console.error('Get stats error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -209,16 +216,12 @@ router.get('/stats', authMiddleware, async (req, res) => {
 router.get('/locked-balance', authMiddleware, async (req, res) => {
     try {
         const db = require('../config/database').getDb();
-        const activeTrades = await new Promise((resolve, reject) => {
-            db.all('SELECT stake FROM trades WHERE user_id = ? AND status = "PENDING"', [req.userId], (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows || []);
-            });
-        });
-
-        const locked = activeTrades.reduce((sum, t) => sum + (t.stake || 0), 0);
-        res.json({ locked, count: activeTrades.length });
+        const trades = db.trades.getAll();
+        const userTrades = trades.filter(t => t.user_id === req.userId && t.status === 'PENDING');
+        const locked = userTrades.reduce((sum, t) => sum + (t.stake || 0), 0);
+        res.json({ locked, count: userTrades.length });
     } catch (error) {
+        console.error('Locked balance error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

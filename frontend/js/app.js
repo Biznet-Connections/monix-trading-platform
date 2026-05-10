@@ -1,9 +1,11 @@
+// Main Application
 let currentUser = null;
 let currentPage = 'dashboard';
 let isReconnecting = false;
 
 console.log('🔵 MONIX App Initializing...');
 
+// DOM Elements
 const authModal = document.getElementById('authModal');
 const appContainer = document.getElementById('appContainer');
 const loginTab = document.getElementById('loginTab');
@@ -18,20 +20,56 @@ const openApiKeys = document.getElementById('openApiKeys');
 const openSettings = document.getElementById('openSettings');
 const viewFullInsights = document.getElementById('viewFullInsights');
 
+// Sidebar navigation
 const navLinks = document.querySelectorAll('.nav-link');
 const pages = document.querySelectorAll('.page-content');
 
+// Mobile Header Elements
 const mobileHeader = document.getElementById('mobileHeader');
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 const sidebarDrawer = document.getElementById('sidebarDrawer');
 const drawerOverlay = document.getElementById('drawerOverlay');
 const closeDrawerBtn = document.getElementById('closeDrawerBtn');
 
+// ============ HELPER FUNCTIONS ============
 function logToTerminal(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
     console.log(`[${timestamp}] ${message}`);
 }
 
+// ============ TOAST NOTIFICATION ============
+function showToast(title, message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    let icon = '';
+    switch (type) {
+        case 'success': icon = '✅'; break;
+        case 'error': icon = '❌'; break;
+        default: icon = 'ℹ️';
+    }
+
+    toast.innerHTML = `
+        <div class="flex items-start gap-3">
+            <span class="text-lg">${icon}</span>
+            <div class="flex-1">
+                <p class="font-semibold text-sm">${title}</p>
+                <p class="text-xs text-slate-400 mt-1">${message}</p>
+            </div>
+            <button class="text-slate-500 hover:text-white" onclick="this.parentElement.parentElement.remove()">✕</button>
+        </div>
+    `;
+
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+window.showToast = showToast;
+
+// ============ MOBILE DRAWER ============
 function initMobileDrawer() {
     logToTerminal('📱 Initializing mobile drawer');
 
@@ -72,6 +110,7 @@ function initMobileDrawer() {
     }
 }
 
+// ============ PAGE CLOSE BUTTONS ============
 function setupPageCloseButtons() {
     const pagesWithClose = ['insightsPage', 'performancePage', 'historyPage', 'leaderboardPage'];
 
@@ -99,6 +138,7 @@ function setupPageCloseButtons() {
     });
 }
 
+// ============ AUTH MODAL SETUP ============
 function setupAuthModal() {
     logToTerminal('🔐 Setting up auth modal');
 
@@ -134,12 +174,12 @@ function setupAuthModal() {
                     currentUser = result.user;
                     showApp();
                     await loadUserData();
-                    window.showToast('Login Successful', `Welcome back ${result.user.username}!`, 'success');
+                    showToast('Login Successful', `Welcome back ${result.user.username}!`, 'success');
                 } else {
-                    window.showToast('Login Failed', result.error || 'Invalid credentials', 'error');
+                    showToast('Login Failed', result.error || 'Invalid credentials', 'error');
                 }
             } catch (error) {
-                window.showToast('Login Failed', error.message, 'error');
+                showToast('Login Failed', error.message, 'error');
             }
         });
     }
@@ -161,17 +201,18 @@ function setupAuthModal() {
                     currentUser = result.user;
                     showApp();
                     await loadUserData();
-                    window.showToast('Registration Successful', `Welcome to MONIX, ${username}!`, 'success');
+                    showToast('Registration Successful', `Welcome to MONIX, ${username}!`, 'success');
                 } else {
-                    window.showToast('Registration Failed', result.error || 'Invalid voucher or data', 'error');
+                    showToast('Registration Failed', result.error || 'Invalid voucher or data', 'error');
                 }
             } catch (error) {
-                window.showToast('Registration Failed', error.message, 'error');
+                showToast('Registration Failed', error.message, 'error');
             }
         });
     }
 }
 
+// ============ MODAL SETUP ============
 function setupModals() {
     logToTerminal('🔧 Setting up modals');
 
@@ -208,16 +249,16 @@ function setupModals() {
                 const result = await window.api.updateApiKeys(demoToken, realToken);
                 if (result.reconnect?.success && result.reconnect?.balance !== undefined) {
                     const balanceNum = typeof result.reconnect.balance === 'number' ? result.reconnect.balance : parseFloat(result.reconnect.balance);
-                    window.showToast('API Keys Saved', `Connected! Balance: $${balanceNum}`, 'success');
+                    showToast('API Keys Saved', `Connected! Balance: $${balanceNum}`, 'success');
                     const balanceEl = document.getElementById('balanceAmount');
                     if (balanceEl) balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
                 } else {
-                    window.showToast('API Keys Saved', 'Keys saved but connection failed', 'warning');
+                    showToast('API Keys Saved', 'Keys saved but connection failed', 'warning');
                 }
                 document.getElementById('apiKeysModal').classList.add('hidden');
                 await loadUserData();
             } catch (error) {
-                window.showToast('Error', error.message, 'error');
+                showToast('Error', error.message, 'error');
             }
         });
     }
@@ -234,7 +275,7 @@ function setupModals() {
                     default_symbol: defaultSymbol,
                     base_stake: defaultStake
                 });
-                window.showToast('Settings Saved', 'Your preferences have been saved', 'success');
+                showToast('Settings Saved', 'Your preferences have been saved', 'success');
                 document.getElementById('settingsModal').classList.add('hidden');
 
                 const stakeSlider = document.getElementById('stakeSlider');
@@ -242,7 +283,7 @@ function setupModals() {
                 if (stakeSlider) stakeSlider.value = defaultStake;
                 if (stakeValue) stakeValue.innerText = `$${defaultStake.toFixed(2)}`;
             } catch (error) {
-                window.showToast('Error', error.message, 'error');
+                showToast('Error', error.message, 'error');
             }
         });
     }
@@ -280,16 +321,15 @@ async function loadSettingsToForm() {
     try {
         const profile = await window.api.getUserProfile();
         if (profile && profile.user) {
-            const defaultSymbol = document.getElementById('defaultSymbol');
-            const defaultStake = document.getElementById('defaultStake');
-            if (defaultSymbol) defaultSymbol.value = profile.user.default_symbol || 'R_75';
-            if (defaultStake) defaultStake.value = profile.user.base_stake || 0.10;
+            document.getElementById('defaultSymbol').value = profile.user.default_symbol || 'R_75';
+            document.getElementById('defaultStake').value = profile.user.base_stake || 0.10;
         }
     } catch (error) {
         console.error('Failed to load settings:', error);
     }
 }
 
+// ============ NAVIGATION ============
 function setupNavigation() {
     logToTerminal('🧭 Setting up navigation');
 
@@ -330,6 +370,7 @@ function switchPage(page) {
     setTimeout(() => setupPageCloseButtons(), 200);
 }
 
+// ============ DATA LOADING ============
 async function loadUserData() {
     try {
         logToTerminal('👤 Loading user data...');
@@ -338,12 +379,9 @@ async function loadUserData() {
         if (profile && profile.user) {
             currentUser = profile.user;
 
-            const welcomeName = document.getElementById('welcomeName');
-            const userName = document.getElementById('userName');
-            const userEmail = document.getElementById('userEmail');
-            if (welcomeName) welcomeName.innerHTML = profile.user.username;
-            if (userName) userName.innerHTML = profile.user.username;
-            if (userEmail) userEmail.innerHTML = profile.user.email;
+            document.getElementById('welcomeName').innerHTML = profile.user.username;
+            document.getElementById('userName').innerHTML = profile.user.username;
+            document.getElementById('userEmail').innerHTML = profile.user.email;
 
             const hasDemoToken = profile.user.demo_token && profile.user.demo_token.length > 0;
             const hasRealToken = profile.user.real_token && profile.user.real_token.length > 0;
@@ -364,15 +402,35 @@ async function loadUserData() {
                     if (marketStatus) marketStatus.innerHTML = `${currentMode} ACTIVE`;
                     logToTerminal(`💰 Balance from Deriv API: $${balanceNum} ${profile.derivBalance.currency} (${currentMode})`);
                 }
+                else if (profile.user.is_demo === 0 && hasRealToken && (!profile.derivBalance || profile.derivBalance.balance === 0)) {
+                    balanceEl.innerHTML = `$0.00`;
+                    if (connectionText) connectionText.innerHTML = 'Connecting to REAL...';
+                    if (marketStatus) marketStatus.innerHTML = 'CONNECTING';
+                    logToTerminal('⚠️ REAL mode but balance is 0 - forcing reconnect');
+                    
+                    try {
+                        const reconnectResult = await window.api.reconnectDeriv();
+                        if (reconnectResult.success && reconnectResult.balance !== undefined) {
+                            balanceEl.innerHTML = `$${reconnectResult.balance.toFixed(2)}`;
+                            if (connectionText) connectionText.innerHTML = `REAL Connected`;
+                            if (marketStatus) marketStatus.innerHTML = `REAL ACTIVE`;
+                            logToTerminal(`💰 REAL balance fetched: $${reconnectResult.balance}`);
+                        }
+                    } catch (reconnectError) {
+                        logToTerminal(`❌ Force reconnect failed: ${reconnectError.message}`, 'error');
+                    }
+                }
                 else if (!hasAnyApiKey) {
                     balanceEl.innerHTML = `$0.00`;
                     if (connectionText) connectionText.innerHTML = 'No API Keys';
                     if (marketStatus) marketStatus.innerHTML = 'READ-ONLY';
+                    logToTerminal('⚠️ No API keys found - showing $0 balance');
                 }
                 else if (hasAnyApiKey && !profile.derivBalance?.authorized && !isReconnecting) {
                     balanceEl.innerHTML = `$0.00`;
                     if (connectionText) connectionText.innerHTML = 'Connecting...';
                     if (marketStatus) marketStatus.innerHTML = 'CONNECTING';
+                    logToTerminal('⚠️ API keys present but Deriv not authorized - attempting reconnect');
 
                     isReconnecting = true;
                     try {
@@ -384,6 +442,7 @@ async function loadUserData() {
                             balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
                             if (connectionText) connectionText.innerHTML = `${reconnectResult.mode || currentMode} Connected`;
                             if (marketStatus) marketStatus.innerHTML = `${reconnectResult.mode || currentMode} ACTIVE`;
+                            logToTerminal(`💰 Reconnected! Balance: $${balanceNum}`);
                         }
                     } catch (reconnectError) {
                         logToTerminal(`❌ Auto-reconnect failed: ${reconnectError.message}`, 'error');
@@ -393,8 +452,7 @@ async function loadUserData() {
                 }
             }
 
-            const winRateEl = document.getElementById('winRateDisplay');
-            if (winRateEl && profile.stats) winRateEl.innerHTML = `Win Rate: ${profile.stats.win_rate || 0}%`;
+            document.getElementById('winRateDisplay').innerHTML = `Win Rate: ${profile.stats?.win_rate || 0}%`;
 
             const todayProfit = profile.stats?.today_profit || 0;
             const todayProfitEl = document.getElementById('todayProfit');
@@ -403,19 +461,10 @@ async function loadUserData() {
                 todayProfitEl.className = todayProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
             }
 
-            const voucherCode = document.getElementById('voucherCode');
-            const tradesRemaining = document.getElementById('tradesRemaining');
-            if (voucherCode && profile.user.voucher_code) voucherCode.innerHTML = profile.user.voucher_code;
-            if (tradesRemaining) tradesRemaining.innerHTML = `Trades Left: ${profile.user.trades_remaining || 0}`;
+            document.getElementById('voucherCode').innerHTML = profile.user.voucher_code || 'MONIX-XXXX';
+            document.getElementById('tradesRemaining').innerHTML = `Trades Left: ${profile.user.trades_remaining || 0}`;
             if (profile.user.voucher_expiry) {
-                const expiryEl = document.getElementById('voucherExpiry');
-                if (expiryEl) expiryEl.innerHTML = `Expires: ${new Date(profile.user.voucher_expiry).toLocaleDateString()}`;
-            }
-
-            const adminLink = document.getElementById('adminLink');
-            if (adminLink && profile.user.is_admin) {
-                adminLink.classList.remove('hidden');
-                logToTerminal('👑 Admin access granted');
+                document.getElementById('voucherExpiry').innerHTML = `Expires: ${new Date(profile.user.voucher_expiry).toLocaleDateString()}`;
             }
 
             const pushSignalsToggle = document.getElementById('pushSignalsToggle');
@@ -430,6 +479,13 @@ async function loadUserData() {
             if (stakeSlider && profile.user.base_stake) stakeSlider.value = Math.max(profile.user.base_stake, 0.35);
             if (stakeValue) stakeValue.innerText = `$${Math.max(profile.user.base_stake || 0.35, 0.35).toFixed(2)}`;
 
+            const adminLink = document.getElementById('adminLink');
+            if (adminLink && profile.user.is_admin) {
+                adminLink.classList.remove('hidden');
+                logToTerminal('👑 Admin access granted');
+            }
+
+            if (window.updateLockedBalance) await window.updateLockedBalance();
             logToTerminal('✅ User data loaded successfully');
         }
     } catch (error) {
@@ -439,19 +495,15 @@ async function loadUserData() {
 
 async function loadPerformanceStats() {
     try {
+        logToTerminal('📈 Loading performance stats...');
         const stats = await window.api.getTradeStats(30);
-        const winRateEl = document.getElementById('statWinRate');
-        const totalTradesEl = document.getElementById('statTotalTrades');
-        const netProfitEl = document.getElementById('statNetProfit');
-        const bestStreakEl = document.getElementById('statBestStreak');
-        const symbolContainer = document.getElementById('symbolStatsContainer');
-        
-        if (winRateEl) winRateEl.innerHTML = `${stats.overall?.win_rate || 0}%`;
-        if (totalTradesEl) totalTradesEl.innerHTML = stats.overall?.total_trades || 0;
+        document.getElementById('statWinRate').innerHTML = `${stats.overall?.win_rate || 0}%`;
+        document.getElementById('statTotalTrades').innerHTML = stats.overall?.total_trades || 0;
         const profit = stats.overall?.net_profit || 0;
-        if (netProfitEl) netProfitEl.innerHTML = `$${profit.toFixed(2)}`;
-        if (bestStreakEl) bestStreakEl.innerHTML = stats.overall?.best_streak || 0;
+        document.getElementById('statNetProfit').innerHTML = `$${profit.toFixed(2)}`;
+        document.getElementById('statBestStreak').innerHTML = stats.overall?.best_streak || 0;
 
+        const symbolContainer = document.getElementById('symbolStatsContainer');
         if (symbolContainer) {
             if (stats.by_symbol && stats.by_symbol.length > 0) {
                 symbolContainer.innerHTML = `<h3 class="font-semibold mb-2">Performance by Symbol</h3>${stats.by_symbol.map(s => `<div class="flex justify-between items-center py-2 border-b border-slate-700"><span class="font-medium">${s.symbol}</span><div class="flex gap-4"><span class="text-sm">${s.total} trades</span><span class="text-sm ${s.win_rate >= 50 ? 'text-emerald-400' : 'text-red-400'}">${s.win_rate}% win</span><span class="text-sm ${s.total_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">$${s.total_profit?.toFixed(2)}</span></div></div>`).join('')}`;
@@ -459,13 +511,15 @@ async function loadPerformanceStats() {
                 symbolContainer.innerHTML = '<p class="text-center text-slate-500">No trades yet</p>';
             }
         }
+        logToTerminal('✅ Performance stats loaded');
     } catch (error) {
-        console.error('Failed to load performance stats:', error);
+        logToTerminal(`❌ Failed to load performance stats: ${error.message}`, 'error');
     }
 }
 
 async function loadFullHistory() {
     try {
+        logToTerminal('📜 Loading trade history...');
         const trades = await window.api.getTradeHistory(100);
         const tbody = document.getElementById('historyTradesBody');
         const symbolFilter = document.getElementById('historyFilterSymbol');
@@ -479,7 +533,7 @@ async function loadFullHistory() {
             if (statusFilter && statusFilter.value) filtered = filtered.filter(t => t.status === statusFilter.value);
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No trades found</td></tr>';
+                                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No trades found</td></tr>';
                 return;
             }
 
@@ -489,13 +543,15 @@ async function loadFullHistory() {
         if (symbolFilter) symbolFilter.addEventListener('change', renderFiltered);
         if (statusFilter) statusFilter.addEventListener('change', renderFiltered);
         renderFiltered();
+        logToTerminal(`✅ Loaded ${trades.length} trades`);
     } catch (error) {
-        console.error('Failed to load trade history:', error);
+        logToTerminal(`❌ Failed to load trade history: ${error.message}`, 'error');
     }
 }
 
 async function loadLeaderboard() {
     try {
+        logToTerminal('🏆 Loading leaderboard...');
         const leaderboard = await window.api.getLeaderboard();
         const container = document.getElementById('leaderboardBody');
 
@@ -513,8 +569,9 @@ async function loadLeaderboard() {
         }
 
         container.innerHTML = leaderboard.map((user, index) => `<div class="flex items-center justify-between bg-slate-800/30 p-3 rounded-lg"><div class="flex items-center gap-3"><span class="text-2xl ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-slate-400' : index === 2 ? 'text-amber-600' : 'text-slate-500'}">${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}</span><div><p class="font-medium">${maskUsername(user.username)}</p><p class="text-xs text-slate-500">${user.total_trades || 0} trades | ${user.win_rate || 0}% win</p></div></div><div class="text-right"><p class="font-bold text-emerald-400">+$${user.net_profit?.toFixed(2)}</p><p class="text-xs text-slate-500">Best: ${user.best_streak || 0} streak</p></div></div>`).join('');
+        logToTerminal(`✅ Leaderboard loaded with ${leaderboard.length} traders`);
     } catch (error) {
-        console.error('Failed to load leaderboard:', error);
+        logToTerminal(`❌ Failed to load leaderboard: ${error.message}`, 'error');
     }
 }
 
@@ -531,7 +588,7 @@ async function loadFullInsights() {
                 <div class="bg-amber-500/20 p-6 rounded-lg text-center border border-amber-500/30">
                     <i class="fas fa-chart-line text-4xl text-amber-400 mb-3"></i>
                     <h3 class="text-xl font-bold mb-2">No Trades Yet</h3>
-                    <p class="text-slate-400 mb-4">${insights.message || "Execute a trade to generate AI insights!"}</p>
+                    <p class="text-slate-400 mb-4">Execute a trade to generate AI insights!</p>
                     <div class="text-sm text-slate-500 mb-4">Go to Dashboard and click GET SIGNAL to start trading</div>
                     <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
                 </div>
@@ -546,7 +603,7 @@ async function loadFullInsights() {
                 <div class="bg-blue-500/20 p-6 rounded-lg text-center border border-blue-500/30">
                     <i class="fas fa-spinner fa-pulse text-4xl text-blue-400 mb-3"></i>
                     <h3 class="text-xl font-bold mb-2">Gathering Trading Data...</h3>
-                    <p class="text-slate-400 mb-4">${insights.message || `AI needs more data. Complete ${tradesNeeded} more trade(s) for pattern analysis.`}</p>
+                    <p class="text-slate-400 mb-4">AI needs more data. Complete ${tradesNeeded} more trade(s) for pattern analysis.</p>
                     <div class="text-sm text-slate-500 mb-4">Current trades: ${insights.user_stats.total_trades}/3 needed</div>
                     <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
                 </div>
@@ -641,12 +698,10 @@ async function loadFullInsights() {
     }
 }
 
+// ============ THEME ============
 function setupTheme() {
     const savedTheme = localStorage.getItem('monix_theme');
     const isDark = savedTheme !== 'light';
-    const themeIcon = document.getElementById('themeIcon');
-    const themeText = document.getElementById('themeText');
-    
     if (!isDark) {
         document.body.classList.add('light-theme');
         document.body.classList.remove('dark-theme');
@@ -654,7 +709,6 @@ function setupTheme() {
         if (themeText) themeText.innerText = 'Light Mode';
     }
 
-    const themeToggle = document.getElementById('themeToggle');
     if (themeToggle) {
         themeToggle.addEventListener('click', () => {
             const isLight = document.body.classList.contains('light-theme');
@@ -665,6 +719,7 @@ function setupTheme() {
                 if (themeIcon) themeIcon.className = 'fas fa-moon';
                 if (themeText) themeText.innerText = 'Dark Mode';
                 if (window.updateChartTheme) window.updateChartTheme(true);
+                logToTerminal('🌙 Theme changed to Dark');
             } else {
                 document.body.classList.remove('dark-theme');
                 document.body.classList.add('light-theme');
@@ -672,6 +727,7 @@ function setupTheme() {
                 if (themeIcon) themeIcon.className = 'fas fa-sun';
                 if (themeText) themeText.innerText = 'Light Mode';
                 if (window.updateChartTheme) window.updateChartTheme(false);
+                logToTerminal('☀️ Theme changed to Light');
             }
         });
     }
@@ -684,6 +740,7 @@ function updateServerTime() {
     }
 }
 
+// ============ MAIN INIT ============
 function showApp() {
     logToTerminal('🚀 Showing main application');
     if (authModal) authModal.classList.add('hidden');
@@ -743,20 +800,12 @@ async function initApp() {
     showAuthModal();
 }
 
+// Global function for dashboard navigation from insights
 window.switchPageToDashboard = function() {
     switchPage('dashboard');
 };
 window.switchPage = switchPage;
-window.showToast = window.showToast || function(title, message, type) {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
-    toast.innerHTML = `<div class="flex items-start gap-3"><span class="text-lg">${icon}</span><div class="flex-1"><p class="font-semibold text-sm">${title}</p><p class="text-xs text-slate-400 mt-1">${message}</p></div><button class="text-slate-500 hover:text-white" onclick="this.parentElement.parentElement.remove()">✕</button></div>`;
-    container.appendChild(toast);
-    setTimeout(() => toast.remove(), 5000);
-};
+window.loadFullInsights = loadFullInsights;
 
 if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {

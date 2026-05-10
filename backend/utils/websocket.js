@@ -69,6 +69,21 @@ function broadcastTradeUpdate(trade) {
     });
 }
 
+function broadcastAIUpdate(update) {
+    broadcastToAll({
+        type: 'ai_update',
+        data: update
+    });
+}
+
+function broadcastNewSetup(setup) {
+    broadcastToAll({
+        type: 'new_setup',
+        setup: setup,
+        timestamp: Date.now()
+    });
+}
+
 module.exports = {
     setWebSocketServer,
     setClients,
@@ -78,5 +93,7 @@ module.exports = {
     broadcastNotification,
     broadcastTradeResult,
     broadcastBalance,
-    broadcastTradeUpdate
+    broadcastTradeUpdate,
+    broadcastAIUpdate,
+    broadcastNewSetup
 };

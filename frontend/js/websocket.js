@@ -1,6 +1,7 @@
 let ws = null;
 let wsReconnectAttempts = 0;
 let wsReconnectInterval = null;
+let lastSetupAlertTime = 0;
 
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -62,6 +63,37 @@ function reconnectWebSocket() {
     }, 3000);
 }
 
+function playBellSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 880;
+        gainNode.gain.value = 0.3;
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+        oscillator.stop(audioContext.currentTime + 0.5);
+        
+        setTimeout(() => {
+            const osc2 = audioContext.createOscillator();
+            const gain2 = audioContext.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioContext.destination);
+            osc2.frequency.value = 660;
+            gain2.gain.value = 0.2;
+            osc2.start();
+            gain2.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+            osc2.stop(audioContext.currentTime + 0.3);
+        }, 150);
+    } catch(e) {
+        console.log('Bell sound not supported');
+    }
+}
+
 function handleWebSocketMessage(data) {
     switch (data.type) {
         case 'price':
@@ -74,16 +106,79 @@ function handleWebSocketMessage(data) {
             }
             break;
 
+        case 'new_setup':
+            console.log('🔔 New setup detected!', data.setup);
+            
+            // Play bell sound
+            playBellSound();
+            
+            // Send browser notification
+            if (Notification.permission === 'granted') {
+                new Notification('🔔 New Trading Setup!', {
+                    body: `${data.setup.action_display} at $${data.setup.entry_price?.toFixed(2)} with ${data.setup.confidence}% confidence`,
+                    icon: '/favicon.ico',
+                    tag: 'new_setup',
+                    requireInteraction: true
+                });
+            }
+            
+            // Show toast notification
+            if (window.showToast) {
+                window.showToast(
+                    '🔔 New Setup Detected!',
+                    `${data.setup.action_display} at $${data.setup.entry_price?.toFixed(2)} | Confidence: ${data.setup.confidence}%`,
+                    'info'
+                );
+            }
+            
+            // Update UI to highlight the setup
+            const signalReasoning = document.getElementById('signalReasoning');
+            if (signalReasoning) {
+                signalReasoning.innerHTML = `🔔 SETUP READY! ${data.setup.action_display} at $${data.setup.entry_price?.toFixed(2)}. Click for details.`;
+                signalReasoning.style.cursor = 'pointer';
+                signalReasoning.style.textDecoration = 'underline';
+                signalReasoning.style.fontWeight = 'bold';
+                signalReasoning.style.color = '#fbbf24';
+                
+                // Flash effect
+                signalReasoning.style.transition = 'all 0.3s ease';
+                setTimeout(() => {
+                    if (signalReasoning) signalReasoning.style.color = '';
+                }, 2000);
+            }
+            
+            // Store current setup for modal
+            window.currentDisplaySignal = {
+                action: data.setup.action,
+                confidence: data.setup.confidence,
+                pattern: data.setup.pattern,
+                entry_price: data.setup.entry_price,
+                take_profit: data.setup.take_profit,
+                stop_loss: data.setup.stop_loss,
+                reasoning: data.setup.reason,
+                simple_reason: data.setup.reason,
+                rsi: data.setup.market_rsi,
+                symbol: data.setup.symbol,
+                support: data.setup.market_support,
+                resistance: data.setup.market_resistance,
+                market_feeling: data.setup.market_feeling,
+                entry_time: data.setup.estimated_time === 'Now' ? new Date().toLocaleTimeString() : data.setup.estimated_time,
+                exit_time: data.setup.estimated_time === 'Now' ? new Date(Date.now() + 5*60000).toLocaleTimeString() : '5 min after entry',
+                is_waiting: false,
+                entry_condition: data.setup.entry_condition
+            };
+            break;
+
         case 'signal':
             if (data.signal && window.displaySignal) {
                 window.displaySignal(data.signal);
-                showToast('New AI Signal!', `${data.signal.action} ${data.signal.symbol} with ${data.signal.confidence}% confidence`, 'info');
-                playSound('signal');
+                if (window.showToast) window.showToast('AI Signal', `${data.signal.action} ${data.signal.symbol} with ${data.signal.confidence}% confidence`, 'info');
+                if (window.playSound) window.playSound('signal');
             }
             break;
 
         case 'notification':
-            showToast(data.title, data.message, data.notificationType);
+            if (window.showToast) window.showToast(data.title, data.message, data.notificationType);
             break;
 
         case 'trade_result':
@@ -97,8 +192,14 @@ function handleWebSocketMessage(data) {
                 if (window.updateLockedBalance) {
                     window.updateLockedBalance();
                 }
-                playSound(data.trade.status === 'WIN' ? 'win' : 'loss');
-                showToast(
+                if (data.trade.status === 'WIN') {
+                    if (window.playSound) window.playSound('win');
+                    if (window.sendNotification) window.sendNotification('Trade WIN!', `${data.trade.action} on ${data.trade.symbol}: +$${data.trade.profit?.toFixed(2)}`);
+                } else if (data.trade.status === 'LOSS') {
+                    if (window.playSound) window.playSound('loss');
+                    if (window.sendNotification) window.sendNotification('Trade LOSS', `${data.trade.action} on ${data.trade.symbol}: -$${Math.abs(data.trade.profit || 0).toFixed(2)}`);
+                }
+                if (window.showToast) window.showToast(
                     `Trade ${data.trade.status}`,
                     `${data.trade.action} on ${data.trade.symbol}: ${data.trade.status === 'WIN' ? '+' : ''}$${data.trade.profit?.toFixed(2)}`,
                     data.trade.status === 'WIN' ? 'success' : 'error'
@@ -118,6 +219,12 @@ function handleWebSocketMessage(data) {
         case 'trade_update':
             if (data.trade && window.loadRecentTrades) {
                 window.loadRecentTrades();
+            }
+            break;
+
+        case 'ai_update':
+            if (data.data && window.updateAIDisplay) {
+                window.updateAIDisplay(data.data);
             }
             break;
 
@@ -168,7 +275,6 @@ function showToast(title, message, type = 'info') {
     `;
 
     container.appendChild(toast);
-
     setTimeout(() => toast.remove(), 5000);
 }
 
@@ -211,13 +317,164 @@ function playSound(type) {
                 gain2.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
                 osc2.stop(audioContext.currentTime + 0.3);
             }, 200);
+        } else if (type === 'execute') {
+            oscillator.frequency.value = 523.25;
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+            oscillator.stop(audioContext.currentTime + 0.3);
         }
     } catch (e) {
         console.log('Audio not supported');
     }
 }
 
+function sendNotification(title, body, tag = 'trade') {
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body, tag, icon: '/favicon.ico' });
+    }
+}
+
+function updateAIDisplay(aiData) {
+    const watchState = aiData.watch_state;
+    if (!watchState) return;
+    
+    const signalReasoning = document.getElementById('signalReasoning');
+    if (signalReasoning && watchState.reason) {
+        let displayText = '';
+        if (watchState.status === 'ANALYZING_NEW_SYMBOL') {
+            displayText = `🤖 AI: ${watchState.reason}`;
+            signalReasoning.style.color = '#fbbf24';
+        } else if (watchState.action === 'WAIT' || watchState.action === 'WAIT_BUY' || watchState.action === 'WAIT_SELL') {
+            displayText = `🤖 AI: ${watchState.reason} ${watchState.entry_condition ? `Entry when: ${watchState.entry_condition}` : ''}`;
+            signalReasoning.style.color = '';
+        } else if (watchState.is_new_setup) {
+            displayText = `🔔 SETUP READY! ${watchState.action_display} at $${watchState.entry_price?.toFixed(2)}. Click for details.`;
+            signalReasoning.style.color = '#fbbf24';
+            signalReasoning.style.fontWeight = 'bold';
+        } else {
+            displayText = `🤖 AI: ${watchState.action_display} - ${watchState.reason}`;
+            signalReasoning.style.color = '';
+            signalReasoning.style.fontWeight = 'normal';
+        }
+        signalReasoning.innerHTML = displayText;
+        signalReasoning.style.cursor = 'pointer';
+        signalReasoning.style.textDecoration = 'underline';
+        signalReasoning.onclick = () => {
+            if (window.showAIReasonModal && window.currentDisplaySignal) {
+                window.showAIReasonModal(window.currentDisplaySignal);
+            } else if (window.showAIReasonModal && watchState) {
+                // Create signal object from watchState
+                const signalFromWatch = {
+                    action: watchState.action === 'BUY' ? 'BUY' : (watchState.action === 'SELL' ? 'SELL' : 'WAIT'),
+                    confidence: watchState.confidence,
+                    pattern: watchState.pattern,
+                    entry_price: watchState.entry_price || watchState.market_price,
+                    take_profit: watchState.take_profit,
+                    stop_loss: watchState.stop_loss,
+                    reasoning: watchState.reason,
+                    simple_reason: watchState.reason,
+                    rsi: watchState.market_rsi,
+                    support: watchState.market_support,
+                    resistance: watchState.market_resistance,
+                    market_feeling: watchState.market_feeling,
+                    entry_time: watchState.estimated_entry_time === 'Now' ? new Date().toLocaleTimeString() : watchState.estimated_entry_time,
+                    exit_time: watchState.estimated_entry_time === 'Now' ? new Date(Date.now() + 5*60000).toLocaleTimeString() : '5 min after entry',
+                    is_waiting: watchState.action === 'WAIT' || watchState.action === 'WAIT_BUY' || watchState.action === 'WAIT_SELL',
+                    entry_condition: watchState.entry_condition
+                };
+                window.showAIReasonModal(signalFromWatch);
+            }
+        };
+    }
+    
+    const signalAction = document.getElementById('signalAction');
+    if (signalAction) {
+        if (watchState.status === 'ANALYZING_NEW_SYMBOL') {
+            signalAction.innerHTML = '⏳ ANALYZING...';
+            signalAction.className = 'text-2xl font-bold text-yellow-400';
+        } else if (watchState.action === 'WAIT' || watchState.action === 'WAIT_BUY' || watchState.action === 'WAIT_SELL') {
+            signalAction.innerHTML = '⏳ WAITING FOR SETUP';
+            signalAction.className = 'text-2xl font-bold text-yellow-400';
+        } else if (watchState.action === 'BUY') {
+            signalAction.innerHTML = '📈 BUY (Price will go UP)';
+            signalAction.className = 'text-4xl font-black text-emerald-400';
+        } else if (watchState.action === 'SELL') {
+            signalAction.innerHTML = '🔻 SELL (Price will go DOWN)';
+            signalAction.className = 'text-4xl font-black text-red-400';
+        }
+    }
+    
+    const signalConfidence = document.getElementById('signalConfidence');
+    if (signalConfidence && watchState.confidence) {
+        signalConfidence.innerHTML = `${watchState.confidence}%`;
+    }
+    
+    const signalPattern = document.getElementById('signalPattern');
+    if (signalPattern && watchState.pattern) {
+        signalPattern.innerHTML = watchState.pattern;
+    }
+    
+    const signalEntry = document.getElementById('signalEntry');
+    if (signalEntry && watchState.entry_price) {
+        signalEntry.innerHTML = `$${watchState.entry_price.toFixed(2)}`;
+    }
+    
+    const signalTP = document.getElementById('signalTP');
+    if (signalTP && watchState.take_profit) {
+        signalTP.innerHTML = `$${watchState.take_profit.toFixed(2)}`;
+    }
+    
+    const signalSL = document.getElementById('signalSL');
+    if (signalSL && watchState.stop_loss) {
+        signalSL.innerHTML = `$${watchState.stop_loss.toFixed(2)}`;
+    }
+    
+    const rsiValue = document.getElementById('rsiValue');
+    if (rsiValue && watchState.market_rsi) {
+        rsiValue.innerHTML = watchState.market_rsi;
+    }
+    
+    const supportLevel = document.getElementById('supportLevel');
+    if (supportLevel && watchState.market_support) {
+        supportLevel.innerHTML = `$${watchState.market_support.toFixed(2)}`;
+    }
+    
+    const resistanceLevel = document.getElementById('resistanceLevel');
+    if (resistanceLevel && watchState.market_resistance) {
+        resistanceLevel.innerHTML = `$${watchState.market_resistance.toFixed(2)}`;
+    }
+    
+    // Store current display signal for modal
+    window.currentDisplaySignal = {
+        action: watchState.action === 'BUY' ? 'BUY' : (watchState.action === 'SELL' ? 'SELL' : 'WAIT'),
+        confidence: watchState.confidence,
+        pattern: watchState.pattern,
+        entry_price: watchState.entry_price || watchState.market_price,
+        take_profit: watchState.take_profit,
+        stop_loss: watchState.stop_loss,
+        reasoning: watchState.reason,
+        simple_reason: watchState.reason,
+        rsi: watchState.market_rsi,
+        support: watchState.market_support,
+        resistance: watchState.market_resistance,
+        market_feeling: watchState.market_feeling,
+        entry_time: watchState.estimated_entry_time === 'Now' ? new Date().toLocaleTimeString() : watchState.estimated_entry_time,
+        exit_time: watchState.estimated_entry_time === 'Now' ? new Date(Date.now() + 5*60000).toLocaleTimeString() : '5 min after entry',
+        is_waiting: watchState.action === 'WAIT' || watchState.action === 'WAIT_BUY' || watchState.action === 'WAIT_SELL',
+        entry_condition: watchState.entry_condition
+    };
+}
+
+// Request notification permission on page load
+if (Notification.permission === 'default') {
+    Notification.requestPermission();
+}
+
 window.connectWebSocket = connectWebSocket;
 window.wsConnected = () => ws && ws.readyState === WebSocket.OPEN;
 window.showToast = showToast;
 window.playSound = playSound;
+window.sendNotification = sendNotification;
+window.updateAIDisplay = updateAIDisplay;
+window.playBellSound = playBellSound;

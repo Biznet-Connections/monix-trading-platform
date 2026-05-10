@@ -15,20 +15,19 @@ router.get('/profile', authMiddleware, async (req, res) => {
         const symbolStats = await Trade.getSymbolStats(req.userId);
 
         let derivBalance = null;
-        const token = user.is_demo ? user.demo_token : user.real_token;
+        const tokenToUse = user.is_demo ? user.demo_token : user.real_token;
         
-        if (token && token.trim().length > 0) {
+        if (tokenToUse && tokenToUse.trim().length > 0) {
             try {
-                const needsReconnect = !derivService.authorized || derivService.currentToken !== token;
-                if (needsReconnect) {
-                    await derivService.reconnectWithToken(token);
-                } else {
-                    const balance = await derivService.getBalance();
-                    derivBalance = { balance: balance.balance, currency: balance.currency || 'USD', authorized: true };
-                    console.log(`💰 [API] Deriv balance: ${balance.balance} ${balance.currency}`);
-                }
+                const balanceResult = await derivService.getBalanceWithToken(tokenToUse);
+                derivBalance = { 
+                    balance: balanceResult.balance, 
+                    currency: balanceResult.currency || 'USD', 
+                    authorized: true 
+                };
+                console.log(`💰 [API] Fresh balance for ${user.is_demo ? 'DEMO' : 'REAL'} mode: ${balanceResult.balance}`);
             } catch (e) {
-                console.error('Failed to get Deriv balance:', e.message);
+                console.error('Failed to fetch fresh balance:', e.message);
                 derivBalance = { authorized: false, balance: 0, currency: 'USD', error: e.message };
             }
         } else {
@@ -82,7 +81,6 @@ router.put('/settings', authMiddleware, async (req, res) => {
         if (jackpot_mode !== undefined) updates.jackpot_mode = jackpot_mode ? 1 : 0;
 
         await User.update(req.userId, updates);
-
         res.json({ success: true, message: 'Settings updated' });
     } catch (error) {
         console.error('Update settings error:', error);
@@ -95,39 +93,26 @@ router.put('/api-keys', authMiddleware, async (req, res) => {
         const { demo_token, real_token } = req.body;
 
         console.log(`🔑 [API] Updating API keys for user ${req.userId}`);
-        console.log(`   Demo token: ${demo_token ? '***' + demo_token.slice(-4) : 'empty'}`);
-        console.log(`   Real token: ${real_token ? '***' + real_token.slice(-4) : 'empty'}`);
 
         const updates = {};
         if (demo_token !== undefined) updates.demo_token = demo_token;
         if (real_token !== undefined) updates.real_token = real_token;
 
         await User.update(req.userId, updates);
-        console.log(`✅ [API] API keys saved to database`);
 
         const user = await User.findById(req.userId);
         const tokenToUse = user.is_demo ? user.demo_token : user.real_token;
-
-        console.log(`🔄 [API] Current mode: ${user.is_demo ? 'DEMO' : 'REAL'}`);
-        console.log(`🔑 [API] Token to use: ${tokenToUse ? '***' + tokenToUse.slice(-4) : 'none'}`);
 
         let reconnectResult = { success: false };
         let balanceValue = 0;
         let currencyValue = 'USD';
 
         if (tokenToUse && tokenToUse.trim().length > 0) {
-            console.log(`🔄 [API] Attempting to reconnect Deriv...`);
             reconnectResult = await derivService.reconnectWithToken(tokenToUse);
-            console.log(`📊 [API] Reconnect result: ${reconnectResult.success ? 'SUCCESS' : 'FAILED'}`);
             if (reconnectResult.success) {
                 balanceValue = reconnectResult.balance;
                 currencyValue = reconnectResult.currency || 'USD';
-                console.log(`💰 [API] Balance: ${balanceValue} ${currencyValue}`);
-            } else {
-                console.log(`❌ [API] Error: ${reconnectResult.error}`);
             }
-        } else {
-            console.log('⚠️ [API] No token available for current mode - staying in read-only mode');
         }
 
         res.json({
@@ -150,16 +135,11 @@ router.post('/reconnect', authMiddleware, async (req, res) => {
         const user = await User.findById(req.userId);
         const tokenToUse = user.is_demo ? user.demo_token : user.real_token;
 
-        console.log(`🔑 [API] Current mode: ${user.is_demo ? 'DEMO' : 'REAL'}`);
-        console.log(`🔑 [API] Token: ${tokenToUse ? '***' + tokenToUse.slice(-4) : 'none'}`);
-
         if (!tokenToUse || tokenToUse.trim().length === 0) {
-            console.log('❌ [API] No API token found for current mode');
             return res.status(400).json({ error: 'No API token found for current mode' });
         }
 
         const result = await derivService.reconnectWithToken(tokenToUse);
-        console.log(`📊 [API] Reconnect result: ${result.success ? 'SUCCESS' : 'FAILED'}`);
 
         if (result.success) {
             broadcastBalance(req.userId, result.balance);
@@ -195,17 +175,12 @@ router.post('/switch-mode', authMiddleware, async (req, res) => {
         let currencyValue = 'USD';
 
         if (tokenToUse && tokenToUse.trim().length > 0) {
-            console.log(`🔄 [API] Reconnecting with ${modeName} mode token...`);
             reconnectResult = await derivService.reconnectWithToken(tokenToUse);
-            console.log(`📊 [API] Reconnect result: ${reconnectResult.success ? 'SUCCESS' : 'FAILED'}`);
             if (reconnectResult.success) {
                 balanceValue = reconnectResult.balance;
                 currencyValue = reconnectResult.currency || 'USD';
-                console.log(`💰 [API] New balance: ${balanceValue} ${currencyValue}`);
                 broadcastBalance(req.userId, balanceValue);
             }
-        } else {
-            console.log(`⚠️ [API] No ${modeName} token available - staying in read-only mode`);
         }
 
         res.json({
