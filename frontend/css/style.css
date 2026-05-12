@@ -69,30 +69,60 @@ body.light-theme .sidebar-glass {
     display: none !important;
 }
 
-/* Sidebar Drawer */
+/* Sidebar Drawer - HAMBURGER ON ALL SCREENS */
 .sidebar-drawer {
     transform: translateX(-100%);
     transition: transform 0.3s ease-in-out;
     z-index: 100;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 280px;
 }
 
 .sidebar-drawer.open {
     transform: translateX(0);
 }
 
+/* Mobile menu button - VISIBLE ON ALL SCREENS */
+.mobile-menu-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 50;
+}
+
+.mobile-menu-btn:hover {
+    background: rgba(99, 102, 241, 0.3);
+    transform: scale(1.05);
+}
+
+/* On desktop, sidebar starts hidden (drawer mode) */
 @media (min-width: 1024px) {
     .sidebar-drawer {
-        transform: translateX(0) !important;
-        position: relative !important;
+        transform: translateX(-100%);
+        position: fixed;
+    }
+    .sidebar-drawer.open {
+        transform: translateX(0);
     }
     .mobile-menu-btn {
-        display: none !important;
+        display: flex !important;
     }
-    .sidebar-drawer .lg\\:hidden {
-        display: none !important;
+    .main-content {
+        margin-left: 0 !important;
     }
 }
 
+/* On mobile, same drawer behavior */
 @media (max-width: 1023px) {
     .main-content {
         margin-left: 0 !important;
@@ -231,27 +261,13 @@ button:disabled {
     animation: slideIn 0.3s ease-out;
 }
 
-.toast-success {
-    border-left: 4px solid #22c55e;
-}
-
-.toast-error {
-    border-left: 4px solid #ef4444;
-}
-
-.toast-info {
-    border-left: 4px solid #4f46e5;
-}
+.toast-success { border-left: 4px solid #22c55e; }
+.toast-error { border-left: 4px solid #ef4444; }
+.toast-info { border-left: 4px solid #4f46e5; }
 
 @keyframes slideIn {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
 }
 
 /* Loading Spinner */
@@ -265,9 +281,7 @@ button:disabled {
     display: inline-block;
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Responsive Tables */
 @media (max-width: 768px) {
@@ -275,48 +289,24 @@ button:disabled {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
-
-    table {
-        min-width: 600px;
-    }
-
-    .p-4 {
-        padding: 0.75rem;
-    }
+    table { min-width: 600px; }
+    .p-4 { padding: 0.75rem; }
 }
 
-/* All links should be clickable */
 a, button, .nav-link, #openApiKeys, #openSettings, #adminLink, .tf-btn, .tab-btn, .admin-tab {
     cursor: pointer;
 }
 
-/* Ensure no invisible overlays blocking clicks */
-.drawer-overlay {
-    pointer-events: auto;
-}
+.drawer-overlay { pointer-events: auto; }
+.sidebar-drawer nav a { pointer-events: auto; z-index: 101; }
 
-.sidebar-drawer nav a {
-    pointer-events: auto;
-    z-index: 101;
-}
-
-/* AI Reason Modal Styles */
-#aiReasonModal .modal-content {
-    animation: modalFadeIn 0.3s ease-out;
-}
+#aiReasonModal .modal-content { animation: modalFadeIn 0.3s ease-out; }
 
 @keyframes modalFadeIn {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
 }
 
-/* Auto Mode Badge */
 .auto-mode-badge {
     background: linear-gradient(135deg, #4f46e5, #7c3aed);
     padding: 2px 8px;
@@ -326,37 +316,14 @@ a, button, .nav-link, #openApiKeys, #openSettings, #adminLink, .tf-btn, .tab-btn
     margin-left: 8px;
 }
 
-/* Clickable AI Reason Text */
-#signalReasoning {
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
+#signalReasoning { cursor: pointer; transition: all 0.2s ease; }
+#signalReasoning:hover { color: #818cf8; text-decoration: underline !important; }
 
-#signalReasoning:hover {
-    color: #818cf8;
-    text-decoration: underline !important;
-}
+@keyframes signalPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+.signal-pulse { animation: signalPulse 1s ease-in-out 3; }
 
-/* Pulse animation for new signal */
-@keyframes signalPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
+#aiReasonModal .modal-content { max-height: 85vh; overflow-y: auto; }
 
-.signal-pulse {
-    animation: signalPulse 1s ease-in-out 3;
-}
-
-/* Modal scrollbar */
-#aiReasonModal .modal-content {
-    max-height: 85vh;
-    overflow-y: auto;
-}
-
-/* Responsive modal */
 @media (max-width: 640px) {
-    #aiReasonModal .modal-content {
-        width: 95%;
-        margin: 0 auto;
-    }
+    #aiReasonModal .modal-content { width: 95%; margin: 0 auto; }
 }

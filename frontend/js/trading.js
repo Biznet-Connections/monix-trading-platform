@@ -21,6 +21,17 @@ const symbolSelect = document.getElementById('symbolSelect');
 const refreshTradesBtn = document.getElementById('refreshTradesBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 
+// Debug log helper - sends to console AND backend
+function uiLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`🖱️ [${timestamp}] ${message}`);
+    fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `🖱️ ${message}`, type, timestamp: new Date().toISOString() })
+    }).catch(() => {});
+}
+
 if (getSignalBtn) {
     getSignalBtn.innerHTML = '🧠 AI REASONING';
     getSignalBtn.title = 'View current AI market analysis (No automatic trade)';
@@ -85,7 +96,7 @@ function sendNotification(title, body, tag = 'trade') {
 }
 
 function showAIReasonModal(signal) {
-    console.log(`📱 [Trading] Opening AI Reason Modal for symbol: ${signal.symbol}, action: ${signal.action}`);
+    uiLog(`Opening AI Reason Modal: ${signal.symbol} action=${signal.action}`);
     const modal = document.getElementById('aiReasonModal');
     if (!modal) {
         console.error('Modal element not found!');
@@ -94,7 +105,7 @@ function showAIReasonModal(signal) {
 
     const isAutoMode = autoModeToggle && autoModeToggle.checked;
     const isWaiting = signal.is_waiting;
-    
+
     const modalAction = document.getElementById('modalAction');
     const modalSymbol = document.getElementById('modalSymbol');
     const modalPrice = document.getElementById('modalPrice');
@@ -109,35 +120,33 @@ function showAIReasonModal(signal) {
     const modalConfidenceBar = document.getElementById('modalConfidenceBar');
     const buttonsDiv = document.getElementById('modalButtons');
     const autoModeNote = document.getElementById('autoModeNote');
-    
+
     if (modalAction) {
         modalAction.innerHTML = signal.action === 'BUY' ? '📈 BUY (Price will go UP)' : (signal.action === 'SELL' ? '📉 SELL (Price will go DOWN)' : '⏳ WAITING FOR SETUP');
         modalAction.className = `text-2xl font-bold ${signal.action === 'BUY' ? 'text-emerald-400' : signal.action === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`;
     }
-    
-    // CRITICAL FIX: Use signal.symbol from the API response
+
     if (modalSymbol) {
         const displaySymbol = signal.symbol || 'R_75';
         modalSymbol.innerHTML = displaySymbol;
-        console.log(`📱 [Trading] Modal symbol set to: ${displaySymbol}`);
     }
-    
+
     if (modalPrice) modalPrice.innerHTML = `$${signal.entry_price?.toFixed(2) || signal.support?.toFixed(2) || '0.00'}`;
     if (modalMarketFeeling) modalMarketFeeling.innerHTML = signal.market_feeling || (signal.rsi > 65 ? 'Price is high' : (signal.rsi < 35 ? 'Price is low' : 'Market is stable'));
     if (modalPattern) modalPattern.innerHTML = signal.pattern || 'Pattern detected';
     if (modalEntryTime) modalEntryTime.innerHTML = signal.entry_time || 'Waiting...';
     if (modalExitTime) modalExitTime.innerHTML = signal.exit_time || '5 minutes after entry';
-    
+
     const defaultStake = parseFloat(stakeSlider ? stakeSlider.value : 0.35);
     const profitDollars = (defaultStake * (signal.confidence / 100) * 1.0).toFixed(2);
     const lossDollars = defaultStake.toFixed(2);
-    
+
     if (modalTakeProfit) modalTakeProfit.innerHTML = signal.take_profit ? `$${signal.take_profit.toFixed(2)} (make +$${profitDollars})` : 'Calculating...';
     if (modalStopLoss) modalStopLoss.innerHTML = signal.stop_loss ? `$${signal.stop_loss.toFixed(2)} (lose -$${lossDollars})` : 'Calculating...';
     if (modalReason) modalReason.innerHTML = signal.simple_reason || signal.reasoning || 'AI analysis complete';
     if (modalConfidence) modalConfidence.innerHTML = `${signal.confidence}%`;
     if (modalConfidenceBar) modalConfidenceBar.style.width = `${signal.confidence}%`;
-    
+
     if (isWaiting || signal.action === 'WAIT') {
         if (buttonsDiv) buttonsDiv.classList.add('hidden');
         if (autoModeNote) {
@@ -155,7 +164,7 @@ function showAIReasonModal(signal) {
         if (buttonsDiv) buttonsDiv.classList.remove('hidden');
         if (autoModeNote) autoModeNote.classList.add('hidden');
     }
-    
+
     modal.classList.remove('hidden');
     window.currentModalSignal = signal;
 }
@@ -164,10 +173,12 @@ function closeAIReasonModal() {
     const modal = document.getElementById('aiReasonModal');
     if (modal) modal.classList.add('hidden');
     window.currentModalSignal = null;
+    uiLog('AI Reason Modal closed');
 }
 
 function acceptTradeFromModal() {
     if (window.currentModalSignal && !isProcessingTrade && window.currentModalSignal.action !== 'WAIT') {
+        uiLog(`Accept trade from modal: ${window.currentModalSignal.action}`);
         closeAIReasonModal();
         currentSignal = window.currentModalSignal;
         executeTrade();
@@ -284,7 +295,7 @@ function showActiveTradePanel(contractId, entryPrice, action, stake, exitTimesta
 
 function displaySignal(signal) {
     currentSignal = signal;
-    console.log(`📊 [Trading] Signal: ${signal.action} ${signal.confidence}% on ${signal.symbol}`);
+    uiLog(`Signal displayed: ${signal.action} ${signal.confidence}% on ${signal.symbol}`);
 
     const signalAction = document.getElementById('signalAction');
     const signalConfidence = document.getElementById('signalConfidence');
@@ -307,7 +318,7 @@ function displaySignal(signal) {
     if (signalEntry) signalEntry.innerHTML = `$${signal.entry_price.toFixed(2)}`;
     if (signalTP) signalTP.innerHTML = `$${signal.take_profit?.toFixed(2) || '—'}`;
     if (signalSL) signalSL.innerHTML = `$${signal.stop_loss?.toFixed(2) || '—'}`;
-    
+
     if (signalReasoning) {
         const reasonText = signal.simple_reason || signal.reasoning || 'AI analysis complete';
         signalReasoning.innerHTML = reasonText;
@@ -315,7 +326,7 @@ function displaySignal(signal) {
         signalReasoning.style.textDecoration = 'underline';
         signalReasoning.onclick = () => window.showAIReasonModal(signal);
     }
-    
+
     if (supportLevel && signal.support) supportLevel.innerHTML = `$${signal.support.toFixed(2)}`;
     if (resistanceLevel && signal.resistance) resistanceLevel.innerHTML = `$${signal.resistance.toFixed(2)}`;
     if (rsiValue && signal.rsi) rsiValue.innerHTML = signal.rsi;
@@ -340,13 +351,14 @@ function displaySignal(signal) {
     sendNotification('New AI Signal', `${signal.action} ${signal.symbol || 'signal'} with ${signal.confidence}% confidence`);
 
     if (autoModeToggle && autoModeToggle.checked) {
-        console.log('🤖 [Auto Mode] Auto-executing trade...');
+        uiLog('Auto Mode: Auto-executing trade from signal');
         setTimeout(() => executeTrade(), 2000);
     }
 }
 
 function clearSignal() {
     currentSignal = null;
+    uiLog('Signal cleared');
 
     const signalAction = document.getElementById('signalAction');
     const signalConfidence = document.getElementById('signalConfidence');
@@ -390,12 +402,13 @@ function clearSignal() {
 
 async function executeTrade() {
     if (!currentSignal || isProcessingTrade) return;
-    
+
     if (currentSignal.action === 'WAIT') {
         if (window.showToast) window.showToast('No Setup', 'AI is waiting for market conditions. No active trade setup.', 'info');
         return;
     }
 
+    uiLog(`Executing trade: ${currentSignal.action} on ${symbolSelect?.value || 'R_75'}`);
     isProcessingTrade = true;
     if (yesBtn) {
         yesBtn.disabled = true;
@@ -426,6 +439,7 @@ async function executeTrade() {
         });
 
         if (result.success) {
+            uiLog(`Trade executed successfully: ${result.contract_id}`);
             playSound('execute');
             sendNotification('Trade Executed', `${currentSignal.action} on ${symbolSelect?.value}`);
             if (window.showToast) window.showToast('Trade Executed', `Contract ID: ${String(result.contract_id).substring(0, 8)}...`, 'success');
@@ -438,9 +452,11 @@ async function executeTrade() {
             await refreshUserData();
             await updateLockedBalance();
         } else {
+            uiLog(`Trade failed: ${result.error}`, 'error');
             if (window.showToast) window.showToast('Trade Failed', result.error || 'Unknown error', 'error');
         }
     } catch (error) {
+        uiLog(`Trade error: ${error.message}`, 'error');
         if (window.showToast) window.showToast('Trade Failed', error.message, 'error');
     } finally {
         isProcessingTrade = false;
@@ -452,7 +468,7 @@ async function executeTrade() {
 }
 
 async function changeSymbol(symbol) {
-    console.log(`🔄 [Trading] Changing symbol to: ${symbol}`);
+    uiLog(`Changing symbol to: ${symbol}`);
     try {
         const response = await fetch('/api/ai/symbol', {
             method: 'POST',
@@ -464,14 +480,14 @@ async function changeSymbol(symbol) {
         });
         const data = await response.json();
         if (data.success) {
-            console.log(`✅ [Trading] Symbol changed to: ${symbol}`);
+            uiLog(`Symbol changed successfully: ${symbol}`);
             if (window.showToast) window.showToast('Symbol Changed', `AI now analyzing ${symbol}`, 'success');
             setTimeout(() => fetchAIAnalysis(), 1000);
         } else {
-            console.error('Failed to change symbol:', data.error);
+            uiLog(`Symbol change failed: ${data.error}`, 'error');
         }
     } catch (error) {
-        console.error('Error changing symbol:', error);
+        uiLog(`Symbol change error: ${error.message}`, 'error');
     }
 }
 
@@ -479,20 +495,21 @@ async function fetchAIAnalysis() {
     if (!getSignalBtn) return;
 
     const symbol = symbolSelect ? symbolSelect.value : 'R_75';
-    console.log(`🔍 [Trading] Fetching AI analysis for symbol: ${symbol}`);
+    uiLog(`Fetching AI analysis for: ${symbol}`);
     getSignalBtn.disabled = true;
     getSignalBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>FETCHING ANALYSIS...';
 
     try {
         const result = await window.api.generateSignal(symbol);
         if (result.success && result.signal) {
-            console.log(`🔍 [Trading] Analysis received for symbol: ${result.signal.symbol}`);
-            // Pass the full signal object to the modal
+            uiLog(`AI analysis received for: ${result.signal.symbol}`);
             showAIReasonModal(result.signal);
         } else if (result.success === false) {
+            uiLog(`AI analysis: ${result.message}`, 'info');
             if (window.showToast) window.showToast('AI Analysis', result.message, 'info');
         }
     } catch (error) {
+        uiLog(`AI analysis error: ${error.message}`, 'error');
         if (window.showToast) window.showToast('Error', error.message, 'error');
     } finally {
         getSignalBtn.disabled = false;
@@ -501,6 +518,7 @@ async function fetchAIAnalysis() {
 }
 
 function startLiveMonitoring() {
+    uiLog('Live monitoring started (30s interval)');
     if (liveMonitoringInterval) clearInterval(liveMonitoringInterval);
     liveMonitoringInterval = setInterval(() => {
         fetchAIAnalysis();
@@ -508,6 +526,7 @@ function startLiveMonitoring() {
 }
 
 async function switchMode(mode) {
+    uiLog(`Switching mode to: ${mode}`);
     try {
         const result = await window.api.switchMode(mode);
         if (result.success) {
@@ -523,11 +542,13 @@ async function switchMode(mode) {
             if (window.showToast) window.showToast(`Switched to ${mode.toUpperCase()} mode`, result.message, 'success');
         }
     } catch (error) {
+        uiLog(`Mode switch error: ${error.message}`, 'error');
         if (window.showToast) window.showToast('Error', error.message, 'error');
     }
 }
 
 async function updateSetting(setting, value) {
+    uiLog(`Updating setting: ${setting} = ${value}`);
     try {
         await window.api.updateUserSettings({ [setting]: value });
         if (setting === 'auto_mode' && value) {
@@ -536,7 +557,9 @@ async function updateSetting(setting, value) {
         } else if (setting === 'auto_mode' && !value) {
             if (liveMonitoringInterval) clearInterval(liveMonitoringInterval);
         }
-    } catch (error) {}
+    } catch (error) {
+        uiLog(`Setting update error: ${error.message}`, 'error');
+    }
 }
 
 async function loadRecentTrades() {
@@ -546,7 +569,8 @@ async function loadRecentTrades() {
         if (!tbody) return;
 
         if (!trades || trades.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No trades yet</tr</tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No trades yet</td></tr>';
+            uiLog('Recent trades: No trades found');
             return;
         }
 
@@ -559,10 +583,11 @@ async function loadRecentTrades() {
                 <td class="p-4">$${trade.exit_price?.toFixed(2) || '--'}</td>
                 <td class="p-4 text-right ${trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.profit >= 0 ? '+' : ''}$${trade.profit?.toFixed(2)}</td>
                 <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-[10px] ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : trade.status === 'LOSS' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}">${trade.status || 'PENDING'}</span></td>
-            </table>
+            </tr>
         `).join('');
+        uiLog(`Recent trades: Loaded ${trades.length} trades`);
     } catch (error) {
-        console.error('Load recent trades error:', error);
+        uiLog(`Recent trades error: ${error.message}`, 'error');
     }
 }
 
@@ -612,7 +637,7 @@ async function refreshUserData() {
             await updateLockedBalance();
         }
     } catch (error) {
-        console.error('Refresh user data error:', error);
+        uiLog(`Refresh user data error: ${error.message}`, 'error');
     }
 }
 
@@ -631,12 +656,14 @@ function addTradeToTable(trade) {
         <td class="p-4 text-right ${trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.profit ? (trade.profit >= 0 ? '+' : '') + trade.profit.toFixed(2) : '--'}</td>
         <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-[10px] ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : trade.status === 'LOSS' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}">${trade.status || 'PENDING'}</span></td>
     `;
-    
+
     tbody.insertBefore(newRow, tbody.firstChild);
     if (tbody.children.length > 20) {
         tbody.removeChild(tbody.lastChild);
     }
-    
+
+    uiLog(`Trade added to table: ${trade.action} ${trade.status}`);
+
     if (trade.status === 'WIN') {
         playSound('win');
         sendNotification('Trade WIN!', `${trade.action} on ${trade.symbol}: +$${trade.profit?.toFixed(2)}`);
@@ -654,6 +681,7 @@ function updateBalanceInUI(balance) {
 }
 
 function initTrading() {
+    uiLog('Initializing trading module...');
     if (stakeSlider) {
         stakeSlider.min = 0.35;
         stakeSlider.value = 0.35;
@@ -665,16 +693,18 @@ function initTrading() {
 
     if (getSignalBtn) {
         getSignalBtn.innerHTML = '🧠 AI REASONING';
-        getSignalBtn.addEventListener('click', (e) => { 
-            e.preventDefault(); 
+        getSignalBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            uiLog('Button clicked: AI REASONING');
             fetchAIAnalysis();
         });
     }
-    
+
     if (yesBtn) {
         yesBtn.innerHTML = '💰 BUY';
-        yesBtn.addEventListener('click', (e) => { 
-            e.preventDefault(); 
+        yesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            uiLog('Button clicked: BUY');
             if (currentSignal && !isProcessingTrade && currentSignal.action !== 'WAIT') {
                 executeTrade();
             } else if (currentSignal && currentSignal.action === 'WAIT') {
@@ -684,49 +714,52 @@ function initTrading() {
     }
     if (noBtn) {
         noBtn.innerHTML = '🔻 SELL';
-        noBtn.addEventListener('click', (e) => { 
-            e.preventDefault(); 
-            clearSignal(); 
-            if (window.showToast) window.showToast('Signal Declined', 'You declined this trade', 'info'); 
+        noBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            uiLog('Button clicked: DECLINE/SELL');
+            clearSignal();
+            if (window.showToast) window.showToast('Signal Declined', 'You declined this trade', 'info');
         });
     }
 
-    if (demoBtn) demoBtn.addEventListener('click', (e) => { e.preventDefault(); switchMode('demo'); });
-    if (realBtn) realBtn.addEventListener('click', (e) => { e.preventDefault(); switchMode('real'); });
+    if (demoBtn) demoBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: DEMO'); switchMode('demo'); });
+    if (realBtn) realBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REAL'); switchMode('real'); });
     if (switchModeBtn) switchModeBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        uiLog('Button clicked: SWITCH MODE');
         const isDemo = demoBtn && demoBtn.classList.contains('bg-emerald-500');
         switchMode(isDemo ? 'real' : 'demo');
     });
 
-    if (refreshBtn) refreshBtn.addEventListener('click', (e) => { e.preventDefault(); refreshUserData(); loadRecentTrades(); });
-    if (refreshTradesBtn) refreshTradesBtn.addEventListener('click', (e) => { e.preventDefault(); loadRecentTrades(); });
+    if (refreshBtn) refreshBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REFRESH'); refreshUserData(); loadRecentTrades(); });
+    if (refreshTradesBtn) refreshTradesBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REFRESH TRADES'); loadRecentTrades(); });
 
     if (symbolSelect) {
         symbolSelect.addEventListener('change', () => {
             const newSymbol = symbolSelect.value;
-            console.log(`🔄 [Trading] Symbol changed to: ${newSymbol}`);
+            uiLog(`Symbol select changed: ${newSymbol}`);
             clearSignal();
             if (window.showToast) window.showToast('Symbol Changed', `AI analyzing ${newSymbol}...`, 'info');
             changeSymbol(newSymbol);
         });
     }
 
-    if (pushSignalsToggle) pushSignalsToggle.addEventListener('change', (e) => updateSetting('push_signals', e.target.checked));
-    if (autoModeToggle) autoModeToggle.addEventListener('change', (e) => updateSetting('auto_mode', e.target.checked));
-    if (jackpotToggle) jackpotToggle.addEventListener('change', (e) => updateSetting('jackpot_mode', e.target.checked));
+    if (pushSignalsToggle) pushSignalsToggle.addEventListener('change', (e) => { uiLog(`Toggle: push_signals = ${e.target.checked}`); updateSetting('push_signals', e.target.checked); });
+    if (autoModeToggle) autoModeToggle.addEventListener('change', (e) => { uiLog(`Toggle: auto_mode = ${e.target.checked}`); updateSetting('auto_mode', e.target.checked); });
+    if (jackpotToggle) jackpotToggle.addEventListener('change', (e) => { uiLog(`Toggle: jackpot_mode = ${e.target.checked}`); updateSetting('jackpot_mode', e.target.checked); });
 
     if (Notification.permission === 'default') Notification.requestPermission();
 
     refreshUserData();
     loadRecentTrades();
-    
+
     if (recentTradesRefreshInterval) clearInterval(recentTradesRefreshInterval);
     recentTradesRefreshInterval = setInterval(() => {
         loadRecentTrades();
     }, 10000);
-    
+
     setInterval(() => { if (currentActiveTrade) updateLockedBalance(); }, 10000);
+    uiLog('Trading module initialized');
 }
 
 window.initTrading = initTrading;
