@@ -12,7 +12,8 @@ dotenv.config();
 
 const { init: initDatabase } = require('./config/database');
 const derivService = require('./services/derivService');
-const { broadcastPrice, broadcastSignal, broadcastNotification } = require('./utils/websocket');
+const marketData = require('./services/marketData');
+const { broadcastPrice, broadcastSignal, broadcastNotification, broadcastAIUpdate } = require('./utils/websocket');
 const aiTrader = require('./services/aiTrader');
 const User = require('./models/User');
 
@@ -28,50 +29,64 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+let lastTickTime = 0;
+let tickCount = 0;
+let wsClients = 0;
+let forceReconnecting = false;
+let lastReconnectAttempt = 0;
+const RECONNECT_COOLDOWN = 120000;
+
 global.clients = new Set();
 global.wss = wss;
 
 wss.on('connection', (ws) => {
     global.clients.add(ws);
-    console.log(`🔌 WebSocket client connected. Total clients: ${global.clients.size}`);
-
+    wsClients = global.clients.size;
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
             if (data.type === 'ping') {
                 ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
             }
-        } catch (error) {
-            console.error('WebSocket message error:', error);
-        }
+        } catch (error) {}
     });
-
     ws.on('close', () => {
         global.clients.delete(ws);
-        console.log(`🔌 WebSocket client disconnected. Total clients: ${global.clients.size}`);
+        wsClients = global.clients.size;
     });
-
     ws.send(JSON.stringify({ type: 'connected', message: 'Connected to MONIX WebSocket' }));
 });
 
-app.use(helmet({
-    contentSecurityPolicy: false,
-}));
+app.get('/health', (req, res) => {
+    const tickAge = lastTickTime ? Math.floor((Date.now() - lastTickTime) / 1000) : 999;
+    res.json({
+        status: 'ok',
+        ticksReceived: tickCount,
+        lastTickAge: tickAge,
+        aiTraderRunning: aiTrader.isRunning,
+        derivConnected: derivService.isConnected,
+        derivAuthorized: derivService.authorized,
+        memory: process.memoryUsage().heapUsed / 1024 / 1024
+    });
+});
+
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(compression());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 app.post('/api/log', express.json(), (req, res) => {
-    const { message, type, timestamp } = req.body;
+    const { message, type } = req.body;
     const logMethod = type === 'error' ? console.error : type === 'warn' ? console.warn : console.log;
     logMethod(`[CLIENT] ${message}`);
     res.json({ success: true });
 });
 
+// Increased rate limit from 100 to 500 for dashboard polling
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500,
     message: { error: 'Too many requests, please try again later' }
 });
 app.use('/api/', limiter);
@@ -88,6 +103,19 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
+// Self-ping
+let selfPingInterval = null;
+function startSelfPing() {
+    if (selfPingInterval) clearInterval(selfPingInterval);
+    const port = process.env.PORT || 3000;
+    selfPingInterval = setInterval(() => {
+        http.request({ hostname: 'localhost', port, path: '/health', method: 'GET', timeout: 5000 }, () => {})
+            .on('error', () => {})
+            .on('timeout', function() { this.destroy(); })
+            .end();
+    }, 300000);
+}
+
 async function startServer() {
     try {
         await initDatabase();
@@ -96,52 +124,67 @@ async function startServer() {
         try {
             await derivService.connect();
             console.log('✅ Deriv WebSocket connected');
-
-            derivService.subscribeToTicks(process.env.DEFAULT_SYMBOL || 'R_75');
+            await derivService.subscribeToTicks(process.env.DEFAULT_SYMBOL || 'R_75');
 
             derivService.on('tick', (tick) => {
+                tickCount++;
+                lastTickTime = Date.now();
+                if (tickCount % 100 === 0) {
+                    console.log(`📈 [Server] Ticks: ${tickCount} | $${tick.quote?.toFixed(2)} | ${tick.symbol}`);
+                }
                 broadcastPrice(tick);
             });
 
             derivService.on('trade_executed', (result) => {
-                console.log(`📊 Trade executed: ${result.contract_id}`);
-                broadcastNotification('Trade Executed', `Contract ${result.contract_id} opened`, 'success');
+                broadcastNotification('Trade Executed', `Contract ${String(result.contract_id).substring(0, 8)}...`, 'success');
             });
 
             derivService.on('trade_error', (error) => {
-                console.error('Trade error:', error);
                 broadcastNotification('Trade Failed', error.message, 'error');
             });
 
             derivService.on('authorized', (data) => {
                 console.log(`🔐 Authorized: ${data.loginid} | Balance: ${data.balance} ${data.currency}`);
+                if (derivService.subscriptions.size === 0 && aiTrader.isRunning) {
+                    console.log(`📡 [Server] No tick subscriptions after auth. Resubscribing...`);
+                    derivService.subscribeToTicks(aiTrader.symbol || 'R_75').then(() => {
+                        lastTickTime = Date.now();
+                    }).catch(() => {});
+                }
             });
+
+            setInterval(async () => {
+                const tickAge = lastTickTime ? Math.floor((Date.now() - lastTickTime) / 1000) : 999;
+                const timeSinceLastReconnect = Date.now() - lastReconnectAttempt;
+                if (tickCount > 0 && tickAge > 90 && !forceReconnecting && timeSinceLastReconnect > RECONNECT_COOLDOWN) {
+                    forceReconnecting = true;
+                    lastReconnectAttempt = Date.now();
+                    try {
+                        await derivService.forceReconnectForTicks(aiTrader.symbol || 'R_75');
+                        lastTickTime = Date.now();
+                    } catch (err) {}
+                    forceReconnecting = false;
+                }
+            }, 60000);
+
         } catch (error) {
             console.error('❌ Deriv connection failed:', error.message);
         }
 
         server.listen(process.env.PORT || 3000, () => {
-            console.log(`✅ MONIX Trading Platform running on port ${process.env.PORT || 3000}`);
-            console.log(`📍 Local: http://localhost:${process.env.PORT || 3000}`);
-            console.log(`📧 Admin email: ${process.env.ADMIN_EMAIL}`);
-            
+            const port = process.env.PORT || 3000;
+            console.log(`✅ MONIX Trading Platform v4.0 running on port ${port}`);
+            startSelfPing();
+
             setTimeout(async () => {
                 try {
                     const users = await User.getAll();
                     const activeUser = users.find(u => u.is_active === 1);
                     if (activeUser) {
-                        const hasDemoToken = activeUser.demo_token && activeUser.demo_token.length > 0;
-                        const hasRealToken = activeUser.real_token && activeUser.real_token.length > 0;
                         const token = activeUser.is_demo ? activeUser.demo_token : activeUser.real_token;
-                        
-                        if (token && (hasDemoToken || hasRealToken)) {
-                            console.log(`🚀 Starting AI Trader for user: ${activeUser.username}`);
+                        if (token && (activeUser.demo_token || activeUser.real_token)) {
                             await aiTrader.start(activeUser.id, activeUser.default_symbol || 'R_75', activeUser.auto_mode ? 'AUTO' : 'MANUAL');
-                        } else {
-                            console.log('⚠️ No API tokens found. AI Trader waiting for API keys...');
                         }
-                    } else {
-                        console.log('⚠️ No active users found. AI Trader waiting for login...');
                     }
                 } catch (error) {
                     console.error('❌ Failed to start AI Trader:', error.message);
@@ -157,9 +200,15 @@ async function startServer() {
 startServer();
 
 process.on('SIGINT', () => {
-    console.log('Shutting down...');
+    if (selfPingInterval) clearInterval(selfPingInterval);
+    aiTrader.stop();
     derivService.disconnect();
-    server.close(() => {
-        process.exit(0);
-    });
+    server.close(() => process.exit(0));
+});
+
+process.on('SIGTERM', () => {
+    if (selfPingInterval) clearInterval(selfPingInterval);
+    aiTrader.stop();
+    derivService.disconnect();
+    server.close(() => process.exit(0));
 });

@@ -19,39 +19,66 @@ class DeepSeekService {
         return fn();
     }
 
-    translateToSimpleLanguage(rsi, marketCondition, pattern, action) {
-        let simpleReason = '';
-        
-        if (marketCondition === 'oversold') {
-            simpleReason = `Price is low right now. `;
-        } else if (marketCondition === 'overbought') {
-            simpleReason = `Price is high right now. `;
-        } else if (rsi && rsi < 40) {
-            simpleReason = `Price is getting low. `;
-        } else if (rsi && rsi > 60) {
-            simpleReason = `Price is getting high. `;
-        } else {
-            simpleReason = `Market is stable. `;
+    /**
+     * Build learning context from historical trade data
+     */
+    buildLearningContext(patternPerformance, rsiPerformance, trendPerformance, sessionPerformance, topPatterns) {
+        let context = '';
+
+        if (patternPerformance && patternPerformance.length > 0) {
+            context += '\n📊 YOUR PATTERN PERFORMANCE ON THIS SYMBOL:';
+            patternPerformance.slice(0, 5).forEach(p => {
+                const emoji = p.winRate >= 70 ? '🟢' : p.winRate >= 50 ? '🟡' : '🔴';
+                const reliable = p.isReliable ? '' : ' ⚠️(low sample)';
+                context += `\n${emoji} "${p.pattern}" → ${p.winRate}% win (${p.wins}W/${p.losses}L, ${p.total} trades)${reliable}`;
+            });
+            
+            const bestPattern = patternPerformance[0];
+            if (bestPattern && bestPattern.winRate >= 65) {
+                context += `\n⭐ YOUR BEST PATTERN: ${bestPattern.pattern} at ${bestPattern.winRate}% win rate. Favor this setup.`;
+            }
+            
+            const worstPatterns = patternPerformance.filter(p => p.winRate < 40 && p.total >= 3);
+            if (worstPatterns.length > 0) {
+                context += `\n⚠️ PATTERNS TO AVOID: ${worstPatterns.map(p => p.pattern).join(', ')} — low win rates.`;
+            }
         }
-        
-        if (pattern && (pattern.toLowerCase().includes('bullish') || pattern.toLowerCase().includes('hammer') || pattern.toLowerCase().includes('support'))) {
-            simpleReason += `Price looks like it's about to go UP. `;
-        } else if (pattern && (pattern.toLowerCase().includes('bearish') || pattern.toLowerCase().includes('shooting') || pattern.toLowerCase().includes('resistance'))) {
-            simpleReason += `Price looks like it's about to go DOWN. `;
-        } else if (action === 'CALL' || action === 'BUY') {
-            simpleReason += `Price is likely to go UP. `;
-        } else if (action === 'PUT' || action === 'SELL') {
-            simpleReason += `Price is likely to go DOWN. `;
-        } else {
-            simpleReason += `Waiting for clearer signal. `;
+
+        if (rsiPerformance && rsiPerformance.length > 0) {
+            context += '\n\n📈 YOUR RSI RANGE PERFORMANCE:';
+            rsiPerformance.slice(0, 4).forEach(r => {
+                const emoji = r.winRate >= 65 ? '🟢' : r.winRate >= 50 ? '🟡' : '🔴';
+                context += `\n${emoji} ${r.label}: ${r.winRate}% win (${r.total} trades)`;
+            });
         }
-        
-        simpleReason += `Risk/reward ratio is favorable (1:2).`;
-        
-        return simpleReason;
+
+        if (sessionPerformance && sessionPerformance.length > 0) {
+            context += '\n\n🕐 YOUR SESSION PERFORMANCE:';
+            sessionPerformance.forEach(s => {
+                const emoji = s.winRate >= 65 ? '🟢' : s.winRate >= 50 ? '🟡' : '🔴';
+                context += `\n${emoji} ${s.session}: ${s.winRate}% win (${s.total} trades, avg profit $${s.avgProfit})`;
+            });
+        }
+
+        if (trendPerformance && trendPerformance.length > 0) {
+            context += '\n\n📉 YOUR TREND PERFORMANCE:';
+            trendPerformance.forEach(t => {
+                const emoji = t.winRate >= 60 ? '🟢' : t.winRate >= 45 ? '🟡' : '🔴';
+                context += `\n${emoji} ${t.trend}: ${t.winRate}% win (${t.total} trades)`;
+            });
+        }
+
+        if (topPatterns && topPatterns.length > 0) {
+            context += '\n\n🏆 GLOBAL TOP PATTERNS (all symbols):';
+            topPatterns.slice(0, 3).forEach(p => {
+                context += `\n- ${p.pattern_name} on ${p.symbol}: ${p.win_rate}% win (${p.times_used} trades)`;
+            });
+        }
+
+        return context;
     }
 
-    async analyzeMarket(symbol, currentPrice, rsi = null, macd = null, session = null, userHistory = null, patterns = null) {
+    async analyzeMarket(symbol, currentPrice, rsi = null, macd = null, session = null, userHistory = null, patterns = null, marketContext = null) {
         if (!session) {
             const hour = new Date().getUTCHours();
             if (hour >= 0 && hour < 9) session = 'ASIAN';
@@ -60,57 +87,131 @@ class DeepSeekService {
         }
 
         let marketCondition = 'neutral';
-        if (rsi) {
-            if (rsi < 35) marketCondition = 'oversold';
-            else if (rsi > 65) marketCondition = 'overbought';
-            else if (rsi < 45) marketCondition = 'approaching_oversold';
-            else if (rsi > 55) marketCondition = 'approaching_overbought';
+        if (rsi && rsi > 0) {
+            if (rsi < 30) marketCondition = 'oversold';
+            else if (rsi > 70) marketCondition = 'overbought';
+            else if (rsi < 40) marketCondition = 'approaching_oversold';
+            else if (rsi > 60) marketCondition = 'approaching_overbought';
         }
+
+        // Build market context section
+        let contextText = '\n\nCRITICAL MARKET CONTEXT:';
+        
+        if (marketContext) {
+            if (marketContext.trend) {
+                const trendEmoji = marketContext.trend.includes('downtrend') ? '🔴' : 
+                                   marketContext.trend.includes('uptrend') ? '🟢' : '🟡';
+                contextText += `\n${trendEmoji} MARKET TREND: ${marketContext.trend.replace(/_/g, ' ').toUpperCase()}`;
+                
+                if (marketContext.trend.includes('strong_downtrend')) {
+                    contextText += `\n⚠️ STRONG DOWNTREND: DO NOT recommend CALL. Only PUT or WAIT.`;
+                } else if (marketContext.trend.includes('strong_uptrend')) {
+                    contextText += `\n⚠️ STRONG UPTREND: DO NOT recommend PUT. Only CALL or WAIT.`;
+                } else if (marketContext.trend.includes('downtrend')) {
+                    contextText += `\n⚠️ DOWNTREND: Prefer PUT. Only CALL if RSI deeply oversold (<25) and price at support.`;
+                } else if (marketContext.trend.includes('uptrend')) {
+                    contextText += `\n⚠️ UPTREND: Prefer CALL. Only PUT if RSI deeply overbought (>75) and price at resistance.`;
+                }
+            }
+            
+            if (marketContext.rsiShort) {
+                const shortMomentum = marketContext.rsiShort > 70 ? '(overbought momentum)' :
+                                      marketContext.rsiShort < 30 ? '(oversold momentum)' : '(neutral momentum)';
+                contextText += `\n📊 Short-term RSI (5-min): ${marketContext.rsiShort} ${shortMomentum}`;
+            }
+            
+            if (marketContext.volatility) {
+                const volLevel = marketContext.volatility > 20 ? 'HIGH' : marketContext.volatility > 10 ? 'MODERATE' : 'LOW';
+                contextText += `\n📈 Volatility: ${marketContext.volatility.toFixed(2)} (${volLevel})`;
+            }
+            
+            if (marketContext.lastPattern && marketContext.lastPattern !== 'none' && 
+                marketContext.lastPattern !== 'no_significant_pattern' && 
+                marketContext.lastPattern !== 'insufficient_data') {
+                contextText += `\n🕯️ Recent candle pattern: ${marketContext.lastPattern.replace(/_/g, ' ')}`;
+            }
+            
+            if (marketContext.consecutiveLosses > 0) {
+                contextText += `\n\n⚠️ BOT STATUS: ${marketContext.consecutiveLosses} consecutive losses. BE VERY CONSERVATIVE.`;
+                if (marketContext.consecutiveLosses >= 2) {
+                    contextText += `\n🛑 Only recommend trades with 70%+ confidence and confirmed by your historical data.`;
+                }
+            }
+            
+            if (marketContext.recentWinRate !== null) {
+                if (marketContext.recentWinRate >= 70) {
+                    contextText += `\n✅ Bot performing well (${marketContext.recentWinRate}% recent win rate). Can be more aggressive.`;
+                } else if (marketContext.recentWinRate <= 30) {
+                    contextText += `\n❌ Bot struggling (${marketContext.recentWinRate}% recent win rate). Only strongest setups.`;
+                }
+            }
+        }
+
+        // LEARNING CONTEXT from database
+        let learningContext = '';
+        if (marketContext?.patternPerformance && marketContext.patternPerformance.length > 0) {
+            learningContext = this.buildLearningContext(
+                marketContext.patternPerformance,
+                marketContext.rsiPerformance,
+                marketContext.trendPerformance,
+                marketContext.sessionPerformance,
+                marketContext.topPatterns
+            );
+        }
+
+        // Session context
+        contextText += `\n\n🕐 SESSION: ${session}`;
+        if (session === 'ASIAN') contextText += ` - Typically ranging. Trade bounces at support/resistance.`;
+        else if (session === 'LONDON') contextText += ` - Breakouts common. Follow momentum.`;
+        else contextText += ` - Highest volatility. Trade with strong momentum.`;
 
         let patternsText = '';
         if (patterns && patterns.length > 0) {
-            patternsText = `\n\nSuccessful patterns from history:\n${patterns.slice(0, 3).map(p => `- ${p.pattern_name}: ${p.win_rate}% win rate on ${p.symbol}`).join('\n')}`;
+            patternsText = '\n\nHistorical winning patterns:';
+            patterns.slice(0, 3).forEach(p => {
+                patternsText += `\n- ${p.pattern_name}: ${p.win_rate}% win on ${p.symbol}`;
+            });
         }
 
         let userHistoryText = '';
         if (userHistory && userHistory.length > 0) {
             const recentTrades = userHistory.slice(0, 5);
-            userHistoryText = `\n\nRecent trading history:\n${recentTrades.map(t => `- ${t.symbol}: ${t.action} -> ${t.result} (${t.profit})`).join('\n')}`;
+            const wins = recentTrades.filter(t => t.result === 'WIN' || t.status === 'WIN').length;
+            userHistoryText = '\n\nRecent trades:';
+            recentTrades.forEach(t => {
+                userHistoryText += `\n- ${t.symbol}: ${t.action} → ${t.result || t.status} (${t.profit >= 0 ? '+' : ''}$${Math.abs(t.profit || 0).toFixed(2)})`;
+            });
+            userHistoryText += `\nResult: ${wins}/${recentTrades.length} wins`;
         }
 
-        const prompt = `You are a professional trader analyzing ${symbol}.
+        const prompt = `You are a disciplined professional binary options trader. You learn from every trade.
 
-Current price: $${currentPrice}
-RSI: ${rsi || 'N/A'} (${marketCondition})
-Session: ${session}
-${patternsText}
-${userHistoryText}
+CURRENT MARKET:
+- Symbol: ${symbol}
+- Current Price: $${currentPrice}
+- RSI (14-period): ${rsi || 'N/A'} → ${marketCondition}
+- Session: ${session}${contextText}${learningContext}${patternsText}${userHistoryText}
 
-IMPORTANT: 
-- Risk/Reward should be at least 1:2 (Take Profit = 2x Stop Loss distance)
-- Take Profit target should be DOUBLE the Stop Loss distance
-- Confidence threshold for entry is 55% or higher
-- In ranging markets, trade bounces off support/resistance
+TRADING RULES:
+1. NEVER trade against a strong trend. If downtrend, only PUT or WAIT.
+2. Risk/Reward MUST be 1:2 minimum.
+3. Use YOUR historical data above to guide decisions:
+   - If a pattern has 70%+ win rate in your history, be MORE confident
+   - If a pattern has <40% win rate, recommend WAIT unless exceptional conditions
+   - If a session has poor performance, be extra cautious
+4. Confidence: 50% = weak, 65% = moderate, 80%+ = strong
+5. In ranging markets → trade bounces. In trending markets → trade with trend.
+6. If bot has losing streak, only recommend confirmed setups.
 
-Based on this data, tell me:
-1. Should I BUY (CALL - price will go UP), SELL (PUT - price will go DOWN), or WAIT?
-2. How confident are you? (0-100%) - Be honest, 55%+ is enough to trade
-3. What pattern do you see in simple words?
-4. What should be my Take Profit price? (aim for 0.8-1.0% move)
-5. What should be my Stop Loss price? (0.4-0.5% move)
-6. Simple 1-sentence reason anyone can understand.
-
-Return ONLY valid JSON:
+Return ONLY valid JSON (no markdown, no backticks):
 {
     "action": "CALL or PUT or WAIT",
     "confidence": number,
-    "pattern": "simple pattern name",
+    "pattern": "short pattern name",
     "take_profit": number,
     "stop_loss": number,
-    "simple_reason": "one sentence explanation"
-}
-
-If WAIT, explain what you're waiting for in the simple_reason.`;
+    "simple_reason": "one sentence why"
+}`;
 
         try {
             const response = await this.callWithRateLimit(async () => {
@@ -119,14 +220,14 @@ If WAIT, explain what you're waiting for in the simple_reason.`;
                     messages: [
                         {
                             role: 'system',
-                            content: 'You are a professional trader. Provide accurate, concise analysis. Risk/Reward should be at least 1:2. Confidence 55%+ is acceptable for trade entry. Return ONLY valid JSON.'
+                            content: 'You are a profit-focused binary options trader. You learn from historical data. You NEVER trade against strong trends. Return ONLY valid JSON.'
                         },
                         {
                             role: 'user',
                             content: prompt
                         }
                     ],
-                    temperature: 0.3,
+                    temperature: 0.2,
                     max_tokens: 500
                 }, {
                     headers: {
@@ -138,101 +239,145 @@ If WAIT, explain what you're waiting for in the simple_reason.`;
             });
 
             let content = response.data.choices[0].message.content;
-            content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+            content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
             const analysis = JSON.parse(content);
-
-            return this.normalizeAnalysis(analysis, symbol, currentPrice, marketCondition);
+            return this.normalizeAnalysis(analysis, symbol, currentPrice, marketCondition, marketContext);
 
         } catch (error) {
             console.error('DeepSeek API error:', error.response?.data || error.message);
-            return this.getFallbackAnalysis(symbol, currentPrice, marketCondition);
+            return this.getFallbackAnalysis(symbol, currentPrice, marketCondition, marketContext);
         }
     }
 
-    normalizeAnalysis(analysis, symbol, currentPrice, marketCondition) {
+    normalizeAnalysis(analysis, symbol, currentPrice, marketCondition, marketContext) {
         if (!analysis.action || !['CALL', 'PUT', 'WAIT'].includes(analysis.action)) {
             analysis.action = 'WAIT';
         }
 
-        analysis.confidence = Math.min(100, Math.max(0, analysis.confidence || 50));
+        analysis.confidence = Math.min(100, Math.max(0, Math.round(analysis.confidence || 50)));
 
-        if (!analysis.pattern) {
-            const patterns = ['Price at support', 'Price at resistance', 'RSI signal', 'Trend continuation', 'Range bounce'];
-            analysis.pattern = patterns[Math.floor(Math.random() * patterns.length)];
+        // LEARNING-BASED OVERRIDE: If pattern has very low historical win rate, downgrade
+        if (marketContext?.patternPerformance && analysis.pattern) {
+            const historyPattern = marketContext.patternPerformance.find(p => 
+                p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase()
+            );
+            if (historyPattern && historyPattern.winRate < 35 && historyPattern.total >= 3) {
+                console.log(`⚠️ [DeepSeek] Pattern "${analysis.pattern}" has ${historyPattern.winRate}% historical win rate. Downgrading.`);
+                analysis.action = 'WAIT';
+                analysis.confidence = Math.min(analysis.confidence, 40);
+                analysis.simple_reason = `Pattern "${analysis.pattern}" has only ${historyPattern.winRate}% win rate in your history. Waiting for better setup.`;
+            }
+            // If pattern has excellent history, boost confidence
+            if (historyPattern && historyPattern.winRate >= 70 && historyPattern.total >= 3 && analysis.action !== 'WAIT') {
+                analysis.confidence = Math.min(100, analysis.confidence + 10);
+                console.log(`⭐ [DeepSeek] Pattern "${analysis.pattern}" has ${historyPattern.winRate}% historical win rate. Boosting confidence to ${analysis.confidence}%.`);
+            }
         }
 
-        // NEW: Force 1:2 Risk/Reward ratio
-        // Risk = 0.4% (stop loss), Reward = 0.8% (take profit)
-        const riskPercent = 0.004; // 0.4% stop loss
-        const rewardPercent = 0.008; // 0.8% take profit (2x risk)
-        
+        // Trend override
+        if (marketContext && marketContext.trend) {
+            const trend = marketContext.trend;
+            const action = analysis.action;
+            
+            if (trend.includes('strong_downtrend') && action === 'CALL') {
+                console.log(`⚠️ [DeepSeek] Overriding CALL in strong downtrend → WAIT`);
+                analysis.action = 'WAIT';
+                analysis.confidence = Math.min(analysis.confidence, 40);
+                analysis.simple_reason = 'Strong downtrend. Not safe to buy.';
+            } else if (trend.includes('strong_uptrend') && action === 'PUT') {
+                console.log(`⚠️ [DeepSeek] Overriding PUT in strong uptrend → WAIT`);
+                analysis.action = 'WAIT';
+                analysis.confidence = Math.min(analysis.confidence, 40);
+                analysis.simple_reason = 'Strong uptrend. Not safe to sell.';
+            } else if (trend.includes('downtrend') && action === 'CALL' && analysis.confidence < 70) {
+                analysis.action = 'WAIT';
+                analysis.confidence = Math.min(analysis.confidence, 45);
+            } else if (trend.includes('uptrend') && action === 'PUT' && analysis.confidence < 70) {
+                analysis.action = 'WAIT';
+                analysis.confidence = Math.min(analysis.confidence, 45);
+            }
+        }
+
+        if (!analysis.pattern) {
+            analysis.pattern = 'market analysis';
+        }
+
+        const riskPercent = 0.004;
+        const rewardPercent = 0.008;
+
         if (analysis.action === 'CALL') {
-            analysis.stop_loss = currentPrice * (1 - riskPercent);
-            analysis.take_profit = currentPrice * (1 + rewardPercent);
+            analysis.stop_loss = analysis.stop_loss || currentPrice * (1 - riskPercent);
+            analysis.take_profit = analysis.take_profit || currentPrice * (1 + rewardPercent);
         } else if (analysis.action === 'PUT') {
-            analysis.stop_loss = currentPrice * (1 + riskPercent);
-            analysis.take_profit = currentPrice * (1 - rewardPercent);
+            analysis.stop_loss = analysis.stop_loss || currentPrice * (1 + riskPercent);
+            analysis.take_profit = analysis.take_profit || currentPrice * (1 - rewardPercent);
         } else {
-            // For WAIT, use reasonable defaults
-            analysis.stop_loss = currentPrice * 0.996;
-            analysis.take_profit = currentPrice * 1.004;
+            analysis.stop_loss = analysis.stop_loss || currentPrice * 0.996;
+            analysis.take_profit = analysis.take_profit || currentPrice * 1.004;
         }
 
         if (!analysis.simple_reason) {
-            if (analysis.action === 'CALL') {
-                analysis.simple_reason = `Price at good level. Risk $0.40 to make $0.80 (1:2 ratio).`;
-            } else if (analysis.action === 'PUT') {
-                analysis.simple_reason = `Price at good level. Risk $0.40 to make $0.80 (1:2 ratio).`;
-            } else {
-                analysis.simple_reason = `Waiting for better price level. Confidence ${analysis.confidence}% needs ${analysis.confidence >= 55 ? 'good' : 'higher'}.`;
-            }
+            analysis.simple_reason = analysis.action === 'WAIT' 
+                ? 'Market conditions not ideal. Waiting for better setup.'
+                : `${analysis.action} signal with ${analysis.confidence}% confidence.`;
         }
 
         analysis.take_profit = parseFloat(analysis.take_profit.toFixed(2));
         analysis.stop_loss = parseFloat(analysis.stop_loss.toFixed(2));
+        analysis.confidence = Math.round(analysis.confidence);
 
         return analysis;
     }
 
-    getFallbackAnalysis(symbol, currentPrice, marketCondition) {
-        // NEW: Use 1:2 risk/reward even in fallback
+    getFallbackAnalysis(symbol, currentPrice, marketCondition, marketContext) {
         const riskPercent = 0.004;
         const rewardPercent = 0.008;
-        
+        const trend = marketContext?.trend || 'sideways';
+
         let action = 'WAIT';
         let confidence = 50;
-        
-        if (marketCondition === 'oversold') {
+        let simpleReason = 'Using fallback analysis (DeepSeek unavailable).';
+
+        if (trend.includes('strong_downtrend')) {
+            action = 'WAIT';
+            confidence = 55;
+            simpleReason = 'Strong downtrend. Waiting.';
+        } else if (trend.includes('strong_uptrend')) {
+            action = 'WAIT';
+            confidence = 55;
+            simpleReason = 'Strong uptrend. Waiting.';
+        } else if (marketCondition === 'oversold' && !trend.includes('downtrend')) {
             action = 'CALL';
             confidence = 60;
-        } else if (marketCondition === 'overbought') {
+            simpleReason = 'RSI oversold in non-downtrend. Bounce likely.';
+        } else if (marketCondition === 'overbought' && !trend.includes('uptrend')) {
             action = 'PUT';
             confidence = 60;
-        } else if (marketCondition === 'approaching_oversold') {
+            simpleReason = 'RSI overbought in non-uptrend. Pullback likely.';
+        } else if (marketContext?.lastPattern === 'hammer_at_support' && !trend.includes('downtrend')) {
             action = 'CALL';
-            confidence = 55;
-        } else if (marketCondition === 'approaching_overbought') {
+            confidence = 65;
+            simpleReason = 'Hammer at support. Reversal signal.';
+        } else if (marketContext?.lastPattern === 'shooting_star_at_resistance' && !trend.includes('uptrend')) {
             action = 'PUT';
-            confidence = 55;
+            confidence = 65;
+            simpleReason = 'Shooting star at resistance. Reversal signal.';
         }
-        
-        const patterns = ['Price pattern detected', 'Support level identified', 'Resistance level identified', 'RSI signal'];
-        
-        let simpleReason = '';
-        if (action === 'CALL') {
-            simpleReason = `Price at support level. Risk $0.40 to make $0.80 (1:2 ratio).`;
-        } else if (action === 'PUT') {
-            simpleReason = `Price at resistance level. Risk $0.40 to make $0.80 (1:2 ratio).`;
-        } else {
-            simpleReason = 'Waiting for better price level or RSI signal.';
+
+        if (marketContext?.consecutiveLosses >= 2 && confidence < 70) {
+            action = 'WAIT';
+            confidence = 50;
+            simpleReason = 'Conservative fallback during losing streak.';
         }
 
         return {
             action: action,
             confidence: confidence,
-            pattern: patterns[Math.floor(Math.random() * patterns.length)],
-            take_profit: action === 'CALL' ? currentPrice * (1 + rewardPercent) : currentPrice * (1 - rewardPercent),
-            stop_loss: action === 'CALL' ? currentPrice * (1 - riskPercent) : currentPrice * (1 + riskPercent),
+            pattern: 'fallback analysis',
+            take_profit: action === 'CALL' ? currentPrice * (1 + rewardPercent) : 
+                        action === 'PUT' ? currentPrice * (1 - rewardPercent) : currentPrice * 1.004,
+            stop_loss: action === 'CALL' ? currentPrice * (1 - riskPercent) : 
+                       action === 'PUT' ? currentPrice * (1 + riskPercent) : currentPrice * 0.996,
             simple_reason: simpleReason
         };
     }
@@ -242,8 +387,10 @@ If WAIT, explain what you're waiting for in the simple_reason.`;
 Win Rate: ${stats.win_rate}%
 Net Profit: $${stats.net_profit}
 Total Trades: ${stats.total_trades}
+Best Patterns: ${bestPatterns?.map(p => p.pattern_name).join(', ') || 'none'}
+Worst Patterns: ${worstPatterns?.map(p => p.pattern_name).join(', ') || 'none'}
 
-Return JSON:
+Give trading advice as JSON:
 {
     "adjustments": ["advice1", "advice2", "advice3"],
     "confidence_adjustment": number,
@@ -269,8 +416,8 @@ Return JSON:
         } catch (error) {
             return {
                 adjustments: [
-                    "Focus on your best performing symbols",
-                    "Use JACKPOT mode for higher confidence trades",
+                    "Focus on your best performing patterns",
+                    "Trade with the trend, not against it",
                     "Reduce stake during losing streaks"
                 ],
                 confidence_adjustment: 0,

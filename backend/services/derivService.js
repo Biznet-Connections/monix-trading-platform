@@ -75,7 +75,7 @@ class DerivService extends EventEmitter {
             "EUR/AUD": "frxEURAUD",
             "GBP/AUD": "frxGBPAUD",
             
-            // Commodities - FIXED: Gold mapping
+            // Commodities
             "XAU/USD (Gold)": "frxXAUUSD",
             "XAG/USD (Silver)": "frxXAGUSD",
             "XPT/USD (Platinum)": "frxXPTUSD",
@@ -113,14 +113,11 @@ class DerivService extends EventEmitter {
     }
 
     convertSymbol(uiSymbol) {
-        // Handle exact matches first
         const derivSymbol = this.symbolMap[uiSymbol];
         if (derivSymbol) {
             console.log(`🔄 [Deriv] Converting symbol: ${uiSymbol} -> ${derivSymbol}`);
             return derivSymbol;
         }
-        
-        // Fallback: return as-is
         console.log(`⚠️ [Deriv] Unknown symbol: ${uiSymbol}, using as-is`);
         return uiSymbol;
     }
@@ -132,7 +129,6 @@ class DerivService extends EventEmitter {
             if (this.ws && this.ws.readyState === WebSocket.OPEN && this.authorized) {
                 try {
                     await this.sendRequest({ ping: 1 });
-                    console.log('💓 [Deriv] Heartbeat sent');
                 } catch (e) {
                     console.log('⚠️ [Deriv] Heartbeat failed:', e.message);
                 }
@@ -247,7 +243,6 @@ class DerivService extends EventEmitter {
                 this.ws.removeAllListeners();
                 if (this.ws.readyState === WebSocket.OPEN) {
                     this.ws.close();
-                    console.log('🔌 [Deriv] WebSocket closed gracefully');
                 } else if (this.ws.readyState === WebSocket.CONNECTING) {
                     setTimeout(() => {
                         if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
@@ -263,6 +258,7 @@ class DerivService extends EventEmitter {
         this.isConnected = false;
         this.isConnecting = false;
         this.authorized = false;
+        this.subscriptions.clear();
         setTimeout(() => { this.isClosing = false; }, 500);
     }
 
@@ -313,6 +309,61 @@ class DerivService extends EventEmitter {
             this.reconnectInProgress = false;
             return { success: false, error: error.message };
         }
+    }
+
+    /**
+     * Force a complete WebSocket reconnect to get a fresh tick stream.
+     * Kills the entire connection and rebuilds from scratch.
+     * Use when ticks stop flowing but the WebSocket appears connected.
+     */
+    async forceReconnectForTicks(symbol) {
+        const derivSymbol = this.convertSymbol(symbol);
+        console.log(`🔄 [Deriv] FORCE RECONNECT: Closing WebSocket for fresh tick stream on ${derivSymbol}...`);
+        
+        const savedToken = this.currentToken;
+        
+        this.isClosing = true;
+        this.stopHeartbeat();
+        
+        if (this.ws) {
+            try {
+                this.ws.removeAllListeners();
+                if (this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.close();
+                } else if (this.ws.readyState === WebSocket.CONNECTING) {
+                    try { this.ws.terminate(); } catch(e) {}
+                }
+            } catch (e) {
+                console.log('⚠️ [Deriv] Error during force close:', e.message);
+            }
+            this.ws = null;
+        }
+        
+        this.isConnected = false;
+        this.isConnecting = false;
+        this.authorized = false;
+        this.subscriptions.clear();
+        
+        for (const [reqId, { reject }] of this.pendingRequests) {
+            reject(new Error('Force reconnect'));
+            this.pendingRequests.delete(reqId);
+        }
+        
+        await new Promise(r => setTimeout(r, 2000));
+        this.isClosing = false;
+        
+        console.log(`🔌 [Deriv] Reconnecting fresh...`);
+        await this.connect(savedToken, true);
+        
+        if (savedToken && savedToken.trim().length > 0) {
+            await this.authorize(savedToken);
+            console.log(`🔐 [Deriv] Re-authorized after force reconnect`);
+        }
+        
+        await this.subscribeToTicks(symbol);
+        
+        console.log(`✅ [Deriv] Force reconnect complete. Ticks should flow now.`);
+        return true;
     }
 
     reconnect() {
@@ -377,7 +428,7 @@ class DerivService extends EventEmitter {
         }
 
         if (msgType === 'pong') {
-            console.log('💓 [Deriv] Heartbeat received');
+            // Silent - heartbeat response
         }
 
         if (response.req_id && this.pendingRequests.has(response.req_id)) {
@@ -407,7 +458,7 @@ class DerivService extends EventEmitter {
                     this.pendingRequests.delete(req_id);
                     reject(new Error('Request timeout'));
                 }
-            }, 15000);
+            }, 30000);
         });
     }
 
@@ -441,18 +492,21 @@ class DerivService extends EventEmitter {
 
     async subscribeToTicks(symbol) {
         const derivSymbol = this.convertSymbol(symbol);
-        if (this.subscriptions.has(derivSymbol)) {
-            console.log(`📡 [Deriv] Already subscribed to ${derivSymbol}`);
-            return;
-        }
         
-        this.subscriptions.add(derivSymbol);
+        // Clear any stale subscription tracking
+        this.subscriptions.delete(derivSymbol);
         
         try {
-            await this.sendRequest({ ticks: derivSymbol });
+            const result = await this.sendRequest({ 
+                ticks: derivSymbol,
+                subscribe: 1 
+            });
+            this.subscriptions.add(derivSymbol);
             console.log(`📡 [Deriv] Subscribed to ticks for ${derivSymbol}`);
+            return result;
         } catch (error) {
             console.error(`❌ [Deriv] Failed to subscribe to ${derivSymbol}:`, error.message);
+            throw error;
         }
     }
 
