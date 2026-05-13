@@ -1,51 +1,28 @@
-const db = require('../config/database').getDb();
+const mongoose = require('mongoose');
+
+const voucherSchema = new mongoose.Schema({
+    code: { type: String, required: true, unique: true },
+    days_valid: { type: Number, required: true },
+    trades_limit: { type: Number, required: true },
+    created_by: { type: String, default: 'system' },
+    used_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    used_at: { type: Date, default: null },
+}, { timestamps: { createdAt: 'created_at' } });
+
+// REMOVED: voucherSchema.index({ code: 1 }) — unique: true already creates index
+
+const VoucherModel = mongoose.model('Voucher', voucherSchema);
 
 class Voucher {
-    static async create(voucherData) {
-        const { days_valid, trades_limit, created_by } = voucherData;
-        const code = `MONIX-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-        
-        const vouchers = db.vouchers.getAll();
-        const newId = vouchers.length > 0 ? Math.max(...vouchers.map(v => v.id)) + 1 : 1;
-        
-        const newVoucher = {
-            id: newId,
-            code,
-            days_valid,
-            trades_limit,
-            created_by: created_by || 'admin',
-            used_by: null,
-            used_at: null,
-            created_at: new Date().toISOString()
-        };
-        
-        vouchers.push(newVoucher);
-        return { id: newId, code };
-    }
-    
-    static async findByCode(code) {
-        return db.vouchers.getByCode(code);
-    }
-    
-    static async markUsed(code, userId) {
-        return db.vouchers.markUsed(code, userId);
-    }
-    
-    static async revoke(code) {
-        return db.vouchers.revoke(code);
-    }
-    
-    static async getAll() {
-        return db.vouchers.getAll();
-    }
-    
-    static async getUnused() {
-        const vouchers = db.vouchers.getAll();
-        return vouchers.filter(v => !v.used_by);
-    }
-    
+    static async getAll() { return VoucherModel.find().lean(); }
+    static async getByCode(code) { return VoucherModel.findOne({ code }); }
+    static async create(voucherData) { return VoucherModel.create(voucherData); }
+    static async markUsed(code, userId) { return VoucherModel.findOneAndUpdate({ code, used_by: null }, { used_by: userId, used_at: new Date() }, { new: true }); }
+    static async revoke(code) { return VoucherModel.findOneAndDelete({ code }); }
     static async getStats() {
-        return db.vouchers.getStats();
+        const total = await VoucherModel.countDocuments();
+        const unused = await VoucherModel.countDocuments({ used_by: null });
+        return { total, unused, used: total - unused };
     }
 }
 

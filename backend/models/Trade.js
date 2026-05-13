@@ -1,9 +1,34 @@
-const db = require('../config/database').getDb();
+const mongoose = require('mongoose');
+
+const tradeSchema = new mongoose.Schema({
+    user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    contract_id: { type: Number, required: true },
+    symbol: { type: String, required: true },
+    action: { type: String, enum: ['BUY', 'SELL'], required: true },
+    entry_price: { type: Number, required: true },
+    stake: { type: Number, required: true },
+    confidence: { type: Number, default: 0 },
+    pattern: { type: String, default: 'Unknown' },
+    rsi: { type: Number, default: 50 },
+    macd: { type: String, default: 'neutral' },
+    session: { type: String, default: 'LONDON' },
+    is_auto: { type: Number, default: 0 },
+    status: { type: String, enum: ['PENDING', 'WIN', 'LOSS', 'DRAW'], default: 'PENDING' },
+    exit_price: { type: Number, default: null },
+    profit: { type: Number, default: null },
+    closed_at: { type: Date, default: null },
+}, { timestamps: { createdAt: 'executed_at', updatedAt: 'updated_at' } });
+
+tradeSchema.index({ user_id: 1, symbol: 1 });
+tradeSchema.index({ user_id: 1, status: 1 });
+tradeSchema.index({ user_id: 1, pattern: 1 });
+tradeSchema.index({ contract_id: 1 });
+
+const TradeModel = mongoose.model('Trade', tradeSchema);
 
 class Trade {
     static async create(tradeData) {
-        // Delegate to database method which properly saves to JSON
-        return db.trades.create({
+        const trade = await TradeModel.create({
             user_id: tradeData.user_id,
             contract_id: tradeData.contract_id,
             symbol: tradeData.symbol,
@@ -17,73 +42,132 @@ class Trade {
             session: tradeData.session || 'LONDON',
             is_auto: tradeData.is_auto || 0,
             status: 'PENDING',
-            exit_price: null,
-            profit: null,
-            closed_at: null
         });
+        return trade._id;
     }
 
     static async updateResult(tradeId, exit_price, profit, status, closed_at = null) {
-        return db.trades.updateResult(tradeId, exit_price, profit, status, closed_at);
+        return TradeModel.findByIdAndUpdate(tradeId, {
+            exit_price,
+            profit,
+            status,
+            closed_at: closed_at || new Date()
+        });
     }
 
     static async findByContractId(contractId) {
-        return db.trades.getByContractId(contractId);
+        return TradeModel.findOne({ contract_id: contractId });
     }
 
     static async getUserTrades(userId, limit = 50, offset = 0) {
-        return db.trades.getUserTrades(parseInt(userId), limit, offset);
+        return TradeModel.find({ user_id: userId })
+            .sort({ executed_at: -1 })
+            .skip(offset)
+            .limit(limit)
+            .lean();
     }
 
     static async getUserStats(userId, days = 30) {
-        return db.trades.getUserStats(parseInt(userId), days);
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        
+        const trades = await TradeModel.find({
+            user_id: userId,
+            executed_at: { $gt: cutoff },
+            status: { $ne: 'PENDING' }
+        }).lean();
+
+        const total = trades.length;
+        const wins = trades.filter(t => t.status === 'WIN').length;
+        const losses = trades.filter(t => t.status === 'LOSS').length;
+        const totalProfit = trades.filter(t => t.status === 'WIN').reduce((sum, t) => sum + (t.profit || 0), 0);
+        const totalLoss = trades.filter(t => t.status === 'LOSS').reduce((sum, t) => sum + (t.profit || 0), 0);
+
+        return {
+            total_trades: total,
+            wins,
+            losses,
+            total_profit: totalProfit,
+            total_loss: totalLoss,
+            net_profit: totalProfit + totalLoss,
+            win_rate: total > 0 ? ((wins / total) * 100).toFixed(1) : 0,
+            avg_win_confidence: wins > 0 
+                ? Math.round(trades.filter(t => t.status === 'WIN').reduce((sum, t) => sum + (t.confidence || 0), 0) / wins) 
+                : 0,
+            max_win: Math.max(...trades.map(t => t.profit || 0), 0),
+            max_loss: Math.min(...trades.map(t => t.profit || 0), 0)
+        };
     }
 
     static async getSymbolStats(userId) {
-        return db.trades.getSymbolStats(parseInt(userId));
+        const trades = await TradeModel.find({ user_id: userId, status: { $ne: 'PENDING' } }).lean();
+        const symbols = {};
+        trades.forEach(t => {
+            if (!symbols[t.symbol]) symbols[t.symbol] = { total: 0, wins: 0, total_profit: 0 };
+            symbols[t.symbol].total++;
+            if (t.status === 'WIN') symbols[t.symbol].wins++;
+            symbols[t.symbol].total_profit += t.profit || 0;
+        });
+        return Object.entries(symbols).map(([symbol, data]) => ({
+            symbol, total: data.total, wins: data.wins,
+            total_profit: data.total_profit,
+            win_rate: ((data.wins / data.total) * 100).toFixed(1)
+        }));
     }
 
     static async getSessionStats(userId) {
-        return db.trades.getSessionStats(parseInt(userId));
+        const trades = await TradeModel.find({ user_id: userId, session: { $ne: null }, status: { $ne: 'PENDING' } }).lean();
+        const sessions = {};
+        trades.forEach(t => {
+            if (!sessions[t.session]) sessions[t.session] = { total: 0, wins: 0, total_profit: 0 };
+            sessions[t.session].total++;
+            if (t.status === 'WIN') sessions[t.session].wins++;
+            sessions[t.session].total_profit += t.profit || 0;
+        });
+        return Object.entries(sessions).map(([session, data]) => ({
+            session, total: data.total, wins: data.wins,
+            total_profit: data.total_profit,
+            win_rate: ((data.wins / data.total) * 100).toFixed(1)
+        }));
     }
 
     static async getTodayStats(userId) {
-        return db.trades.getTodayStats(parseInt(userId));
+        const today = new Date().toISOString().split('T')[0];
+        const todayStart = new Date(today);
+        const todayEnd = new Date(todayStart.getTime() + 86400000);
+        
+        const todayTrades = await TradeModel.find({
+            user_id: userId,
+            executed_at: { $gte: todayStart, $lt: todayEnd },
+            status: { $ne: 'PENDING' }
+        }).lean();
+
+        return {
+            trades_count: todayTrades.length,
+            wins: todayTrades.filter(t => t.status === 'WIN').length,
+            losses: todayTrades.filter(t => t.status === 'LOSS').length,
+            profit: todayTrades.reduce((sum, t) => sum + (t.profit || 0), 0)
+        };
     }
 
     static async getAllTrades(limit = 1000) {
-        return db.trades.getAllTrades(limit);
+        return TradeModel.find().sort({ executed_at: -1 }).limit(limit).populate('user_id', 'username email').lean();
     }
 
-    /**
-     * LEARNING LOOP: Get pattern performance for a specific symbol
-     * Returns win rates per pattern to feed into DeepSeek
-     */
-    static async getPatternPerformance(userId, symbol, session = null) {
-        const trades = db.trades.getAll();
-        const userTrades = trades.filter(t => 
-            t.user_id === parseInt(userId) && 
-            t.symbol === symbol &&
-            t.status && t.status !== 'PENDING'
-        );
+    static async getPatternPerformance(userId, symbol) {
+        const trades = await TradeModel.find({
+            user_id: userId,
+            symbol,
+            status: { $ne: 'PENDING' }
+        }).lean();
 
-        if (session) {
-            return userTrades.filter(t => t.session === session);
-        }
-
-        // Group by pattern and calculate win rates
         const patternStats = {};
-        userTrades.forEach(t => {
+        trades.forEach(t => {
             const key = t.pattern || 'Unknown';
-            if (!patternStats[key]) {
-                patternStats[key] = { wins: 0, losses: 0, total: 0, totalProfit: 0 };
-            }
+            if (!patternStats[key]) patternStats[key] = { wins: 0, losses: 0, total: 0, totalProfit: 0 };
             patternStats[key].total++;
-            if (t.status === 'WIN') {
-                patternStats[key].wins++;
-            } else {
-                patternStats[key].losses++;
-            }
+            if (t.status === 'WIN') patternStats[key].wins++;
+            else patternStats[key].losses++;
             patternStats[key].totalProfit += (t.profit || 0);
         });
 
@@ -97,23 +181,18 @@ class Trade {
                 avgProfit: data.total > 0 ? (data.totalProfit / data.total).toFixed(2) : '0.00',
                 isReliable: data.total >= 3
             }))
-            .filter(p => p.total >= 2) // Only return patterns with at least 2 trades
+            .filter(p => p.total >= 2)
             .sort((a, b) => b.winRate - a.winRate);
     }
 
-    /**
-     * LEARNING LOOP: Get RSI-based performance for a symbol
-     */
     static async getRSIPerformance(userId, symbol) {
-        const trades = db.trades.getAll();
-        const userTrades = trades.filter(t => 
-            t.user_id === parseInt(userId) && 
-            t.symbol === symbol &&
-            t.rsi && t.rsi > 0 &&
-            t.status && t.status !== 'PENDING'
-        );
+        const trades = await TradeModel.find({
+            user_id: userId,
+            symbol,
+            rsi: { $gt: 0 },
+            status: { $ne: 'PENDING' }
+        }).lean();
 
-        // Group by RSI ranges
         const ranges = [
             { label: 'RSI 0-25 (deeply oversold)', min: 0, max: 25, wins: 0, losses: 0 },
             { label: 'RSI 25-35 (oversold)', min: 25, max: 35, wins: 0, losses: 0 },
@@ -124,7 +203,7 @@ class Trade {
             { label: 'RSI 75-100 (deeply overbought)', min: 75, max: 100, wins: 0, losses: 0 }
         ];
 
-        userTrades.forEach(t => {
+        trades.forEach(t => {
             const rsi = t.rsi;
             ranges.forEach(range => {
                 if (rsi >= range.min && rsi < range.max) {
@@ -137,49 +216,36 @@ class Trade {
         return ranges
             .filter(r => (r.wins + r.losses) >= 2)
             .map(r => ({
-                label: r.label,
-                wins: r.wins,
-                losses: r.losses,
+                label: r.label, wins: r.wins, losses: r.losses,
                 total: r.wins + r.losses,
                 winRate: (r.wins + r.losses) > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0
             }))
             .sort((a, b) => b.winRate - a.winRate);
     }
 
-    /**
-     * LEARNING LOOP: Get trend-based performance for a symbol
-     */
     static async getTrendPerformance(userId, symbol) {
-        const trades = db.trades.getAll();
-        const userTrades = trades.filter(t => 
-            t.user_id === parseInt(userId) && 
-            t.symbol === symbol &&
-            t.status && t.status !== 'PENDING'
-        );
+        const trades = await TradeModel.find({
+            user_id: userId,
+            symbol,
+            status: { $ne: 'PENDING' }
+        }).lean();
 
-        // We derive trend from the trade context (stored in pattern or can be inferred)
         const trendStats = {};
-        
-        userTrades.forEach(t => {
-            // Try to extract trend from pattern or use 'unknown'
+        trades.forEach(t => {
             let trend = 'unknown';
             const pattern = (t.pattern || '').toLowerCase();
             if (pattern.includes('downtrend')) trend = 'downtrend';
             else if (pattern.includes('uptrend')) trend = 'uptrend';
             else if (pattern.includes('sideways') || pattern.includes('neutral') || pattern.includes('range')) trend = 'sideways';
             
-            if (!trendStats[trend]) {
-                trendStats[trend] = { wins: 0, losses: 0 };
-            }
+            if (!trendStats[trend]) trendStats[trend] = { wins: 0, losses: 0 };
             if (t.status === 'WIN') trendStats[trend].wins++;
             else trendStats[trend].losses++;
         });
 
         return Object.entries(trendStats)
             .map(([trend, data]) => ({
-                trend,
-                wins: data.wins,
-                losses: data.losses,
+                trend, wins: data.wins, losses: data.losses,
                 total: data.wins + data.losses,
                 winRate: (data.wins + data.losses) > 0 ? Math.round((data.wins / (data.wins + data.losses)) * 100) : 0
             }))
@@ -187,23 +253,17 @@ class Trade {
             .sort((a, b) => b.winRate - a.winRate);
     }
 
-    /**
-     * LEARNING LOOP: Get session-based performance
-     */
     static async getSessionPerformance(userId, symbol) {
-        const trades = db.trades.getAll();
-        const userTrades = trades.filter(t => 
-            t.user_id === parseInt(userId) && 
-            t.symbol === symbol &&
-            t.session &&
-            t.status && t.status !== 'PENDING'
-        );
+        const trades = await TradeModel.find({
+            user_id: userId,
+            symbol,
+            session: { $ne: null },
+            status: { $ne: 'PENDING' }
+        }).lean();
 
         const sessionStats = {};
-        userTrades.forEach(t => {
-            if (!sessionStats[t.session]) {
-                sessionStats[t.session] = { wins: 0, losses: 0, totalProfit: 0 };
-            }
+        trades.forEach(t => {
+            if (!sessionStats[t.session]) sessionStats[t.session] = { wins: 0, losses: 0, totalProfit: 0 };
             sessionStats[t.session].totalProfit += (t.profit || 0);
             if (t.status === 'WIN') sessionStats[t.session].wins++;
             else sessionStats[t.session].losses++;
@@ -211,9 +271,7 @@ class Trade {
 
         return Object.entries(sessionStats)
             .map(([session, data]) => ({
-                session,
-                wins: data.wins,
-                losses: data.losses,
+                session, wins: data.wins, losses: data.losses,
                 total: data.wins + data.losses,
                 winRate: (data.wins + data.losses) > 0 ? Math.round((data.wins / (data.wins + data.losses)) * 100) : 0,
                 avgProfit: (data.wins + data.losses) > 0 ? (data.totalProfit / (data.wins + data.losses)).toFixed(2) : '0.00'

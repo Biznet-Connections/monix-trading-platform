@@ -13,6 +13,7 @@ dotenv.config();
 const { init: initDatabase } = require('./config/database');
 const derivService = require('./services/derivService');
 const marketData = require('./services/marketData');
+const knowledgeBase = require('./services/knowledgeBase');
 const { broadcastPrice, broadcastSignal, broadcastNotification, broadcastAIUpdate } = require('./utils/websocket');
 const aiTrader = require('./services/aiTrader');
 const User = require('./models/User');
@@ -59,8 +60,13 @@ wss.on('connection', (ws) => {
 
 app.get('/health', (req, res) => {
     const tickAge = lastTickTime ? Math.floor((Date.now() - lastTickTime) / 1000) : 999;
+    const session = knowledgeBase.getSessionRules();
     res.json({
         status: 'ok',
+        version: '6.0.0',
+        edition: 'Professional Trader',
+        session: session.name,
+        sessionStrategy: session.bestStrategy,
         ticksReceived: tickCount,
         lastTickAge: tickAge,
         aiTraderRunning: aiTrader.isRunning,
@@ -83,7 +89,6 @@ app.post('/api/log', express.json(), (req, res) => {
     res.json({ success: true });
 });
 
-// Increased rate limit from 100 to 500 for dashboard polling
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500,
@@ -103,7 +108,6 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
-// Self-ping
 let selfPingInterval = null;
 function startSelfPing() {
     if (selfPingInterval) clearInterval(selfPingInterval);
@@ -119,7 +123,13 @@ function startSelfPing() {
 async function startServer() {
     try {
         await initDatabase();
-        console.log('✅ Database initialized');
+        console.log('✅ MongoDB connected');
+
+        // Initialize Trading DNA
+        const session = knowledgeBase.getSessionRules();
+        console.log(`🧬 Trading DNA loaded successfully`);
+        console.log(`📚 Session: ${session.name} | ${session.personality} | ${session.bestStrategy}`);
+        console.log(`🛡️ Risk: ${knowledgeBase.TRADING_KNOWLEDGE.riskManagement.maxRiskPerTrade * 100}% per trade | 1:2 RR | Pause after ${knowledgeBase.TRADING_KNOWLEDGE.riskManagement.maxConsecutiveLosses} losses`);
 
         try {
             await derivService.connect();
@@ -173,17 +183,19 @@ async function startServer() {
 
         server.listen(process.env.PORT || 3000, () => {
             const port = process.env.PORT || 3000;
-            console.log(`✅ MONIX Trading Platform v4.0 running on port ${port}`);
+            console.log(`✅ MONIX Trading Platform v6.0 PROFESSIONAL TRADER running on port ${port}`);
+            console.log(`🧬 Trading DNA: ACTIVE | ${session.name} session optimized`);
             startSelfPing();
 
             setTimeout(async () => {
                 try {
                     const users = await User.getAll();
-                    const activeUser = users.find(u => u.is_active === 1);
+                    const activeUser = Array.isArray(users) ? users.find(u => u.is_active === 1) : null;
                     if (activeUser) {
                         const token = activeUser.is_demo ? activeUser.demo_token : activeUser.real_token;
                         if (token && (activeUser.demo_token || activeUser.real_token)) {
-                            await aiTrader.start(activeUser.id, activeUser.default_symbol || 'R_75', activeUser.auto_mode ? 'AUTO' : 'MANUAL');
+                            console.log(`🚀 Starting AI Professional Trader for: ${activeUser.username || activeUser.email}`);
+                            await aiTrader.start(activeUser._id || activeUser.id, activeUser.default_symbol || 'R_75', activeUser.auto_mode ? 'AUTO' : 'MANUAL');
                         }
                     }
                 } catch (error) {

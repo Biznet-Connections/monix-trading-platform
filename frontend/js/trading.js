@@ -126,6 +126,7 @@ function showAIReasonModal(signal) {
         modalAction.className = `text-2xl font-bold ${signal.action === 'BUY' ? 'text-emerald-400' : signal.action === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`;
     }
 
+    // CRITICAL FIX: Use signal.symbol from the API response
     if (modalSymbol) {
         const displaySymbol = signal.symbol || 'R_75';
         modalSymbol.innerHTML = displaySymbol;
@@ -137,7 +138,7 @@ function showAIReasonModal(signal) {
     if (modalEntryTime) modalEntryTime.innerHTML = signal.entry_time || 'Waiting...';
     if (modalExitTime) modalExitTime.innerHTML = signal.exit_time || '5 minutes after entry';
 
-    const defaultStake = parseFloat(stakeSlider ? stakeSlider.value : 0.35);
+    const defaultStake = parseFloat(stakeSlider ? stakeSlider.value : 0.50);
     const profitDollars = (defaultStake * (signal.confidence / 100) * 1.0).toFixed(2);
     const lossDollars = defaultStake.toFixed(2);
 
@@ -415,11 +416,11 @@ async function executeTrade() {
         yesBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>EXECUTING...';
     }
 
-    let stake = stakeSlider ? parseFloat(stakeSlider.value) : 0.35;
-    if (stake < 0.35) {
-        stake = 0.35;
-        if (stakeSlider) stakeSlider.value = 0.35;
-        if (stakeValue) stakeValue.innerText = '$0.35';
+    let stake = stakeSlider ? parseFloat(stakeSlider.value) : 0.50;
+    if (stake < 0.50) {
+        stake = 0.50;
+        if (stakeSlider) stakeSlider.value = 0.50;
+        if (stakeValue) stakeValue.innerText = '$0.50';
     }
 
     try {
@@ -562,17 +563,153 @@ async function updateSetting(setting, value) {
     }
 }
 
+// ============================================================
+// PENDING ORDERS DISPLAY
+// ============================================================
+let lastFetchedTrades = [];
+let pendingOrdersInterval = null;
+
+function updatePendingOrdersDisplay(pendingOrders) {
+    const container = document.getElementById('pendingOrdersContainer');
+    const countBadge = document.getElementById('pendingOrdersCount');
+    if (!container) return;
+    
+    if (!pendingOrders || pendingOrders.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-3">No pending limit orders</p>';
+        if (countBadge) countBadge.innerText = '(0)';
+        return;
+    }
+    
+    if (countBadge) countBadge.innerText = `(${pendingOrders.length})`;
+    
+    const currentPrice = parseFloat(document.getElementById('livePrice')?.innerText?.replace('$', '') || '0');
+    
+    container.innerHTML = pendingOrders.map(order => {
+        const distance = currentPrice > 0 ? Math.abs(currentPrice - order.entryPrice) : 0;
+        const distancePercent = currentPrice > 0 ? ((distance / order.entryPrice) * 100).toFixed(2) : '0';
+        const timeLeft = order.expires ? Math.max(0, Math.floor((order.expires - Date.now()) / 60000)) : 0;
+        const isApproaching = parseFloat(distancePercent) < 0.3;
+        const borderColor = isApproaching ? 'border-yellow-500' : 'border-slate-600';
+        const bgColor = isApproaching ? 'bg-yellow-500/10' : '';
+        
+        return `
+            <div class="p-3 rounded-lg border ${borderColor} ${bgColor} mb-2 hover:border-indigo-400 transition">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-sm ${order.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}">${order.action} LIMIT</span>
+                    <span class="text-xs text-slate-500">⏰ ${timeLeft}min</span>
+                </div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-400">Entry: <span class="text-white font-mono">$${order.entryPrice?.toFixed(2) || '0.00'}</span></span>
+                    <span class="text-slate-400">Stake: <span class="text-white">$${order.stake?.toFixed(2) || '2.00'}</span></span>
+                </div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-400">Current: <span class="text-white font-mono">$${currentPrice.toFixed(2)}</span></span>
+                    <span class="${isApproaching ? 'text-yellow-400 font-bold' : 'text-slate-500'}">${distancePercent}% away</span>
+                </div>
+                <div class="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden mt-2">
+                    <div class="bg-indigo-500 h-full rounded-full transition-all" style="width: ${Math.min(100, Math.max(0, 100 - (parseFloat(distancePercent) * 200)))}%"></div>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">🎯 ${order.reason || 'Waiting for price level'}</p>
+                <p class="text-xs text-slate-600 mt-1">Confidence: ${order.confidence || 0}% | Pattern: ${order.pattern || 'N/A'}</p>
+            </div>
+        `;
+    }).join('');
+}
+
+// Poll for pending orders every 5 seconds
+function startPendingOrdersPolling() {
+    if (pendingOrdersInterval) clearInterval(pendingOrdersInterval);
+    pendingOrdersInterval = setInterval(async () => {
+        try {
+            const response = await fetch('/api/ai/analysis', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('monix_token')}` }
+            });
+            const data = await response.json();
+            if (data.watch_state?.pending_orders) {
+                updatePendingOrdersDisplay(data.watch_state.pending_orders);
+            }
+            if (data.pending_orders) {
+                updatePendingOrdersDisplay(data.pending_orders);
+            }
+        } catch(e) {}
+    }, 5000);
+}
+
+// ============================================================
+// COPY FUNCTIONS
+// ============================================================
+function copyTradeToClipboard(trade) {
+    const text = `${trade.action} ${trade.symbol} @ $${trade.entry_price?.toFixed(2)} | Exit: $${trade.exit_price?.toFixed(2) || 'PENDING'} | ${trade.profit >= 0 ? '+' : ''}$${trade.profit?.toFixed(2)} | ${trade.status} | Pattern: ${trade.pattern || 'N/A'} | RSI: ${trade.rsi || 'N/A'} | ${new Date(trade.executed_at).toLocaleString()}`;
+    navigator.clipboard.writeText(text).then(() => {
+        uiLog(`Copied trade: ${trade.action} ${trade.symbol}`);
+        if (window.showToast) window.showToast('Copied!', 'Trade details copied to clipboard', 'success');
+    }).catch(() => {
+        if (window.showToast) window.showToast('Copy Failed', 'Could not copy to clipboard', 'error');
+    });
+}
+
+async function copyAllTrades() {
+    const trades = await window.api.getTradeHistory(100);
+    if (!trades || trades.length === 0) {
+        if (window.showToast) window.showToast('No Trades', 'No trades to copy', 'info');
+        return;
+    }
+    let text = 'MONIX TRADING PLATFORM - TRADE HISTORY\n';
+    text += '═'.repeat(80) + '\n';
+    text += 'TIME'.padEnd(12) + 'SYMBOL'.padEnd(8) + 'ACTION'.padEnd(8) + 'ENTRY'.padEnd(14) + 'EXIT'.padEnd(14) + 'PROFIT'.padEnd(12) + 'STATUS'.padEnd(8) + 'PATTERN\n';
+    text += '─'.repeat(80) + '\n';
+    trades.forEach(t => {
+        text += new Date(t.executed_at).toLocaleTimeString().padEnd(12);
+        text += (t.symbol || '').padEnd(8);
+        text += (t.action || '').padEnd(8);
+        text += `$${t.entry_price?.toFixed(2) || '--'}`.padEnd(14);
+        text += `$${t.exit_price?.toFixed(2) || '--'}`.padEnd(14);
+        text += `${t.profit >= 0 ? '+' : ''}$${t.profit?.toFixed(2) || '0.00'}`.padEnd(12);
+        text += (t.status || 'PENDING').padEnd(8);
+        text += (t.pattern || 'N/A');
+        text += '\n';
+    });
+    text += '─'.repeat(80) + '\n';
+    const totalProfit = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
+    const wins = trades.filter(t => t.status === 'WIN').length;
+    text += `Total: ${trades.length} trades | ${wins} wins | Net: ${totalProfit >= 0 ? '+' : ''}$${totalProfit.toFixed(2)}\n`;
+    text += '═'.repeat(80) + '\n';
+    navigator.clipboard.writeText(text).then(() => {
+        uiLog(`Copied all ${trades.length} trades`);
+        if (window.showToast) window.showToast('Copied!', `${trades.length} trades copied to clipboard`, 'success');
+    }).catch(() => {
+        if (window.showToast) window.showToast('Copy Failed', 'Could not copy to clipboard', 'error');
+    });
+}
+
+window.copyTradeById = async function(tradeId) {
+    const trades = lastFetchedTrades.length > 0 ? lastFetchedTrades : await window.api.getTradeHistory(50);
+    lastFetchedTrades = trades;
+    const trade = trades.find(t => t._id === tradeId);
+    if (trade) copyTradeToClipboard(trade);
+};
+
+// ============================================================
+// LOAD RECENT TRADES
+// ============================================================
 async function loadRecentTrades() {
     try {
-        const trades = await window.api.getTradeHistory(20);
         const tbody = document.getElementById('recentTradesBody');
+        const countBadge = document.getElementById('recentTradesCount');
         if (!tbody) return;
-
+        tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">Loading...</td></tr>';
+        
+        const trades = await window.api.getTradeHistory(20);
+        lastFetchedTrades = trades;
+        
         if (!trades || trades.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No trades yet</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet</td></tr>';
+            if (countBadge) countBadge.innerText = '(0)';
             uiLog('Recent trades: No trades found');
             return;
         }
+
+        if (countBadge) countBadge.innerText = `(${trades.length})`;
 
         tbody.innerHTML = trades.map(trade => `
             <tr class="hover:bg-slate-700/20">
@@ -583,14 +720,22 @@ async function loadRecentTrades() {
                 <td class="p-4">$${trade.exit_price?.toFixed(2) || '--'}</td>
                 <td class="p-4 text-right ${trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.profit >= 0 ? '+' : ''}$${trade.profit?.toFixed(2)}</td>
                 <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-[10px] ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : trade.status === 'LOSS' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}">${trade.status || 'PENDING'}</span></td>
+                <td class="p-4 text-center">
+                    <button onclick="window.copyTradeById('${trade._id}')" class="text-slate-400 hover:text-white transition text-lg" title="Copy trade details">📋</button>
+                </td>
             </tr>
         `).join('');
         uiLog(`Recent trades: Loaded ${trades.length} trades`);
     } catch (error) {
         uiLog(`Recent trades error: ${error.message}`, 'error');
+        const tbody = document.getElementById('recentTradesBody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-red-400">Error loading trades</td></tr>';
     }
 }
 
+// ============================================================
+// REFRESH USER DATA
+// ============================================================
 async function refreshUserData() {
     try {
         const profile = await window.api.getUserProfile();
@@ -620,8 +765,8 @@ async function refreshUserData() {
             if (pushSignalsToggle) pushSignalsToggle.checked = profile.user.push_signals === 1;
             if (autoModeToggle) autoModeToggle.checked = profile.user.auto_mode === 1;
             if (jackpotToggle) jackpotToggle.checked = profile.user.jackpot_mode === 1;
-            if (stakeSlider && profile.user.base_stake) stakeSlider.value = Math.max(profile.user.base_stake, 0.35);
-            if (stakeValue) stakeValue.innerText = `$${Math.max(profile.user.base_stake || 0.35, 0.35).toFixed(2)}`;
+            if (stakeSlider && profile.user.base_stake) stakeSlider.value = Math.max(profile.user.base_stake, 0.50);
+            if (stakeValue) stakeValue.innerText = `$${Math.max(profile.user.base_stake || 0.50, 0.50).toFixed(2)}`;
 
             const adminLink = document.getElementById('adminLink');
             if (adminLink && profile.user.is_admin) adminLink.classList.remove('hidden');
@@ -641,6 +786,9 @@ async function refreshUserData() {
     }
 }
 
+// ============================================================
+// ADD TRADE TO TABLE
+// ============================================================
 function addTradeToTable(trade) {
     const tbody = document.getElementById('recentTradesBody');
     if (!tbody) return;
@@ -655,12 +803,11 @@ function addTradeToTable(trade) {
         <td class="p-4">${trade.exit_price ? `$${trade.exit_price.toFixed(2)}` : '--'}</td>
         <td class="p-4 text-right ${trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.profit ? (trade.profit >= 0 ? '+' : '') + trade.profit.toFixed(2) : '--'}</td>
         <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-[10px] ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : trade.status === 'LOSS' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}">${trade.status || 'PENDING'}</span></td>
+        <td class="p-4 text-center"><button onclick="window.copyTradeById('${trade._id || trade.id}')" class="text-slate-400 hover:text-white transition text-lg" title="Copy trade details">📋</button></td>
     `;
 
     tbody.insertBefore(newRow, tbody.firstChild);
-    if (tbody.children.length > 20) {
-        tbody.removeChild(tbody.lastChild);
-    }
+    if (tbody.children.length > 20) tbody.removeChild(tbody.lastChild);
 
     uiLog(`Trade added to table: ${trade.action} ${trade.status}`);
 
@@ -673,6 +820,9 @@ function addTradeToTable(trade) {
     }
 }
 
+// ============================================================
+// UPDATE BALANCE IN UI
+// ============================================================
 function updateBalanceInUI(balance) {
     const balanceEl = document.getElementById('balanceAmount');
     if (balanceEl) {
@@ -680,11 +830,18 @@ function updateBalanceInUI(balance) {
     }
 }
 
+// ============================================================
+// INIT TRADING
+// ============================================================
 function initTrading() {
-    uiLog('Initializing trading module...');
+    uiLog('Initializing trading module v6.0 Professional...');
+    
     if (stakeSlider) {
-        stakeSlider.min = 0.35;
-        stakeSlider.value = 0.35;
+        stakeSlider.min = 0.50;
+        stakeSlider.max = 20;
+        stakeSlider.step = 0.50;
+        stakeSlider.value = 2.00;
+        if (stakeValue) stakeValue.innerText = '$2.00';
         stakeSlider.addEventListener('input', (e) => {
             const val = parseFloat(e.target.value).toFixed(2);
             if (stakeValue) stakeValue.innerText = `$${val}`;
@@ -752,6 +909,7 @@ function initTrading() {
 
     refreshUserData();
     loadRecentTrades();
+    startPendingOrdersPolling();
 
     if (recentTradesRefreshInterval) clearInterval(recentTradesRefreshInterval);
     recentTradesRefreshInterval = setInterval(() => {
@@ -759,7 +917,7 @@ function initTrading() {
     }, 10000);
 
     setInterval(() => { if (currentActiveTrade) updateLockedBalance(); }, 10000);
-    uiLog('Trading module initialized');
+    uiLog('Trading module v6.0 Professional initialized');
 }
 
 window.initTrading = initTrading;
@@ -774,3 +932,6 @@ window.showAIReasonModal = showAIReasonModal;
 window.closeAIReasonModal = closeAIReasonModal;
 window.acceptTradeFromModal = acceptTradeFromModal;
 window.changeSymbol = changeSymbol;
+window.copyAllTrades = copyAllTrades;
+window.copyTradeToClipboard = copyTradeToClipboard;
+window.updatePendingOrdersDisplay = updatePendingOrdersDisplay;

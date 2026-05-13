@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>MONIX AI TRADING PLATFORM</title>
+    <title>MONIX AI TRADING PLATFORM v6.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -217,7 +217,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-lg">MONIX <span class="text-indigo-400">AI</span></h1>
-                    <p class="text-[10px] text-slate-500">v3.0 Trading Platform</p>
+                    <p class="text-[10px] text-slate-500">v6.0 Professional</p>
                 </div>
             </div>
         </div>
@@ -331,93 +331,16 @@
                         <div class="flex justify-between items-center mb-5 flex-wrap gap-3">
                             <div class="flex gap-3 flex-wrap">
                                 <select id="symbolSelect" class="bg-slate-800 rounded-lg px-4 py-2 text-sm border border-slate-700">
-                                    <optgroup label="📊 Volatility Indices (1s)">
-                                        <option>R_10</option>
-                                        <option>R_25</option>
-                                        <option>R_50</option>
-                                        <option selected>R_75</option>
-                                        <option>R_100</option>
-                                    </optgroup>
-                                    <optgroup label="📈 Volatility Indices (2s)">
-                                        <option>R_10_2S</option>
-                                        <option>R_25_2S</option>
-                                        <option>R_50_2S</option>
-                                        <option>R_75_2S</option>
-                                        <option>R_100_2S</option>
-                                    </optgroup>
-                                    <optgroup label="💥 Boom & Crash Indices">
-                                        <option>Boom 300</option>
-                                        <option>Boom 500</option>
-                                        <option>Boom 1000</option>
-                                        <option>Crash 300</option>
-                                        <option>Crash 500</option>
-                                        <option>Crash 1000</option>
-                                    </optgroup>
-                                    <optgroup label="📉 Step Indices">
-                                        <option>Step 200</option>
-                                        <option>Step 300</option>
-                                        <option>Step 400</option>
-                                        <option>Step 500</option>
-                                    </optgroup>
-                                    <optgroup label="🏆 Derived Indices">
-                                        <option>1HZ10</option>
-                                        <option>1HZ25</option>
-                                        <option>1HZ50</option>
-                                        <option>1HZ75</option>
-                                        <option>1HZ100</option>
-                                    </optgroup>
-                                    <optgroup label="💱 Major Forex">
-                                        <option>EUR/USD</option>
-                                        <option>GBP/USD</option>
-                                        <option>USD/JPY</option>
-                                        <option>AUD/USD</option>
-                                        <option>USD/CAD</option>
-                                        <option>NZD/USD</option>
-                                        <option>USD/CHF</option>
-                                    </optgroup>
-                                    <optgroup label="💱 Minor Forex">
-                                        <option>EUR/GBP</option>
-                                        <option>EUR/JPY</option>
-                                        <option>GBP/JPY</option>
-                                        <option>AUD/JPY</option>
-                                        <option>CAD/JPY</option>
-                                        <option>CHF/JPY</option>
-                                        <option>EUR/AUD</option>
-                                        <option>GBP/AUD</option>
-                                    </optgroup>
-                                    <optgroup label="🥇 Commodities">
-                                        <option>XAU/USD (Gold)</option>
-                                        <option>XAG/USD (Silver)</option>
-                                        <option>XPT/USD (Platinum)</option>
-                                        <option>XPD/USD (Palladium)</option>
-                                        <option>WTI (Oil)</option>
-                                        <option>Brent (Oil)</option>
-                                    </optgroup>
-                                    <optgroup label="🪙 Cryptocurrencies">
-                                        <option>BTC/USD (Bitcoin)</option>
-                                        <option>ETH/USD (Ethereum)</option>
-                                        <option>LTC/USD (Litecoin)</option>
-                                        <option>XRP/USD (Ripple)</option>
-                                        <option>ADA/USD (Cardano)</option>
-                                        <option>DOT/USD (Polkadot)</option>
-                                        <option>SOL/USD (Solana)</option>
-                                        <option>DOGE/USD (Dogecoin)</option>
-                                        <option>MATIC/USD (Polygon)</option>
-                                        <option>AVAX/USD (Avalanche)</option>
-                                    </optgroup>
-                                    <optgroup label="📊 Stock Indices">
-                                        <option>US500 (S&P 500)</option>
-                                        <option>USTEC (Nasdaq)</option>
-                                        <option>US30 (Dow Jones)</option>
-                                        <option>GER40 (DAX)</option>
-                                        <option>UK100 (FTSE)</option>
-                                        <option>FRA40 (CAC 40)</option>
-                                        <option>ESP35 (IBEX 35)</option>
-                                        <option>NETH25 (AEX)</option>
-                                        <option>HK50 (Hang Seng)</option>
-                                        <option>JP225 (Nikkei)</option>
-                                        <option>AUS200 (ASX 200)</option>
-                                    </optgroup>
+                                    <optgroup label="📊 Volatility Indices (1s)"><option>R_10</option><option>R_25</option><option>R_50</option><option selected>R_75</option><option>R_100</option></optgroup>
+                                    <optgroup label="📈 Volatility Indices (2s)"><option>R_10_2S</option><option>R_25_2S</option><option>R_50_2S</option><option>R_75_2S</option><option>R_100_2S</option></optgroup>
+                                    <optgroup label="💥 Boom & Crash Indices"><option>Boom 300</option><option>Boom 500</option><option>Boom 1000</option><option>Crash 300</option><option>Crash 500</option><option>Crash 1000</option></optgroup>
+                                    <optgroup label="📉 Step Indices"><option>Step 200</option><option>Step 300</option><option>Step 400</option><option>Step 500</option></optgroup>
+                                    <optgroup label="🏆 Derived Indices"><option>1HZ10</option><option>1HZ25</option><option>1HZ50</option><option>1HZ75</option><option>1HZ100</option></optgroup>
+                                    <optgroup label="💱 Major Forex"><option>EUR/USD</option><option>GBP/USD</option><option>USD/JPY</option><option>AUD/USD</option><option>USD/CAD</option><option>NZD/USD</option><option>USD/CHF</option></optgroup>
+                                    <optgroup label="💱 Minor Forex"><option>EUR/GBP</option><option>EUR/JPY</option><option>GBP/JPY</option><option>AUD/JPY</option><option>CAD/JPY</option><option>CHF/JPY</option><option>EUR/AUD</option><option>GBP/AUD</option></optgroup>
+                                    <optgroup label="🥇 Commodities"><option>XAU/USD (Gold)</option><option>XAG/USD (Silver)</option><option>XPT/USD (Platinum)</option><option>XPD/USD (Palladium)</option><option>WTI (Oil)</option><option>Brent (Oil)</option></optgroup>
+                                    <optgroup label="🪙 Cryptocurrencies"><option>BTC/USD (Bitcoin)</option><option>ETH/USD (Ethereum)</option><option>LTC/USD (Litecoin)</option><option>XRP/USD (Ripple)</option><option>ADA/USD (Cardano)</option><option>DOT/USD (Polkadot)</option><option>SOL/USD (Solana)</option><option>DOGE/USD (Dogecoin)</option></optgroup>
+                                    <optgroup label="📊 Stock Indices"><option>US500 (S&P 500)</option><option>USTEC (Nasdaq)</option><option>US30 (Dow Jones)</option><option>GER40 (DAX)</option><option>UK100 (FTSE)</option><option>FRA40 (CAC 40)</option><option>ESP35 (IBEX 35)</option><option>NETH25 (AEX)</option><option>HK50 (Hang Seng)</option><option>JP225 (Nikkei)</option><option>AUS200 (ASX 200)</option></optgroup>
                                 </select>
                                 <div class="flex bg-slate-800 rounded-lg p-1 text-xs gap-1">
                                     <button data-tf="1m" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">1m</button>
@@ -462,22 +385,10 @@
                             <div id="confidenceBars" class="grid grid-cols-10 gap-1 mb-5"></div>
 
                             <div class="grid grid-cols-2 gap-3 mb-5">
-                                <div class="bg-slate-800/50 p-3 rounded-lg">
-                                    <p class="text-slate-500 text-[10px]">Entry Price</p>
-                                    <p id="signalEntry" class="font-bold text-base">$0.00</p>
-                                </div>
-                                <div class="bg-slate-800/50 p-3 rounded-lg">
-                                    <p class="text-slate-500 text-[10px]">Exit Time</p>
-                                    <p id="signalExit" class="font-bold text-base">5 min</p>
-                                </div>
-                                <div class="bg-slate-800/50 p-3 rounded-lg">
-                                    <p class="text-slate-500 text-[10px]">Take Profit</p>
-                                    <p id="signalTP" class="font-bold text-base text-emerald-400">$0.00</p>
-                                </div>
-                                <div class="bg-slate-800/50 p-3 rounded-lg">
-                                    <p class="text-slate-500 text-[10px]">Stop Loss</p>
-                                    <p id="signalSL" class="font-bold text-base text-red-400">$0.00</p>
-                                </div>
+                                <div class="bg-slate-800/50 p-3 rounded-lg"><p class="text-slate-500 text-[10px]">Entry Price</p><p id="signalEntry" class="font-bold text-base">$0.00</p></div>
+                                <div class="bg-slate-800/50 p-3 rounded-lg"><p class="text-slate-500 text-[10px]">Exit Time</p><p id="signalExit" class="font-bold text-base">5 min</p></div>
+                                <div class="bg-slate-800/50 p-3 rounded-lg"><p class="text-slate-500 text-[10px]">Take Profit</p><p id="signalTP" class="font-bold text-base text-emerald-400">$0.00</p></div>
+                                <div class="bg-slate-800/50 p-3 rounded-lg"><p class="text-slate-500 text-[10px]">Stop Loss</p><p id="signalSL" class="font-bold text-base text-red-400">$0.00</p></div>
                             </div>
 
                             <div class="mt-3 text-xs text-slate-300 bg-slate-800/30 p-3 rounded-lg mb-5">
@@ -497,28 +408,19 @@
                     <div class="grid grid-cols-2 gap-3 mt-5">
                         <div class="glass-card p-4 rounded-xl flex justify-between items-center">
                             <div><p class="text-sm font-semibold">📡 SIGNAL PUSH</p><p class="text-[10px] text-slate-500">Auto signals</p></div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="pushSignalsToggle" class="sr-only peer">
-                                <div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
-                            </label>
+                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="pushSignalsToggle" class="sr-only peer"><div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div></label>
                         </div>
                         <div class="glass-card p-4 rounded-xl flex justify-between items-center">
                             <div><p class="text-sm font-semibold">🤖 AUTO MODE</p><p class="text-[10px] text-slate-500">Bot trades</p></div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="autoModeToggle" class="sr-only peer">
-                                <div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
-                            </label>
+                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="autoModeToggle" class="sr-only peer"><div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div></label>
                         </div>
                         <div class="glass-card p-4 rounded-xl flex justify-between items-center">
                             <div><p class="text-sm font-semibold">🎰 JACKPOT</p><p class="text-[10px] text-slate-500">85%+ only</p></div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="jackpotToggle" class="sr-only peer">
-                                <div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
-                            </label>
+                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="jackpotToggle" class="sr-only peer"><div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div></label>
                         </div>
                         <div class="glass-card p-4 rounded-xl flex justify-between items-center">
-                            <div><p class="text-sm font-semibold">💰 STAKE</p><p id="stakeValue" class="text-[10px] text-slate-500">$0.10</p></div>
-                            <input type="range" min="0.01" max="1" step="0.01" value="0.10" id="stakeSlider" class="w-24 accent-indigo-500">
+                            <div><p class="text-sm font-semibold">💰 STAKE</p><p id="stakeValue" class="text-[10px] text-slate-500">$2.00</p></div>
+                            <input type="range" min="0.50" max="20" step="0.50" value="2.00" id="stakeSlider" class="w-24 accent-indigo-500">
                         </div>
                     </div>
 
@@ -535,19 +437,40 @@
                 </div>
             </div>
 
-            <!-- Recent Trades Table -->
-            <div class="glass-card rounded-2xl overflow-hidden mb-8">
-                <div class="p-5 border-b border-slate-700 flex justify-between items-center">
-                    <h3 class="font-bold"><i class="fas fa-history mr-2 text-indigo-400"></i>RECENT TRADES</h3>
-                    <button id="refreshTradesBtn" class="text-xs text-indigo-400 hover:underline">REFRESH</button>
+            <!-- ============================================================ -->
+            <!-- NEW: Pending Limit Orders Panel (Collapsible) -->
+            <!-- ============================================================ -->
+            <div class="glass-card rounded-2xl overflow-hidden mb-5">
+                <div class="p-5 border-b border-slate-700 flex justify-between items-center cursor-pointer" onclick="toggleCollapsible('pendingOrdersContent', 'pendingOrdersIcon')">
+                    <h3 class="font-bold"><i class="fas fa-clock mr-2 text-yellow-400"></i>⏳ PENDING ORDERS <span id="pendingOrdersCount" class="text-xs text-slate-500 ml-2">(0)</span></h3>
+                    <i id="pendingOrdersIcon" class="fas fa-chevron-down text-slate-400 transition-transform"></i>
                 </div>
-                <div class="overflow-x-auto">
+                <div id="pendingOrdersContent" class="p-4">
+                    <div id="pendingOrdersContainer">
+                        <p class="text-xs text-slate-500 text-center py-3">No pending limit orders</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- Recent Trades Table (Collapsible) -->
+            <!-- ============================================================ -->
+            <div class="glass-card rounded-2xl overflow-hidden mb-8">
+                <div class="p-5 border-b border-slate-700 flex justify-between items-center cursor-pointer" onclick="toggleCollapsible('recentTradesContent', 'recentTradesIcon')">
+                    <h3 class="font-bold"><i class="fas fa-history mr-2 text-indigo-400"></i>📊 RECENT TRADES <span id="recentTradesCount" class="text-xs text-slate-500 ml-2">(0)</span></h3>
+                    <div class="flex items-center gap-3">
+                        <button id="copyAllTradesBtn" class="text-xs text-indigo-400 hover:text-indigo-300 transition" onclick="event.stopPropagation(); window.copyAllTrades()" title="Copy all trades to clipboard">📋 Copy All</button>
+                        <button id="refreshTradesBtn" class="text-xs text-indigo-400 hover:underline" onclick="event.stopPropagation(); window.loadRecentTrades()">REFRESH</button>
+                        <i id="recentTradesIcon" class="fas fa-chevron-down text-slate-400 transition-transform"></i>
+                    </div>
+                </div>
+                <div id="recentTradesContent" class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-slate-800/50 text-slate-400 text-xs uppercase">
-                            <tr><th class="p-4">Time</th><th class="p-4">Symbol</th><th class="p-4">Action</th><th class="p-4">Entry</th><th class="p-4">Exit</th><th class="p-4 text-right">Profit</th><th class="p-4 text-center">Status</th></tr>
+                            <tr><th class="p-4">Time</th><th class="p-4">Symbol</th><th class="p-4">Action</th><th class="p-4">Entry</th><th class="p-4">Exit</th><th class="p-4 text-right">Profit</th><th class="p-4 text-center">Status</th><th class="p-4 text-center">📋</th></tr>
                         </thead>
                         <tbody id="recentTradesBody" class="divide-y divide-slate-700/50">
-                            <tr><td colspan="7" class="p-4 text-center text-slate-500">No trades yet. Click GET SIGNAL!</td></tr>
+                            <tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet. Click GET SIGNAL!</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -557,9 +480,7 @@
         <!-- Performance Page -->
         <div id="performancePage" class="page-content hidden">
             <div class="glass-card p-5 rounded-2xl mb-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold"><i class="fas fa-chart-line text-indigo-400 mr-2"></i>Performance Statistics</h2>
-                </div>
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold"><i class="fas fa-chart-line text-indigo-400 mr-2"></i>Performance Statistics</h2></div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-6">
                     <div class="bg-slate-800/30 p-4 rounded-xl"><p id="statWinRate" class="text-3xl font-bold text-emerald-400">0%</p><p class="text-xs text-slate-500">Win Rate</p></div>
                     <div class="bg-slate-800/30 p-4 rounded-xl"><p id="statTotalTrades" class="text-3xl font-bold">0</p><p class="text-xs text-slate-500">Total Trades</p></div>
@@ -573,17 +494,10 @@
         <!-- Trade History Page -->
         <div id="historyPage" class="page-content hidden">
             <div class="glass-card p-5 rounded-2xl">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold"><i class="fas fa-history text-indigo-400 mr-2"></i>Trade History</h2>
-                </div>
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold"><i class="fas fa-history text-indigo-400 mr-2"></i>Trade History</h2></div>
                 <div class="flex gap-3 mb-4 flex-wrap">
-                    <select id="historyFilterSymbol" class="bg-slate-800 rounded-lg px-3 py-2 text-sm">
-                        <option value="">All Symbols</option>
-                        <option>R_75</option><option>EUR/USD</option><option>XAU/USD</option>
-                    </select>
-                    <select id="historyFilterStatus" class="bg-slate-800 rounded-lg px-3 py-2 text-sm">
-                        <option value="">All Status</option><option>WIN</option><option>LOSS</option>
-                    </select>
+                    <select id="historyFilterSymbol" class="bg-slate-800 rounded-lg px-3 py-2 text-sm"><option value="">All Symbols</option><option>R_75</option><option>EUR/USD</option><option>XAU/USD</option></select>
+                    <select id="historyFilterStatus" class="bg-slate-800 rounded-lg px-3 py-2 text-sm"><option value="">All Status</option><option>WIN</option><option>LOSS</option></select>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
@@ -597,9 +511,7 @@
         <!-- Leaderboard Page -->
         <div id="leaderboardPage" class="page-content hidden">
             <div class="glass-card p-5 rounded-2xl">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold"><i class="fas fa-trophy text-yellow-500 mr-2"></i>Leaderboard</h2>
-                </div>
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold"><i class="fas fa-trophy text-yellow-500 mr-2"></i>Leaderboard</h2></div>
                 <div id="leaderboardBody" class="space-y-2"></div>
             </div>
         </div>
@@ -607,9 +519,7 @@
         <!-- AI Insights Page -->
         <div id="insightsPage" class="page-content hidden">
             <div class="glass-card p-5 rounded-2xl">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold"><i class="fas fa-brain text-indigo-400 mr-2"></i>AI Insights & Learning</h2>
-                </div>
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold"><i class="fas fa-brain text-indigo-400 mr-2"></i>AI Insights & Learning</h2></div>
                 <div id="fullInsightsContent" class="space-y-6"></div>
             </div>
         </div>
@@ -626,78 +536,14 @@
             <h2 class="text-xl font-bold"><i class="fas fa-brain text-indigo-400 mr-2"></i>AI TRADE RECOMMENDATION</h2>
             <button onclick="closeAIReasonModal()" class="text-slate-400 hover:text-white text-2xl">&times;</button>
         </div>
-        
         <div class="space-y-4">
-            <!-- Action -->
-            <div class="text-center">
-                <span id="modalAction" class="text-2xl font-bold text-emerald-400">📈 BUY (Price will go UP)</span>
-                <p class="text-xs text-slate-500 mt-1">on <span id="modalSymbol">R_75</span></p>
-            </div>
-            
-            <!-- Current Market -->
-            <div class="bg-slate-800/30 p-3 rounded-lg">
-                <p class="text-xs text-slate-400 mb-1">📍 CURRENT MARKET</p>
-                <div class="flex justify-between">
-                    <span>Price right now:</span>
-                    <span id="modalPrice" class="font-bold">$0.00</span>
-                </div>
-                <div class="flex justify-between">
-                    <span>Market feeling:</span>
-                    <span id="modalMarketFeeling" class="font-bold">Stable</span>
-                </div>
-                <div class="flex justify-between">
-                    <span>Pattern detected:</span>
-                    <span id="modalPattern" class="font-bold text-indigo-400">—</span>
-                </div>
-            </div>
-            
-            <!-- Timing -->
-            <div class="bg-slate-800/30 p-3 rounded-lg">
-                <p class="text-xs text-slate-400 mb-1">⏰ TIMING</p>
-                <div class="flex justify-between">
-                    <span>Enter trade at:</span>
-                    <span id="modalEntryTime" class="font-bold">--:-- --</span>
-                </div>
-                <div class="flex justify-between">
-                    <span>Exit trade at:</span>
-                    <span id="modalExitTime" class="font-bold">--:-- --</span>
-                </div>
-            </div>
-            
-            <!-- Targets -->
-            <div class="bg-slate-800/30 p-3 rounded-lg">
-                <p class="text-xs text-slate-400 mb-1">🎯 YOUR TARGETS</p>
-                <div class="flex justify-between text-emerald-400">
-                    <span>Take Profit:</span>
-                    <span id="modalTakeProfit" class="font-bold">$0.00</span>
-                </div>
-                <div class="flex justify-between text-red-400">
-                    <span>Stop Loss:</span>
-                    <span id="modalStopLoss" class="font-bold">$0.00</span>
-                </div>
-            </div>
-            
-            <!-- Reasoning -->
-            <div class="bg-indigo-600/20 p-3 rounded-lg border border-indigo-500/30">
-                <p class="text-xs text-slate-400 mb-1">💡 WHY</p>
-                <p id="modalReason" class="text-sm">Loading...</p>
-            </div>
-            
-            <!-- Confidence -->
-            <div class="text-center">
-                <p class="text-xs text-slate-400">CONFIDENCE</p>
-                <p id="modalConfidence" class="text-2xl font-bold text-emerald-400">0%</p>
-                <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden mt-1">
-                    <div id="modalConfidenceBar" class="bg-indigo-500 h-full w-0 rounded-full"></div>
-                </div>
-            </div>
-            
-            <!-- Auto Mode Note -->
-            <div id="autoModeNote" class="hidden text-center p-2 bg-yellow-500/20 rounded-lg">
-                <i class="fas fa-robot mr-2"></i> AUTO MODE ACTIVE - Trade will execute automatically
-            </div>
-            
-            <!-- Buttons (Manual Mode only) -->
+            <div class="text-center"><span id="modalAction" class="text-2xl font-bold text-emerald-400">📈 BUY (Price will go UP)</span><p class="text-xs text-slate-500 mt-1">on <span id="modalSymbol">R_75</span></p></div>
+            <div class="bg-slate-800/30 p-3 rounded-lg"><p class="text-xs text-slate-400 mb-1">📍 CURRENT MARKET</p><div class="flex justify-between"><span>Price right now:</span><span id="modalPrice" class="font-bold">$0.00</span></div><div class="flex justify-between"><span>Market feeling:</span><span id="modalMarketFeeling" class="font-bold">Stable</span></div><div class="flex justify-between"><span>Pattern detected:</span><span id="modalPattern" class="font-bold text-indigo-400">—</span></div></div>
+            <div class="bg-slate-800/30 p-3 rounded-lg"><p class="text-xs text-slate-400 mb-1">⏰ TIMING</p><div class="flex justify-between"><span>Enter trade at:</span><span id="modalEntryTime" class="font-bold">--:-- --</span></div><div class="flex justify-between"><span>Exit trade at:</span><span id="modalExitTime" class="font-bold">--:-- --</span></div></div>
+            <div class="bg-slate-800/30 p-3 rounded-lg"><p class="text-xs text-slate-400 mb-1">🎯 YOUR TARGETS</p><div class="flex justify-between text-emerald-400"><span>Take Profit:</span><span id="modalTakeProfit" class="font-bold">$0.00</span></div><div class="flex justify-between text-red-400"><span>Stop Loss:</span><span id="modalStopLoss" class="font-bold">$0.00</span></div></div>
+            <div class="bg-indigo-600/20 p-3 rounded-lg border border-indigo-500/30"><p class="text-xs text-slate-400 mb-1">💡 WHY</p><p id="modalReason" class="text-sm">Loading...</p></div>
+            <div class="text-center"><p class="text-xs text-slate-400">CONFIDENCE</p><p id="modalConfidence" class="text-2xl font-bold text-emerald-400">0%</p><div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden mt-1"><div id="modalConfidenceBar" class="bg-indigo-500 h-full w-0 rounded-full"></div></div></div>
+            <div id="autoModeNote" class="hidden text-center p-2 bg-yellow-500/20 rounded-lg"><i class="fas fa-robot mr-2"></i> AUTO MODE ACTIVE - Trade will execute automatically</div>
             <div id="modalButtons" class="flex gap-3">
                 <button onclick="acceptTradeFromModal()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg transition">✅ ACCEPT TRADE</button>
                 <button onclick="closeAIReasonModal()" class="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold py-3 rounded-lg transition">❌ DECLINE</button>
@@ -714,41 +560,70 @@
 <script src="/js/app.js"></script>
 
 <script>
-    // REAL token eye toggle
-    const toggleRealToken = document.getElementById('toggleRealToken');
-    const realTokenInput = document.getElementById('realToken');
-    if (toggleRealToken && realTokenInput) {
-        toggleRealToken.addEventListener('click', function() {
-            const type = realTokenInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            realTokenInput.setAttribute('type', type);
-            this.querySelector('i').classList.toggle('fa-eye');
-            this.querySelector('i').classList.toggle('fa-eye-slash');
-        });
-    }
+// Collapsible toggle function
+function toggleCollapsible(contentId, iconId) {
+    const content = document.getElementById(contentId);
+    const icon = document.getElementById(iconId);
+    if (!content || !icon) return;
+    const isHidden = content.style.display === 'none' || !content.style.display;
+    content.style.display = isHidden ? 'block' : 'none';
+    icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+    localStorage.setItem(`collapsible_${contentId}`, isHidden ? 'open' : 'closed');
+}
 
-    // Login password eye toggle
-    const toggleLoginPassword = document.getElementById('toggleLoginPassword');
-    const loginPasswordInput = document.getElementById('loginPassword');
-    if (toggleLoginPassword && loginPasswordInput) {
-        toggleLoginPassword.addEventListener('click', function() {
-            const type = loginPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            loginPasswordInput.setAttribute('type', type);
-            this.querySelector('i').classList.toggle('fa-eye');
-            this.querySelector('i').classList.toggle('fa-eye-slash');
-        });
-    }
+// Restore collapsible states on load
+document.addEventListener('DOMContentLoaded', () => {
+    ['pendingOrdersContent', 'recentTradesContent'].forEach(id => {
+        const state = localStorage.getItem(`collapsible_${id}`);
+        const content = document.getElementById(id);
+        const icon = document.getElementById(id.replace('Content', 'Icon'));
+        if (content && icon) {
+            if (state === 'closed') {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+    });
+});
 
-    // Register password eye toggle
-    const toggleRegPassword = document.getElementById('toggleRegPassword');
-    const regPasswordInput = document.getElementById('regPassword');
-    if (toggleRegPassword && regPasswordInput) {
-        toggleRegPassword.addEventListener('click', function() {
-            const type = regPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            regPasswordInput.setAttribute('type', type);
-            this.querySelector('i').classList.toggle('fa-eye');
-            this.querySelector('i').classList.toggle('fa-eye-slash');
-        });
-    }
+// REAL token eye toggle
+const toggleRealToken = document.getElementById('toggleRealToken');
+const realTokenInput = document.getElementById('realToken');
+if (toggleRealToken && realTokenInput) {
+    toggleRealToken.addEventListener('click', function() {
+        const type = realTokenInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        realTokenInput.setAttribute('type', type);
+        this.querySelector('i').classList.toggle('fa-eye');
+        this.querySelector('i').classList.toggle('fa-eye-slash');
+    });
+}
+
+// Login password eye toggle
+const toggleLoginPassword = document.getElementById('toggleLoginPassword');
+const loginPasswordInput = document.getElementById('loginPassword');
+if (toggleLoginPassword && loginPasswordInput) {
+    toggleLoginPassword.addEventListener('click', function() {
+        const type = loginPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        loginPasswordInput.setAttribute('type', type);
+        this.querySelector('i').classList.toggle('fa-eye');
+        this.querySelector('i').classList.toggle('fa-eye-slash');
+    });
+}
+
+// Register password eye toggle
+const toggleRegPassword = document.getElementById('toggleRegPassword');
+const regPasswordInput = document.getElementById('regPassword');
+if (toggleRegPassword && regPasswordInput) {
+    toggleRegPassword.addEventListener('click', function() {
+        const type = regPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        regPasswordInput.setAttribute('type', type);
+        this.querySelector('i').classList.toggle('fa-eye');
+        this.querySelector('i').classList.toggle('fa-eye-slash');
+    });
+}
 </script>
 </body>
 </html>
