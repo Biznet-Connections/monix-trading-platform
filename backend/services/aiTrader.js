@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v6.1 - Fixed log spam, Asian session tuned, PUT/CALL aligned
+ * v6.2 - Asian session override for proven patterns
  */
 
 const marketData = require('./marketData');
@@ -37,7 +37,7 @@ class AITrader {
         this.isExecuting = false;
         this.pendingManualSetup = null;
         this.pendingLimitOrders = [];
-        this._lastPendingLog = {}; // For log throttling
+        this._lastPendingLog = {};
         this.userId = 1;
         this.symbol = 'R_75';
         this.mode = 'AUTO';
@@ -94,10 +94,11 @@ class AITrader {
         this.trendDirection = null;
         
         const session = knowledgeBase.getSessionRules();
-        console.log(`🤖 [AI Trader] Starting v6.1 PROFESSIONAL TRADER EDITION`);
+        console.log(`🤖 [AI Trader] Starting v6.2 PROFESSIONAL TRADER EDITION`);
         console.log(`📚 [AI Trader] Trading DNA loaded: ${session.name} session optimized`);
         console.log(`💰 [AI Trader] Stakes: Base=$${this.BASE_STAKE} | Confident=$${this.CONFIDENT_STAKE} | High=$${this.HIGH_STAKE} | Max=$${this.MAX_STAKE}`);
         console.log(`🛡️ [AI Trader] Knowledge base + Rule engine + AI enhancement ACTIVE`);
+        console.log(`🔓 [AI Trader] Asian session override: Proven patterns (65%+ WR) will trade`);
         
         marketData.reset();
         
@@ -169,11 +170,10 @@ class AITrader {
                         simple_reason: `Limit order triggered. ${order.reason}`
                     });
                 } else {
-                    // THROTTLED LOGGING - only log every 30s per order
                     const logKey = `${order.id}_${distancePercent.toFixed(2)}`;
+                    const timeLeft = Math.max(0, Math.floor((order.expiresAt - now) / 60000));
                     if (!this._lastPendingLog[logKey] || Date.now() - this._lastPendingLog[logKey] > 30000) {
                         this._lastPendingLog[logKey] = Date.now();
-                        const timeLeft = Math.max(0, Math.floor((order.expiresAt - now) / 60000));
                         console.log(`👀 [AI Trader] Pending ${order.action} @ $${order.entryPrice.toFixed(2)} | ${distancePercent.toFixed(2)}% away | ${timeLeft}min left | Waiting for confirmation`);
                     }
                 }
@@ -183,7 +183,6 @@ class AITrader {
     
     checkOrderConfirmations(order, marketState) {
         if (!order.conditions || order.conditions.length === 0) return true;
-        
         let met = 0;
         for (const condition of order.conditions) {
             switch (condition) {
@@ -201,12 +200,10 @@ class AITrader {
     
     createPendingOrder(params) {
         const { action, entryPrice, stake, confidence, pattern, reason } = params;
-        
         const exists = this.pendingLimitOrders.find(o => 
             o.action === action && Math.abs(o.entryPrice - entryPrice) / entryPrice < 0.001
         );
         if (exists) {
-            // Throttled log
             const logKey = `duplicate_${entryPrice.toFixed(0)}`;
             if (!this._lastPendingLog[logKey] || Date.now() - this._lastPendingLog[logKey] > 30000) {
                 this._lastPendingLog[logKey] = Date.now();
@@ -214,11 +211,7 @@ class AITrader {
             }
             return null;
         }
-        
-        if (this.pendingLimitOrders.length >= 3) {
-            this.pendingLimitOrders.shift();
-        }
-        
+        if (this.pendingLimitOrders.length >= 3) this.pendingLimitOrders.shift();
         const order = {
             id: Date.now().toString(36) + Math.random().toString(36).substr(2),
             action, entryPrice, stake, confidence, pattern, reason,
@@ -228,13 +221,8 @@ class AITrader {
             createdAt: Date.now(),
             expiresAt: Date.now() + (45 * 60 * 1000)
         };
-        
-        if (action === 'BUY') {
-            order.conditions = ['RSI_OVERSOLD', 'CANDLE_BULLISH', 'NO_STRONG_DOWNTREND'];
-        } else {
-            order.conditions = ['RSI_OVERBOUGHT', 'CANDLE_BEARISH', 'NO_STRONG_UPTREND'];
-        }
-        
+        if (action === 'BUY') order.conditions = ['RSI_OVERSOLD', 'CANDLE_BULLISH', 'NO_STRONG_DOWNTREND'];
+        else order.conditions = ['RSI_OVERBOUGHT', 'CANDLE_BEARISH', 'NO_STRONG_UPTREND'];
         this.pendingLimitOrders.push(order);
         console.log(`📝 [AI Trader] PENDING ORDER CREATED: ${action} @ $${entryPrice.toFixed(2)} | Stake: $${stake} | Expires in 45min`);
         return order;
@@ -281,7 +269,6 @@ class AITrader {
             }
             if (this.consecutiveLosses >= 2) dynamicThreshold = Math.max(dynamicThreshold, 70);
             
-            // Apply session modifier
             const sessionRules = knowledgeBase.getSessionRules();
             dynamicThreshold += sessionRules.confidenceModifier;
             dynamicThreshold = Math.max(50, Math.min(80, dynamicThreshold));
@@ -316,7 +303,7 @@ class AITrader {
             }
             
             if (action !== 'WAIT' && analysis.confidence >= dynamicThreshold) {
-                const kbValidation = knowledgeBase.validateSetup({
+                let kbValidation = knowledgeBase.validateSetup({
                     pattern: analysis.pattern,
                     currentTrend: marketState.trend,
                     rsi: marketState.rsi,
@@ -325,17 +312,58 @@ class AITrader {
                     action: action
                 });
                 
+                // ============================================================
+                // ASIAN SESSION OVERRIDE FOR PROVEN PATTERNS
+                // ============================================================
+                if (!kbValidation.valid && kbValidation.reason?.includes('SESSION')) {
+                    const currentPattern = patternPerformance?.find(p => 
+                        p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase()
+                    );
+                    if (currentPattern && currentPattern.winRate >= 65 && currentPattern.total >= 5 && analysis.confidence >= 70) {
+                        kbValidation = {
+                            valid: true,
+                            action: action,
+                            confidence: analysis.confidence,
+                            reason: `ASIAN OVERRIDE: Pattern "${analysis.pattern}" has ${currentPattern.winRate}% win rate (${currentPattern.total} trades). Trading despite session caution.`,
+                            confirmations: 3,
+                            source: 'ASIAN_OVERRIDE',
+                            sessionModifier: 0
+                        };
+                        console.log(`🔓 [AI Trader] ASIAN OVERRIDE: ${analysis.pattern} has ${currentPattern.winRate}% WR (${currentPattern.total} trades). Allowing ${action}!`);
+                    }
+                }
+                
+                // ============================================================
+                // SIDEWAYS OVERRIDE FOR PROVEN PATTERNS
+                // ============================================================
+                if (!kbValidation.valid && kbValidation.reason?.includes('SIDEWAYS')) {
+                    const currentPattern = patternPerformance?.find(p => 
+                        p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase()
+                    );
+                    if (currentPattern && currentPattern.winRate >= 70 && currentPattern.total >= 5 && analysis.confidence >= 75) {
+                        kbValidation = {
+                            valid: true,
+                            action: action,
+                            confidence: analysis.confidence,
+                            reason: `SIDEWAYS OVERRIDE: Pattern "${analysis.pattern}" has ${currentPattern.winRate}% win rate (${currentPattern.total} trades). Trading despite sideways market.`,
+                            confirmations: 3,
+                            source: 'SIDEWAYS_OVERRIDE',
+                            sessionModifier: 0
+                        };
+                        console.log(`🔓 [AI Trader] SIDEWAYS OVERRIDE: ${analysis.pattern} has ${currentPattern.winRate}% WR. Allowing ${action}!`);
+                    }
+                }
+                
                 if (!kbValidation.valid) {
                     if (shouldLog) {
                         console.log(`🧬 [AI Trader] KNOWLEDGE BASE REJECTED: ${kbValidation.reason}`);
                     }
                     
-                    // Create pending order ALIGNED with DeepSeek's recommendation
+                    // Create pending order aligned with DeepSeek's recommendation
                     if (marketState.nearSupport || marketState.nearResistance) {
                         const pendingStake = this.calculateStake(analysis.confidence, 0, marketState.trend);
                         let entryLevel, pendingAction;
                         
-                        // ALIGN with DeepSeek's recommendation
                         if (analysis.action === 'CALL' && (marketState.nearSupport || marketState.support > 0)) {
                             pendingAction = 'BUY';
                             entryLevel = marketState.nearSupport ? marketState.support : (marketState.support || currentPrice * 0.998);
@@ -380,19 +408,21 @@ class AITrader {
                     return;
                 }
                 
+                // Setup validated! Execute
                 const finalConfidence = Math.max(analysis.confidence, kbValidation.confidence);
                 const currentPattern = patternPerformance?.find(p => p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase());
                 const patternWinRate = currentPattern?.winRate || 0;
                 const stake = this.calculateStake(finalConfidence, patternWinRate, marketState.trend);
                 
                 console.log(`✅ [AI Trader] DNA VALIDATED: ${action} ${this.symbol} | KB: ${kbValidation.confidence}% | AI: ${analysis.confidence}% | Stake: $${stake}`);
+                console.log(`🧬 [AI Trader] Source: ${kbValidation.source} | ${kbValidation.reason}`);
                 
                 if (this.mode === 'AUTO') {
                     await this.executeEntry(action, currentPrice, stake, {
                         action: analysis.action,
                         confidence: finalConfidence,
                         pattern: analysis.pattern,
-                        simple_reason: `[DNA] ${kbValidation.reason} | [AI] ${analysis.simple_reason}`
+                        simple_reason: `[${kbValidation.source}] ${kbValidation.reason} | [AI] ${analysis.simple_reason}`
                     });
                 }
                 return;
@@ -565,8 +595,8 @@ class AITrader {
     validateSetup(action, pattern, trend, rsi) {
         if(!this.isTradeableTrend(trend))return{valid:false,reason:`SIDEWAYS: ${trend}`};
         const te=this.hasTrendException(trend,rsi);
-        if(action==='BUY'&&this.isBearishPattern(pattern)&&!this.isBullishPattern(pattern))return{valid:false,reason:`PATTERN MISMATCH: Cannot BUY on bearish pattern`};
-        if(action==='SELL'&&this.isBullishPattern(pattern)&&!this.isBearishPattern(pattern))return{valid:false,reason:`PATTERN MISMATCH: Cannot SELL on bullish pattern`};
+        if(action==='BUY'&&this.isBearishPattern(pattern)&&!this.isBullishPattern(pattern))return{valid:false,reason:`PATTERN MISMATCH`};
+        if(action==='SELL'&&this.isBullishPattern(pattern)&&!this.isBearishPattern(pattern))return{valid:false,reason:`PATTERN MISMATCH`};
         if(action==='SELL'&&rsi<25&&!te.allowed)return{valid:false,reason:`RSI BOUNDARY: ${rsi}<25`};
         if(action==='BUY'&&rsi>75&&!te.allowed)return{valid:false,reason:`RSI BOUNDARY: ${rsi}>75`};
         if(action==='BUY'&&trend?.includes('downtrend')&&rsi>35&&!te.allowed)return{valid:false,reason:`TREND CONTRADICTION`};
