@@ -70,7 +70,6 @@ class DeepSeekService {
             else session = 'NEWYORK';
         }
 
-        // Get session rules from knowledge base
         const sessionRules = knowledgeBase.getSessionRules();
         const sessionName = sessionRules.name;
 
@@ -82,16 +81,14 @@ class DeepSeekService {
             else if (rsi > 60) marketCondition = 'approaching_overbought';
         }
 
-        // Build comprehensive market context
         let contextText = '\n\nCRITICAL MARKET CONTEXT:';
-        
+
         if (marketContext) {
             if (marketContext.trend) {
-                const trendEmoji = marketContext.trend.includes('downtrend') ? '🔴' : 
-                                   marketContext.trend.includes('uptrend') ? '🟢' : '🟡';
+                const trendEmoji = marketContext.trend.includes('downtrend') ? '🔴' :
+                    marketContext.trend.includes('uptrend') ? '🟢' : '🟡';
                 contextText += `\n${trendEmoji} MARKET TREND: ${marketContext.trend.replace(/_/g, ' ').toUpperCase()}`;
-                
-                // Use knowledge base trend rules
+
                 const trendRule = knowledgeBase.getTrendRule(marketContext.trend);
                 if (trendRule) {
                     contextText += `\n📐 RULE: ${trendRule.rule}`;
@@ -100,49 +97,49 @@ class DeepSeekService {
                     }
                 }
             }
-            
+
             if (marketContext.rsiShort) {
                 const shortMomentum = marketContext.rsiShort > 70 ? '(overbought momentum)' :
-                                      marketContext.rsiShort < 30 ? '(oversold momentum)' : '(neutral momentum)';
+                    marketContext.rsiShort < 30 ? '(oversold momentum)' : '(neutral momentum)';
                 contextText += `\n📊 Short-term RSI (5-min): ${marketContext.rsiShort} ${shortMomentum}`;
             }
-            
+
             if (marketContext.volatility) {
-                const volLevel = marketContext.volatility > 20 ? 'HIGH' : marketContext.volatility > 10 ? 'MODERATE' : 'LOW';
+                const volLevel = marketContext.volatility > 20 ? 'HIGH' :
+                    marketContext.volatility > 10 ? 'MODERATE' : 'LOW';
                 contextText += `\n📈 Volatility: ${marketContext.volatility.toFixed(2)} (${volLevel})`;
             }
-            
-            if (marketContext.lastPattern && marketContext.lastPattern !== 'none' && 
-                marketContext.lastPattern !== 'no_significant_pattern' && 
+
+            if (marketContext.lastPattern && marketContext.lastPattern !== 'none' &&
+                marketContext.lastPattern !== 'no_significant_pattern' &&
                 marketContext.lastPattern !== 'insufficient_data') {
                 const patternName = marketContext.lastPattern.replace(/_/g, ' ');
-                
-                // Get pattern context from knowledge base
+
                 const patternContext = knowledgeBase.getPatternContext(
                     marketContext.lastPattern,
                     marketContext.trend,
                     marketContext.nearSupport,
                     marketContext.nearResistance
                 );
-                
+
                 contextText += `\n🕯️ Recent candle pattern: ${patternName}`;
                 if (patternContext && patternContext.action !== 'UNKNOWN_PATTERN') {
                     contextText += `\n📐 PATTERN RULE: ${patternName} → ${patternContext.action} (reliability: ${patternContext.reliability})`;
                     if (patternContext.note) contextText += `\n   Note: ${patternContext.note}`;
                     if (patternContext.reason) contextText += `\n   Reason: ${patternContext.reason}`;
                 }
-                
+
                 if (marketContext.nearSupport) contextText += `\n📍 Price is NEAR SUPPORT ($${marketContext.support?.toFixed(2)})`;
                 if (marketContext.nearResistance) contextText += `\n📍 Price is NEAR RESISTANCE ($${marketContext.resistance?.toFixed(2)})`;
             }
-            
+
             if (marketContext.consecutiveLosses > 0) {
                 contextText += `\n\n⚠️ BOT STATUS: ${marketContext.consecutiveLosses} consecutive losses. BE VERY CONSERVATIVE.`;
                 if (marketContext.consecutiveLosses >= 2) {
                     contextText += `\n🛑 Only recommend trades with 70%+ confidence and confirmed by historical data.`;
                 }
             }
-            
+
             if (marketContext.recentWinRate !== null) {
                 if (marketContext.recentWinRate >= 70) {
                     contextText += `\n✅ Bot performing well (${marketContext.recentWinRate}% recent win rate). Can be more aggressive.`;
@@ -152,13 +149,11 @@ class DeepSeekService {
             }
         }
 
-        // Session context from knowledge base
         contextText += `\n\n🕐 SESSION: ${sessionName}`;
         contextText += `\n📐 SESSION RULE: ${sessionRules.bestStrategy}`;
         contextText += `\n⚠️ AVOID: ${sessionRules.avoidStrategy}`;
         contextText += `\n📊 Confidence modifier: ${sessionRules.confidenceModifier >= 0 ? '+' : ''}${sessionRules.confidenceModifier}%`;
 
-        // LEARNING CONTEXT from database
         let learningContext = '';
         if (marketContext?.patternPerformance && marketContext.patternPerformance.length > 0) {
             learningContext = this.buildLearningContext(
@@ -170,7 +165,6 @@ class DeepSeekService {
             );
         }
 
-        // RSI rules from knowledge base
         let rsiContext = '';
         if (rsi && rsi > 0) {
             const rsiRule = knowledgeBase.getRSIRule(rsi, marketContext?.trend);
@@ -231,7 +225,10 @@ Return ONLY valid JSON (no markdown, no backticks):
                     temperature: 0.2,
                     max_tokens: 500
                 }, {
-                    headers: { 'Authorization': `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+                    headers: {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
                     timeout: 30000
                 });
             });
@@ -247,11 +244,73 @@ Return ONLY valid JSON (no markdown, no backticks):
         }
     }
 
+    /**
+     * UPDATED: Normalize pattern names to match Knowledge Base standards
+     * This ensures learning data is consistent across the system
+     */
+    normalizePatternName(pattern) {
+        if (!pattern) return 'market analysis';
+
+        const lowerPattern = pattern.toLowerCase().trim();
+
+        // Pattern name mapping: DeepSeek natural language → KB standard names
+        const patternMap = {
+            'sell bounce': 'bearish_engulfing',
+            'sell_bounce': 'bearish_engulfing',
+            'sell on bounce': 'bearish_engulfing',
+            'sell_on_bounce': 'bearish_engulfing',
+            'buy pullback': 'bullish_engulfing',
+            'buy_pullback': 'bullish_engulfing',
+            'buy on pullback': 'bullish_engulfing',
+            'buy_on_pullback': 'bullish_engulfing',
+            'oversold bounce': 'hammer',
+            'oversold_bounce': 'hammer',
+            'overbought drop': 'shooting_star',
+            'overbought_drop': 'shooting_star',
+            'downtrend continuation': 'bearish_engulfing',
+            'downtrend_continuation': 'bearish_engulfing',
+            'uptrend continuation': 'bullish_engulfing',
+            'uptrend_continuation': 'bullish_engulfing',
+            'strong uptrend continuation': 'bullish_engulfing',
+            'strong downtrend continuation': 'bearish_engulfing',
+            'doji at support': 'doji',
+            'doji_at_support': 'doji',
+            'doji at resistance': 'doji',
+            'doji_at_resistance': 'doji',
+            'hammer at support': 'hammer',
+            'hammer_at_support': 'hammer',
+            'shooting star at resistance': 'shooting_star',
+            'shooting_star_at_resistance': 'shooting_star',
+        };
+
+        // Check for exact match first
+        if (patternMap[lowerPattern]) {
+            return patternMap[lowerPattern];
+        }
+
+        // Check if any KB standard pattern is contained in the name
+        const kbPatterns = ['hammer', 'shooting_star', 'bullish_engulfing', 'bearish_engulfing',
+            'doji', 'three_white_soldiers', 'three_black_crows'
+        ];
+
+        for (const kbPattern of kbPatterns) {
+            if (lowerPattern.includes(kbPattern)) {
+                return kbPattern;
+            }
+        }
+
+        // Return original if no mapping found
+        return pattern;
+    }
+
     normalizeAnalysis(analysis, symbol, currentPrice, marketCondition, marketContext) {
         if (!analysis.action || !['CALL', 'PUT', 'WAIT'].includes(analysis.action)) {
             analysis.action = 'WAIT';
         }
         analysis.confidence = Math.min(100, Math.max(0, Math.round(analysis.confidence || 50)));
+
+        // Normalize pattern name to KB standard
+        analysis.pattern = this.normalizePatternName(analysis.pattern);
 
         // Knowledge base validation on DeepSeek's output
         if (marketContext?.trend && analysis.action !== 'WAIT') {
@@ -266,7 +325,7 @@ Return ONLY valid JSON (no markdown, no backticks):
 
         // Pattern history override
         if (marketContext?.patternPerformance && analysis.pattern) {
-            const historyPattern = marketContext.patternPerformance.find(p => 
+            const historyPattern = marketContext.patternPerformance.find(p =>
                 p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase()
             );
             if (historyPattern && historyPattern.winRate < 35 && historyPattern.total >= 3) {
@@ -305,7 +364,7 @@ Return ONLY valid JSON (no markdown, no backticks):
         }
 
         if (!analysis.simple_reason) {
-            analysis.simple_reason = analysis.action === 'WAIT' 
+            analysis.simple_reason = analysis.action === 'WAIT'
                 ? 'Market conditions not ideal. Waiting for better setup.'
                 : `${analysis.action} signal with ${analysis.confidence}% confidence.`;
         }
@@ -328,7 +387,6 @@ Return ONLY valid JSON (no markdown, no backticks):
 
         const trendRule = knowledgeBase.getTrendRule(trend);
         if (trendRule?.forbiddenActions) {
-            // Stay safe
             action = 'WAIT';
             confidence = 55;
             simpleReason = trendRule.rule;
@@ -359,10 +417,13 @@ Return ONLY valid JSON (no markdown, no backticks):
         }
 
         return {
-            action, confidence,
-            pattern: 'fallback with knowledge base',
-            take_profit: action === 'CALL' ? currentPrice * (1 + rewardPercent) : action === 'PUT' ? currentPrice * (1 - rewardPercent) : currentPrice * 1.004,
-            stop_loss: action === 'CALL' ? currentPrice * (1 - riskPercent) : action === 'PUT' ? currentPrice * (1 + riskPercent) : currentPrice * 0.996,
+            action,
+            confidence,
+            pattern: this.normalizePatternName('fallback with knowledge base'),
+            take_profit: action === 'CALL' ? currentPrice * (1 + rewardPercent) :
+                action === 'PUT' ? currentPrice * (1 - rewardPercent) : currentPrice * 1.004,
+            stop_loss: action === 'CALL' ? currentPrice * (1 - riskPercent) :
+                action === 'PUT' ? currentPrice * (1 + riskPercent) : currentPrice * 0.996,
             simple_reason: simpleReason
         };
     }
@@ -389,7 +450,10 @@ Give trading advice as JSON:
                     temperature: 0.4,
                     max_tokens: 300
                 }, {
-                    headers: { 'Authorization': `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
+                    headers: {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
                     timeout: 10000
                 });
             });

@@ -1,7 +1,7 @@
 /**
  * Market Data Service - Professional Edition
  * Processes ticks → candles → indicators → supply/demand zones → liquidity detection
- * v6.0 - Professional Trader Edition
+ * v6.1 - Fast crash/rally detection + Professional indicators
  */
 
 class MarketDataService {
@@ -18,11 +18,9 @@ class MarketDataService {
         this.updateInterval = 5000;
         this.tickCount = 0;
         this.calculationCount = 0;
-        
-        // NEW: Supply/Demand Zones
-        this.supplyZones = [];    // Resistance zones where price reversed down
-        this.demandZones = [];    // Support zones where price reversed up
-        this.liquidityLevels = []; // Levels where stops are clustered
+        this.supplyZones = [];
+        this.demandZones = [];
+        this.liquidityLevels = [];
         this.swingHighs = [];
         this.swingLows = [];
     }
@@ -44,7 +42,7 @@ class MarketDataService {
         this.liquidityLevels = [];
         this.swingHighs = [];
         this.swingLows = [];
-        console.log('🔄 [MarketData] State completely reset (Professional Edition)');
+        console.log('🔄 [MarketData] State completely reset (Professional Edition v6.1)');
     }
 
     addTick(tick) {
@@ -56,7 +54,7 @@ class MarketDataService {
         const now = Date.now();
         const needsMoreData = this.candles.length < 10;
         const interval = needsMoreData ? 2000 : this.updateInterval;
-        
+
         if (now - this.lastUpdate >= interval) {
             this.lastUpdate = now;
             this.calculateIndicators();
@@ -64,7 +62,7 @@ class MarketDataService {
             this.detectSupplyDemandZones();
             this.detectLiquidityLevels();
             this.detectSwingPoints();
-            
+
             if (this.calculationCount <= 10 || this.calculationCount % 20 === 0) {
                 console.log(`📊 [MarketData] Calc #${this.calculationCount} | Candles: ${this.candles.length} | RSI: ${this.rsi !== null ? this.rsi : 'calc...'} | Zones: S${this.supplyZones.length}/D${this.demandZones.length}`);
             }
@@ -82,17 +80,25 @@ class MarketDataService {
             if (this.currentCandle) {
                 this.candles.push(this.currentCandle);
                 if (this.candles.length > 300) this.candles = this.candles.slice(-200);
-                // Only log every 3 candles to reduce spam
                 if (this.candles.length % 3 === 0) {
                     console.log(`🕯️ [MarketData] Candle: ${this.currentCandle.key} | O:${this.currentCandle.open.toFixed(2)} C:${this.currentCandle.close.toFixed(2)} | Total: ${this.candles.length}`);
                 }
             }
 
             this.currentCandle = {
-                key: candleKey, minute, hour, time: tick.epoch,
-                open: tick.quote, high: tick.quote, low: tick.quote, close: tick.quote,
-                body: 0, upperWick: 0, lowerWick: 0,
-                volume: 1, isComplete: false
+                key: candleKey,
+                minute,
+                hour,
+                time: tick.epoch,
+                open: tick.quote,
+                high: tick.quote,
+                low: tick.quote,
+                close: tick.quote,
+                body: 0,
+                upperWick: 0,
+                lowerWick: 0,
+                volume: 1,
+                isComplete: false
             };
         } else {
             this.currentCandle.high = Math.max(this.currentCandle.high, tick.quote);
@@ -108,7 +114,8 @@ class MarketDataService {
     calculateIndicators() {
         // RSI (14-period or whatever we have)
         if (this.candles.length >= 2) {
-            let gains = 0, losses = 0;
+            let gains = 0;
+            let losses = 0;
             const period = Math.min(14, this.candles.length);
             const recent = this.candles.slice(-period);
             for (let i = 1; i < recent.length; i++) {
@@ -121,13 +128,17 @@ class MarketDataService {
             if (avgLoss !== 0) {
                 const rs = avgGain / avgLoss;
                 this.rsi = Math.round(100 - (100 / (1 + rs)));
-            } else if (avgGain > 0) { this.rsi = 100; }
-            else { this.rsi = 0; }
+            } else if (avgGain > 0) {
+                this.rsi = 100;
+            } else {
+                this.rsi = 0;
+            }
         }
 
-        // Short-term RSI
+        // Short-term RSI (5-period)
         if (this.candles.length >= 2) {
-            let gains5 = 0, losses5 = 0;
+            let gains5 = 0;
+            let losses5 = 0;
             const period5 = Math.min(5, this.candles.length);
             const last5 = this.candles.slice(-period5);
             for (let i = 1; i < last5.length; i++) {
@@ -140,8 +151,11 @@ class MarketDataService {
             if (avgLoss5 !== 0) {
                 const rs5 = avgGain5 / avgLoss5;
                 this.rsiShort = Math.round(100 - (100 / (1 + rs5)));
-            } else if (avgGain5 > 0) { this.rsiShort = 100; }
-            else { this.rsiShort = 0; }
+            } else if (avgGain5 > 0) {
+                this.rsiShort = 100;
+            } else {
+                this.rsiShort = 0;
+            }
         }
 
         // Support & Resistance (20-period)
@@ -153,15 +167,9 @@ class MarketDataService {
         }
     }
 
-    /**
-     * NEW: Detect supply and demand zones
-     * Supply zone = area where price reversed sharply DOWN (resistance)
-     * Demand zone = area where price reversed sharply UP (support)
-     */
     detectSupplyDemandZones() {
         if (this.candles.length < 10) return;
 
-        // Look for strong reversal candles in the last 30 candles
         const lookback = Math.min(30, this.candles.length);
         const recentCandles = this.candles.slice(-lookback);
 
@@ -169,7 +177,7 @@ class MarketDataService {
             const candle = recentCandles[i];
             const body = candle.body || 0;
             const range = candle.high - candle.low;
-            
+
             // Strong bearish reversal (supply zone created)
             if (body > 0 && range > 0 && candle.close < candle.open && body > range * 0.6) {
                 const zone = {
@@ -182,7 +190,7 @@ class MarketDataService {
                 };
                 this.addZoneIfNew(zone, this.supplyZones);
             }
-            
+
             // Strong bullish reversal (demand zone created)
             if (body > 0 && range > 0 && candle.close > candle.open && body > range * 0.6) {
                 const zone = {
@@ -197,47 +205,36 @@ class MarketDataService {
             }
         }
 
-        // Clean up old zones (keep max 5 of each)
         if (this.supplyZones.length > 5) this.supplyZones = this.supplyZones.slice(-5);
         if (this.demandZones.length > 5) this.demandZones = this.demandZones.slice(-5);
     }
 
-    /**
-     * NEW: Add a zone if it doesn't overlap with existing ones
-     */
     addZoneIfNew(newZone, zoneArray) {
         const overlaps = zoneArray.find(z => {
             const overlapTop = Math.min(z.top, newZone.top);
             const overlapBottom = Math.max(z.bottom, newZone.bottom);
             return overlapTop > overlapBottom;
         });
-        
+
         if (!overlaps) {
             zoneArray.push(newZone);
         } else {
-            // Increase strength of existing zone (price tested it again)
             overlaps.tested++;
             overlaps.strength = Math.min(10, overlaps.strength + 1);
         }
     }
 
-    /**
-     * NEW: Detect liquidity levels (where stop losses cluster)
-     * Above recent highs = buy stops (liquidity for SELL)
-     * Below recent lows = sell stops (liquidity for BUY)
-     */
     detectLiquidityLevels() {
         if (this.candles.length < 10) return;
-        
+
         this.liquidityLevels = [];
         const lookback = Math.min(20, this.candles.length);
         const recentCandles = this.candles.slice(-lookback);
-        
-        // Find clusters of highs (liquidity above)
+
         const highs = recentCandles.map(c => c.high);
         const avgHigh = highs.reduce((a, b) => a + b, 0) / highs.length;
         const highCluster = highs.filter(h => h > avgHigh);
-        
+
         if (highCluster.length >= 3) {
             this.liquidityLevels.push({
                 type: 'BUY_STOPS',
@@ -245,12 +242,11 @@ class MarketDataService {
                 description: 'Stops clustered above recent highs'
             });
         }
-        
-        // Find clusters of lows (liquidity below)
+
         const lows = recentCandles.map(c => c.low);
         const avgLow = lows.reduce((a, b) => a + b, 0) / lows.length;
         const lowCluster = lows.filter(l => l < avgLow);
-        
+
         if (lowCluster.length >= 3) {
             this.liquidityLevels.push({
                 type: 'SELL_STOPS',
@@ -260,23 +256,20 @@ class MarketDataService {
         }
     }
 
-    /**
-     * NEW: Detect swing highs and lows (market structure)
-     */
     detectSwingPoints() {
         if (this.candles.length < 5) return;
-        
+
         const recentCandles = this.candles.slice(-Math.min(20, this.candles.length));
-        
+
         for (let i = 2; i < recentCandles.length - 2; i++) {
             const current = recentCandles[i];
             const prev1 = recentCandles[i - 1];
             const prev2 = recentCandles[i - 2];
             const next1 = recentCandles[i + 1];
             const next2 = recentCandles[i + 2];
-            
+
             // Swing high
-            if (current.high > prev1.high && current.high > prev2.high && 
+            if (current.high > prev1.high && current.high > prev2.high &&
                 current.high > next1.high && current.high > next2.high) {
                 const swing = { price: current.high, time: current.time, type: 'HIGH' };
                 if (!this.swingHighs.find(s => Math.abs(s.price - swing.price) / swing.price < 0.001)) {
@@ -284,9 +277,9 @@ class MarketDataService {
                     if (this.swingHighs.length > 10) this.swingHighs.shift();
                 }
             }
-            
+
             // Swing low
-            if (current.low < prev1.low && current.low < prev2.low && 
+            if (current.low < prev1.low && current.low < prev2.low &&
                 current.low < next1.low && current.low < next2.low) {
                 const swing = { price: current.low, time: current.time, type: 'LOW' };
                 if (!this.swingLows.find(s => Math.abs(s.price - swing.price) / swing.price < 0.001)) {
@@ -312,53 +305,72 @@ class MarketDataService {
         const bodyRatio = body / totalRange;
 
         // Doji
-        if (bodyRatio < 0.15 && totalRange > 0) { this.lastPattern = 'doji'; return; }
+        if (bodyRatio < 0.15 && totalRange > 0) {
+            this.lastPattern = 'doji';
+            return;
+        }
 
         // Hammer
         if (last.lowerWick > body * 2 && last.upperWick < body * 0.5 && last.close > last.open) {
-            if (this.support > 0 && last.low <= this.support * 1.002) { this.lastPattern = 'hammer_at_support'; return; }
-            this.lastPattern = 'hammer'; return;
+            if (this.support > 0 && last.low <= this.support * 1.002) {
+                this.lastPattern = 'hammer_at_support';
+                return;
+            }
+            this.lastPattern = 'hammer';
+            return;
         }
 
         // Shooting star
         if (last.upperWick > body * 2 && last.lowerWick < body * 0.5 && last.close < last.open) {
-            if (this.resistance > 0 && last.high >= this.resistance * 0.998) { this.lastPattern = 'shooting_star_at_resistance'; return; }
-            this.lastPattern = 'shooting_star'; return;
+            if (this.resistance > 0 && last.high >= this.resistance * 0.998) {
+                this.lastPattern = 'shooting_star_at_resistance';
+                return;
+            }
+            this.lastPattern = 'shooting_star';
+            return;
         }
 
         // Bullish engulfing
-        if (prev && last.close > last.open && prev.close < prev.open && last.open <= prev.close && last.close >= prev.open && body > (prev.body || 0) * 1.2) {
-            this.lastPattern = 'bullish_engulfing'; return;
+        if (prev && last.close > last.open && prev.close < prev.open &&
+            last.open <= prev.close && last.close >= prev.open &&
+            body > (prev.body || 0) * 1.2) {
+            this.lastPattern = 'bullish_engulfing';
+            return;
         }
 
         // Bearish engulfing
-        if (prev && last.close < last.open && prev.close > prev.open && last.open >= prev.close && last.close <= prev.open && body > (prev.body || 0) * 1.2) {
-            this.lastPattern = 'bearish_engulfing'; return;
+        if (prev && last.close < last.open && prev.close > prev.open &&
+            last.open >= prev.close && last.close <= prev.open &&
+            body > (prev.body || 0) * 1.2) {
+            this.lastPattern = 'bearish_engulfing';
+            return;
         }
 
         // Three white soldiers
-        if (prevPrev && last.close > last.open && prev.close > prev.open && prevPrev.close > prevPrev.open && last.close > prev.close && prev.close > prevPrev.close) {
-            this.lastPattern = 'three_white_soldiers'; return;
+        if (prevPrev && last.close > last.open && prev.close > prev.open &&
+            prevPrev.close > prevPrev.open &&
+            last.close > prev.close && prev.close > prevPrev.close) {
+            this.lastPattern = 'three_white_soldiers';
+            return;
         }
 
         // Three black crows
-        if (prevPrev && last.close < last.open && prev.close < prev.open && prevPrev.close < prevPrev.open && last.close < prev.close && prev.close < prevPrev.close) {
-            this.lastPattern = 'three_black_crows'; return;
+        if (prevPrev && last.close < last.open && prev.close < prev.open &&
+            prevPrev.close < prevPrev.open &&
+            last.close < prev.close && prev.close < prevPrev.close) {
+            this.lastPattern = 'three_black_crows';
+            return;
         }
 
         this.lastPattern = 'no_significant_pattern';
     }
 
-    /**
-     * NEW: Check if current price is near a supply or demand zone
-     */
     isNearSupplyZone(currentPrice) {
         if (!currentPrice) return { near: false };
         for (const zone of this.supplyZones) {
             if (currentPrice >= zone.bottom && currentPrice <= zone.top) {
                 return { near: true, zone, type: 'SUPPLY', strength: zone.strength };
             }
-            // Within 0.3% proximity
             const proximity = Math.abs(currentPrice - zone.top) / zone.top;
             if (proximity < 0.003) {
                 return { near: true, zone, type: 'SUPPLY_APPROACHING', strength: zone.strength };
@@ -388,10 +400,19 @@ class MarketDataService {
 
         if (this.rsi !== null && this.candles.length >= 2) {
             feeling = 'Market is stable';
-            if (this.rsi < 30) { condition = 'oversold'; feeling = 'Price is very low (oversold)'; }
-            else if (this.rsi < 40) { condition = 'approaching_oversold'; feeling = 'Price is getting low'; }
-            else if (this.rsi > 70) { condition = 'overbought'; feeling = 'Price is very high (overbought)'; }
-            else if (this.rsi > 60) { condition = 'approaching_overbought'; feeling = 'Price is getting high'; }
+            if (this.rsi < 30) {
+                condition = 'oversold';
+                feeling = 'Price is very low (oversold)';
+            } else if (this.rsi < 40) {
+                condition = 'approaching_oversold';
+                feeling = 'Price is getting low';
+            } else if (this.rsi > 70) {
+                condition = 'overbought';
+                feeling = 'Price is very high (overbought)';
+            } else if (this.rsi > 60) {
+                condition = 'approaching_overbought';
+                feeling = 'Price is getting high';
+            }
         }
 
         let nearSupport = false;
@@ -408,7 +429,6 @@ class MarketDataService {
             nearResistance = distanceToResistance < 0.5;
         }
 
-        // Check supply/demand zones too
         const supplyCheck = this.isNearSupplyZone(currentPrice);
         const demandCheck = this.isNearDemandZone(currentPrice);
 
@@ -420,7 +440,8 @@ class MarketDataService {
             rsiShort_actual: this.rsiShort,
             support: this.support,
             resistance: this.resistance,
-            condition, feeling,
+            condition,
+            feeling,
             nearSupport: nearSupport || demandCheck.near,
             nearResistance: nearResistance || supplyCheck.near,
             distanceToSupport: parseFloat(distanceToSupport.toFixed(2)),
@@ -440,10 +461,42 @@ class MarketDataService {
         };
     }
 
+    /**
+     * UPDATED: Fast crash/rally detection using 3-candle momentum
+     * Falls back to 10-candle trend analysis for normal conditions
+     */
     detectTrend() {
         if (this.candles.length < 3) return 'building_data';
+
+        // ============================================================
+        // FAST DETECTION: 3-candle momentum for crashes and rallies
+        // ============================================================
+        const last3 = this.candles.slice(-3);
+        if (last3.length === 3) {
+            const open3 = last3[0].open;
+            const close3 = last3[2].close;
+            const range3 = Math.max(...last3.map(c => c.high)) - Math.min(...last3.map(c => c.low));
+
+            if (range3 > 0) {
+                const changePercent = (close3 - open3) / range3;
+
+                // Strong 3-candle crash (>60% of range is downward)
+                if (changePercent < -0.6) {
+                    return 'strong_downtrend';
+                }
+                // Strong 3-candle rally (>60% of range is upward)
+                if (changePercent > 0.6) {
+                    return 'strong_uptrend';
+                }
+            }
+        }
+
+        // ============================================================
+        // STANDARD DETECTION: 10-candle trend analysis
+        // ============================================================
         const lastN = this.candles.slice(-Math.min(10, this.candles.length));
-        let upMoves = 0, downMoves = 0;
+        let upMoves = 0;
+        let downMoves = 0;
         for (let i = 1; i < lastN.length; i++) {
             if (lastN[i].close > lastN[i - 1].close) upMoves++;
             else if (lastN[i].close < lastN[i - 1].close) downMoves++;
@@ -490,14 +543,13 @@ class MarketDataService {
         };
     }
 
-    /**
-     * NEW: Get the nearest supply/demand zone to current price
-     */
     getNearestZone(currentPrice) {
         const supplyCheck = this.isNearSupplyZone(currentPrice);
         const demandCheck = this.isNearDemandZone(currentPrice);
         if (supplyCheck.near && demandCheck.near) {
-            return supplyCheck.zone.top - currentPrice < currentPrice - demandCheck.zone.bottom ? supplyCheck : demandCheck;
+            return supplyCheck.zone.top - currentPrice < currentPrice - demandCheck.zone.bottom
+                ? supplyCheck
+                : demandCheck;
         }
         if (supplyCheck.near) return supplyCheck;
         if (demandCheck.near) return demandCheck;
