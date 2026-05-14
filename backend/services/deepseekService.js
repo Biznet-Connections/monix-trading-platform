@@ -200,6 +200,7 @@ TRADING RULES (HARD RULES - NEVER BREAK):
 7. Risk/Reward MUST be 1:2 minimum.
 8. Use historical data to adjust confidence.
 9. If bot has losing streak, BE CONSERVATIVE.
+10. DOJI = INDECISION. Only trade doji at support (BUY) or resistance (SELL). Mid-range doji = WAIT.
 
 Return ONLY valid JSON (no markdown, no backticks):
 {
@@ -218,7 +219,7 @@ Return ONLY valid JSON (no markdown, no backticks):
                     messages: [
                         {
                             role: 'system',
-                            content: 'You are a profit-focused professional ICT/SMC trader. You understand trend analysis, supply/demand zones, RSI, candlestick patterns WITH context, session-based strategies, and risk management. You NEVER trade against strong trends. You know that context (where the pattern forms) is more important than the pattern itself. Return ONLY valid JSON.'
+                            content: 'You are a profit-focused professional ICT/SMC trader. You understand trend analysis, supply/demand zones, RSI, candlestick patterns WITH context, session-based strategies, and risk management. You NEVER trade against strong trends. You know that context (where the pattern forms) is more important than the pattern itself. DOJI means indecision — only trade doji at support or resistance. Return ONLY valid JSON.'
                         },
                         { role: 'user', content: prompt }
                     ],
@@ -244,16 +245,11 @@ Return ONLY valid JSON (no markdown, no backticks):
         }
     }
 
-    /**
-     * UPDATED: Normalize pattern names to match Knowledge Base standards
-     * This ensures learning data is consistent across the system
-     */
     normalizePatternName(pattern) {
         if (!pattern) return 'market analysis';
 
         const lowerPattern = pattern.toLowerCase().trim();
 
-        // Pattern name mapping: DeepSeek natural language → KB standard names
         const patternMap = {
             'sell bounce': 'bearish_engulfing',
             'sell_bounce': 'bearish_engulfing',
@@ -281,14 +277,14 @@ Return ONLY valid JSON (no markdown, no backticks):
             'hammer_at_support': 'hammer',
             'shooting star at resistance': 'shooting_star',
             'shooting_star_at_resistance': 'shooting_star',
+            'buy dip at support': 'hammer',
+            'buy_dip_at_support': 'hammer',
         };
 
-        // Check for exact match first
         if (patternMap[lowerPattern]) {
             return patternMap[lowerPattern];
         }
 
-        // Check if any KB standard pattern is contained in the name
         const kbPatterns = ['hammer', 'shooting_star', 'bullish_engulfing', 'bearish_engulfing',
             'doji', 'three_white_soldiers', 'three_black_crows'
         ];
@@ -299,7 +295,6 @@ Return ONLY valid JSON (no markdown, no backticks):
             }
         }
 
-        // Return original if no mapping found
         return pattern;
     }
 
@@ -309,8 +304,35 @@ Return ONLY valid JSON (no markdown, no backticks):
         }
         analysis.confidence = Math.min(100, Math.max(0, Math.round(analysis.confidence || 50)));
 
-        // Normalize pattern name to KB standard
         analysis.pattern = this.normalizePatternName(analysis.pattern);
+
+        // ============================================================
+        // DOJI BLOCKER: Doji = indecision. Only trade at support/resistance
+        // ============================================================
+        if (analysis.pattern === 'doji' && analysis.action !== 'WAIT') {
+            const nearSupport = marketContext?.nearSupport;
+            const nearResistance = marketContext?.nearResistance;
+
+            if (!nearSupport && !nearResistance) {
+                console.log('🛑 [Doji Blocker] Doji detected but NOT at support/resistance → WAIT');
+                analysis.action = 'WAIT';
+                analysis.confidence = 30;
+                analysis.simple_reason = 'Doji without support/resistance context — waiting for confirmation.';
+            }
+        }
+
+        // ============================================================
+        // RSI NEUTRAL BLOCKER: No edge at RSI 45-55
+        // ============================================================
+        if (marketContext?.rsiShort && analysis.action !== 'WAIT') {
+            const rsiVal = marketContext.rsiShort;
+            if (rsiVal >= 45 && rsiVal <= 55 && !marketContext.nearSupport && !marketContext.nearResistance) {
+                console.log(`🛑 [RSI Blocker] RSI neutral (${rsiVal}) without support/resistance → WAIT`);
+                analysis.action = 'WAIT';
+                analysis.confidence = 30;
+                analysis.simple_reason = 'RSI in neutral zone with no support/resistance context. No edge.';
+            }
+        }
 
         // Knowledge base validation on DeepSeek's output
         if (marketContext?.trend && analysis.action !== 'WAIT') {

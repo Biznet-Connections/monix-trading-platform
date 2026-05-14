@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v6.3 - Smart staking, profit protection, pending order re-validation, real pauses
+ * v6.4 - Session blocker, RSI filter, doji blocker, hard pause, stake cap, API saver
  */
 
 const marketData = require('./marketData');
@@ -60,23 +60,28 @@ class AITrader {
         this.totalWins = 0;
         this.totalLosses = 0;
 
-        // ============================================================
-        // NEW: Session profit tracking for smart staking
-        // ============================================================
+        // Session profit tracking
         this.sessionProfit = 0;
         this.sessionLoss = 0;
-        this.SESSION_PROFIT_LOCK = 20; // Lock in gains at +$20
-        this.SESSION_PROFIT_CAP = 10; // Reduce stakes at +$10
+        this.SESSION_PROFIT_LOCK = 20;
+        this.SESSION_PROFIT_CAP = 10;
 
+        // v6.4: Hard stake cap — never exceed $5
         this.MIN_STAKE = 0.50;
         this.BASE_STAKE = 2.00;
         this.CONFIDENT_STAKE = 5.00;
-        this.HIGH_STAKE = 10.00;
-        this.MAX_STAKE = 20.00;
+        this.HIGH_STAKE = 5.00;
+        this.MAX_STAKE = 5.00;
 
         this.trendStartTime = 0;
         this.trendDirection = null;
         this.MIN_TREND_DURATION = 5 * 60 * 1000;
+
+        // Log throttles
+        this._lastLondonLog = 0;
+        this._lastRSILog = 0;
+        this._lastSkipLog = 0;
+        this._lastAnalysisLog = 0;
     }
 
     async start(userId, symbol = 'R_75', mode = 'AUTO') {
@@ -101,17 +106,17 @@ class AITrader {
         this.trendStartTime = 0;
         this.trendDirection = null;
 
-        // Reset session profit for new session
         this.sessionProfit = 0;
         this.sessionLoss = 0;
 
         const session = knowledgeBase.getSessionRules();
-        console.log(`🤖 [AI Trader] Starting v6.3 SMART STAKING EDITION`);
+        console.log(`🤖 [AI Trader] Starting v6.4 HARDENED EDITION`);
         console.log(`📚 [AI Trader] Trading DNA loaded: ${session.name} session optimized`);
-        console.log(`💰 [AI Trader] Stakes: Min=$${this.MIN_STAKE} | Base=$${this.BASE_STAKE} | Confident=$${this.CONFIDENT_STAKE} | High=$${this.HIGH_STAKE}`);
-        console.log(`🛡️ [AI Trader] Smart staking: Scale down on losses, scale up on wins`);
+        console.log(`💰 [AI Trader] Stakes: Min=$${this.MIN_STAKE} | Base=$${this.BASE_STAKE} | Confident=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
+        console.log(`🛡️ [AI Trader] Session blocker: London (08-17 UTC) restricted`);
+        console.log(`🛑 [AI Trader] Hard pause: 15min after 3 consecutive losses`);
         console.log(`🔒 [AI Trader] Profit lock: +$${this.SESSION_PROFIT_LOCK} triggers minimum stakes`);
-        console.log(`🛑 [AI Trader] Real pauses: No trades during cooldown period`);
+        console.log(`⏭️ [AI Trader] API Saver: Skip DeepSeek on neutral markets`);
 
         marketData.reset();
 
@@ -157,18 +162,10 @@ class AITrader {
         broadcastAIUpdate(this.getCurrentAnalysis());
     }
 
-    /**
-     * UPDATED: Check pending orders with Knowledge Base re-validation
-     * and respect pausedUntil for real pauses
-     */
     checkPendingLimitOrders() {
         if (this.pendingLimitOrders.length === 0) return;
 
-        // ============================================================
-        // NEW: Respect pause — no pending orders fire during cooldown
-        // ============================================================
         if (this.pausedUntil > Date.now()) {
-            // Still log status but don't execute
             return;
         }
 
@@ -193,9 +190,6 @@ class AITrader {
                 const confirmationsMet = this.checkOrderConfirmations(order, marketState);
 
                 if (confirmationsMet) {
-                    // ============================================================
-                    // NEW: Re-validate against Knowledge Base BEFORE executing
-                    // ============================================================
                     const kbRecheck = knowledgeBase.validateSetup({
                         pattern: order.pattern,
                         currentTrend: marketState.trend,
@@ -305,6 +299,47 @@ class AITrader {
             const timeSinceLastTrade = Date.now() - this.lastTradeTime;
             if (this.lastTradeTime > 0 && timeSinceLastTrade < this.tradeCooldown) return;
 
+            // ============================================================
+            // v6.4: SESSION BLOCKER — Skip London hours (08:00-17:00 UTC)
+            // Only trade London if historical WR is 60%+
+            // ============================================================
+            const currentHour = new Date().getUTCHours();
+            if (currentHour >= 8 && currentHour < 17) {
+                try {
+                    const sessionStats = await Trade.getSessionStats(this.userId);
+                    const londonPerf = sessionStats?.find(s => s.session === 'LONDON');
+                    const londonWR = londonPerf ? parseFloat(londonPerf.win_rate) : 0;
+                    if (londonWR < 60) {
+                        if (!this._lastLondonLog || Date.now() - this._lastLondonLog > 120000) {
+                            console.log(`🛑 [Session Blocker] London hours (08-17 UTC) — skipping. London WR: ${londonWR}% (need 60%+)`);
+                            this._lastLondonLog = Date.now();
+                        }
+                        this.currentWatchState = {
+                            status: 'SESSION_BLOCKED',
+                            action: 'WAIT',
+                            symbol: this.symbol,
+                            reason: `London session blocked (${londonWR}% WR). Waiting for ASIAN or NEWYORK session.`,
+                            confidence: 0,
+                            pattern: 'none',
+                            market_price: 0,
+                            market_rsi: 50,
+                            trend: 'unknown',
+                            lastUpdate: Date.now(),
+                            is_auto_mode: this.mode === 'AUTO',
+                            confidence_threshold: 80,
+                            pending_orders: this.pendingLimitOrders.length
+                        };
+                        return;
+                    }
+                } catch (e) {
+                    if (!this._lastLondonLog || Date.now() - this._lastLondonLog > 120000) {
+                        console.log('🛑 [Session Blocker] London hours — could not verify WR. Skipping to be safe.');
+                        this._lastLondonLog = Date.now();
+                    }
+                    return;
+                }
+            }
+
             const marketState = marketData.getMarketState();
             const currentPrice = marketState.price;
 
@@ -321,6 +356,68 @@ class AITrader {
             }
 
             if (!this.dataReady) this.dataReady = true;
+
+            // ============================================================
+            // v6.4: API SAVER — Skip DeepSeek when market is clearly neutral
+            // RSI 45-55 + no pattern + not near S/R = nothing worth analyzing
+            // These setups historically lose money, so skip the API call
+            // ============================================================
+            const isNeutralMarket = 
+                marketState.rsi >= 45 && marketState.rsi <= 55 &&
+                !marketState.nearSupport && !marketState.nearResistance &&
+                (marketState.lastPattern === 'no_significant_pattern' || 
+                 marketState.lastPattern === 'doji' ||
+                 marketState.lastPattern === 'none');
+
+            if (isNeutralMarket && this.mode === 'AUTO') {
+                if (!this._lastSkipLog || Date.now() - this._lastSkipLog > 60000) {
+                    console.log(`⏭️ [API Saver] Skipping DeepSeek — neutral RSI (${marketState.rsi}), no pattern, no S/R. No edge to analyze.`);
+                    this._lastSkipLog = Date.now();
+                }
+                this.currentWatchState = {
+                    status: 'API_SAVED',
+                    action: 'WAIT',
+                    symbol: this.symbol,
+                    reason: `Neutral market — RSI ${marketState.rsi}, no significant pattern. Skipping analysis to save API costs.`,
+                    confidence: 0,
+                    pattern: 'none',
+                    market_price: currentPrice,
+                    market_rsi: marketState.rsi,
+                    trend: marketState.trend,
+                    lastUpdate: Date.now(),
+                    is_auto_mode: this.mode === 'AUTO',
+                    confidence_threshold: 80,
+                    pending_orders: this.pendingLimitOrders.length
+                };
+                return;
+            }
+
+            // ============================================================
+            // v6.4: RSI NEUTRAL BLOCKER — Skip RSI 45-55 without S/R context
+            // (This catches cases where DeepSeek was called but RSI is still neutral)
+            // ============================================================
+            if (marketState.rsi >= 45 && marketState.rsi <= 55 && !marketState.nearSupport && !marketState.nearResistance) {
+                if (!this._lastRSILog || Date.now() - this._lastRSILog > 60000) {
+                    console.log(`🛑 [RSI Filter] RSI neutral (${marketState.rsi}) without support/resistance — no edge. Waiting.`);
+                    this._lastRSILog = Date.now();
+                }
+                this.currentWatchState = {
+                    status: 'RSI_BLOCKED',
+                    action: 'WAIT',
+                    symbol: this.symbol,
+                    reason: `RSI neutral (${marketState.rsi}) with no support/resistance context. No edge.`,
+                    confidence: 0,
+                    pattern: 'none',
+                    market_price: currentPrice,
+                    market_rsi: marketState.rsi,
+                    trend: marketState.trend,
+                    lastUpdate: Date.now(),
+                    is_auto_mode: this.mode === 'AUTO',
+                    confidence_threshold: 80,
+                    pending_orders: this.pendingLimitOrders.length
+                };
+                return;
+            }
 
             const shouldLog = !this._lastAnalysisLog || Date.now() - this._lastAnalysisLog > 30000;
             if (shouldLog) {
@@ -380,9 +477,6 @@ class AITrader {
                     action: action
                 });
 
-                // ============================================================
-                // ASIAN SESSION OVERRIDE FOR PROVEN PATTERNS
-                // ============================================================
                 if (!kbValidation.valid && kbValidation.reason?.includes('SESSION')) {
                     const currentPattern = patternPerformance?.find(p =>
                         p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase()
@@ -401,9 +495,6 @@ class AITrader {
                     }
                 }
 
-                // ============================================================
-                // SIDEWAYS OVERRIDE FOR PROVEN PATTERNS
-                // ============================================================
                 if (!kbValidation.valid && kbValidation.reason?.includes('SIDEWAYS')) {
                     const currentPattern = patternPerformance?.find(p =>
                         p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase()
@@ -422,15 +513,11 @@ class AITrader {
                     }
                 }
 
-                // ============================================================
-                // IF STILL INVALID — decide whether to create pending order
-                // ============================================================
                 if (!kbValidation.valid) {
                     if (shouldLog) {
                         console.log(`🧬 [AI Trader] KNOWLEDGE BASE REJECTED: ${kbValidation.reason}`);
                     }
 
-                    // DO NOT create pending orders for TREND CONTRADICTION
                     if (kbValidation.reason?.includes('TREND CONTRADICTION') ||
                         kbValidation.reason?.includes('TREND_RULE') ||
                         kbValidation.reason?.includes('PATTERN MISMATCH')) {
@@ -454,7 +541,6 @@ class AITrader {
                         return;
                     }
 
-                    // For other rejections (RSI, session), create pending order
                     if (marketState.nearSupport || marketState.nearResistance) {
                         const pendingStake = this.calculateStake(analysis.confidence, 0, marketState.trend);
                         let entryLevel, pendingAction;
@@ -503,7 +589,6 @@ class AITrader {
                     return;
                 }
 
-                // Setup validated! Execute with smart staking
                 const finalConfidence = Math.max(analysis.confidence, kbValidation.confidence);
                 const currentPattern = patternPerformance?.find(p => p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase());
                 const patternWinRate = currentPattern?.winRate || 0;
@@ -549,37 +634,24 @@ class AITrader {
         }
     }
 
-    /**
-     * COMPLETELY REWRITTEN: Smart staking with profit protection
-     * Rules:
-     * 1. Losing streak (2+ losses) → MIN_STAKE
-     * 2. Session profit over $20 → lock to MIN_STAKE
-     * 3. Session profit over $10 → cap at BASE_STAKE
-     * 4. 3+ consecutive wins → scale up to CONFIDENT_STAKE
-     * 5. 2 consecutive wins → use BASE_STAKE
-     * 6. Default: MIN_STAKE until proven otherwise
-     */
     calculateStake(confidence, patternWinRate, trend) {
-        // RULE 1: Losing streak → always minimum
+        // v6.4: Hard cap — NEVER exceed MAX_STAKE ($5)
         if (this.consecutiveLosses >= 2) {
             console.log('📉 [Stake] Losing streak detected — MIN STAKE ($' + this.MIN_STAKE + ')');
             return this.MIN_STAKE;
         }
 
-        // RULE 2: Session profit lock — protect gains
         if (this.sessionProfit >= this.SESSION_PROFIT_LOCK) {
             console.log('🔒 [Stake] Profit lock triggered (+$' + this.sessionProfit.toFixed(2) + ') — MIN STAKE ($' + this.MIN_STAKE + ')');
             return this.MIN_STAKE;
         }
 
-        // RULE 3: Session profit protection — reduce risk
         if (this.sessionProfit >= this.SESSION_PROFIT_CAP) {
             console.log('🔒 [Stake] Profit protection (+$' + this.sessionProfit.toFixed(2) + ') — max BASE STAKE ($' + this.BASE_STAKE + ')');
             if (confidence >= 85 && patternWinRate >= 70) return this.BASE_STAKE;
             return this.MIN_STAKE;
         }
 
-        // RULE 4: Check winning streak for scaling up
         const recentWins = this.recentResults.slice(-5).filter(r => r === 'WIN').length;
         const last3AreWins = this.recentResults.length >= 3 &&
             this.recentResults.slice(-3).every(r => r === 'WIN');
@@ -596,13 +668,11 @@ class AITrader {
             return this.BASE_STAKE;
         }
 
-        // RULE 5: For confident setups with good pattern history, allow BASE
         if (confidence >= 80 && patternWinRate >= 65 && this.consecutiveLosses === 0) {
             console.log('📈 [Stake] High confidence proven pattern — BASE STAKE ($' + this.BASE_STAKE + ')');
             return this.BASE_STAKE;
         }
 
-        // RULE 6: Default — start small, prove yourself
         console.log('📉 [Stake] Default conservative — MIN STAKE ($' + this.MIN_STAKE + ')');
         return this.MIN_STAKE;
     }
@@ -689,9 +759,6 @@ class AITrader {
         });
     }
 
-    /**
-     * UPDATED: Track session profit/loss for smart staking
-     */
     async checkTradeResult(tradeId, contractId, entryPrice, stake) {
         try {
             let contractResult = null,
@@ -726,9 +793,6 @@ class AITrader {
             this.recentResults.push(status);
             if (this.recentResults.length > 10) this.recentResults.shift();
 
-            // ============================================================
-            // NEW: Track session profit/loss
-            // ============================================================
             if (status === 'WIN') {
                 this.totalWins++;
                 this.consecutiveLosses = 0;
@@ -739,9 +803,11 @@ class AITrader {
                 this.consecutiveLosses++;
                 this.sessionLoss += Math.abs(profit);
                 console.log(`❌ LOSS #${this.consecutiveLosses} | ${this.totalWins}W/${this.totalLosses}L | Session P&L: +$${this.sessionProfit.toFixed(2)} / -$${this.sessionLoss.toFixed(2)}`);
+
                 if (this.consecutiveLosses >= 3) {
-                    this.pausedUntil = Date.now() + 300000;
-                    console.log('🛑 Paused 5min — 3 consecutive losses');
+                    this.pausedUntil = Date.now() + 900000;
+                    this.pendingLimitOrders = [];
+                    console.log('🛑 HARD PAUSE 15min — 3 consecutive losses. All pending orders cleared.');
                 }
             }
             broadcastTradeResult({
