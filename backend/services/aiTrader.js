@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v6.5 - Percentage-based staking, session blocker, RSI filter, doji blocker, hard pause, API saver
+ * v6.5.1 - HARD London block by UTC hour (not session label), fixed session overlap
  */
 
 const marketData = require('./marketData');
@@ -60,62 +60,53 @@ class AITrader {
         this.totalWins = 0;
         this.totalLosses = 0;
 
-        // Session profit tracking
         this.sessionProfit = 0;
         this.sessionLoss = 0;
 
-        // v6.5: Dynamic balance from Deriv — updated on start and after each trade
         this.currentBalance = 1000;
 
-        // v6.5: Percentage-based stake multipliers
-        this.PCT_MIN = 0.005;       // 0.5% for losing streaks / defaults
-        this.PCT_BASE = 0.01;       // 1% for normal conditions
-        this.PCT_CONFIDENT = 0.02;  // 2% for winning streaks / proven patterns
-        this.PCT_MAX = 0.03;        // 3% absolute maximum per trade
+        this.PCT_MIN = 0.005;
+        this.PCT_BASE = 0.01;
+        this.PCT_CONFIDENT = 0.02;
+        this.PCT_MAX = 0.03;
 
-        // These are recalculated from balance every time
         this.MIN_STAKE = 0.50;
         this.BASE_STAKE = 2.00;
         this.CONFIDENT_STAKE = 5.00;
         this.HIGH_STAKE = 5.00;
         this.MAX_STAKE = 5.00;
 
-        // v6.5: Daily limits (percentage-based)
-        this.DAILY_PROFIT_TARGET_PCT = 0.05;  // 5% daily target
-        this.DAILY_LOSS_LIMIT_PCT = 0.06;     // 6% daily max loss
+        this.DAILY_PROFIT_TARGET_PCT = 0.05;
+        this.DAILY_LOSS_LIMIT_PCT = 0.06;
+
+        // v6.5.1: HARD blocked hours (UTC) — NEVER trade during these windows
+        this.BLOCKED_HOURS_START = 8;  // 08:00 UTC
+        this.BLOCKED_HOURS_END = 17;   // 17:00 UTC
 
         this.trendStartTime = 0;
         this.trendDirection = null;
         this.MIN_TREND_DURATION = 5 * 60 * 1000;
 
-        // Log throttles
         this._lastLondonLog = 0;
         this._lastRSILog = 0;
         this._lastSkipLog = 0;
         this._lastAnalysisLog = 0;
         this._lastBalanceLog = 0;
+        this._lastDailyLog = 0;
     }
 
-    /**
-     * v6.5: Round stake to nearest 0.50 for Deriv compatibility
-     */
     roundStake(amount) {
         return Math.max(0.50, Math.round(amount * 2) / 2);
     }
 
-    /**
-     * v6.5: Recalculate stakes based on current balance
-     */
     recalculateStakes() {
         const bal = this.currentBalance || 1000;
-
         this.MIN_STAKE = this.roundStake(bal * this.PCT_MIN);
         this.BASE_STAKE = this.roundStake(bal * this.PCT_BASE);
         this.CONFIDENT_STAKE = this.roundStake(bal * this.PCT_CONFIDENT);
         this.MAX_STAKE = this.roundStake(bal * this.PCT_MAX);
         this.HIGH_STAKE = this.MAX_STAKE;
 
-        // Log once per hour
         if (!this._lastBalanceLog || Date.now() - this._lastBalanceLog > 3600000) {
             console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
             this._lastBalanceLog = Date.now();
@@ -147,7 +138,6 @@ class AITrader {
         this.sessionProfit = 0;
         this.sessionLoss = 0;
 
-        // v6.5: Fetch real balance from Deriv
         try {
             const bal = await derivService.getBalance();
             this.currentBalance = bal?.balance || 1000;
@@ -157,12 +147,12 @@ class AITrader {
         this.recalculateStakes();
 
         const session = knowledgeBase.getSessionRules();
-        console.log(`🤖 [AI Trader] Starting v6.5 PROFIT EDITION`);
+        console.log(`🤖 [AI Trader] Starting v6.5.1 HARDENED PROFIT EDITION`);
         console.log(`📚 [AI Trader] Trading DNA loaded: ${session.name} session optimized`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)} | Stakes: Min=$${this.MIN_STAKE} | Base=$${this.BASE_STAKE} | Confident=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
         console.log(`🎯 [AI Trader] Daily target: $${(this.currentBalance * this.DAILY_PROFIT_TARGET_PCT).toFixed(2)} (5%)`);
         console.log(`🛡️ [AI Trader] Daily loss limit: $${(this.currentBalance * this.DAILY_LOSS_LIMIT_PCT).toFixed(2)} (6%)`);
-        console.log(`🛡️ [AI Trader] Session blocker: London (08-17 UTC) restricted`);
+        console.log(`🛑 [AI Trader] HARD BLOCK: ${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC (London window)`);
         console.log(`🛑 [AI Trader] Hard pause: 15min after 3 consecutive losses`);
         console.log(`⏭️ [AI Trader] API Saver: Skip DeepSeek on neutral markets`);
 
@@ -212,10 +202,7 @@ class AITrader {
 
     checkPendingLimitOrders() {
         if (this.pendingLimitOrders.length === 0) return;
-
-        if (this.pausedUntil > Date.now()) {
-            return;
-        }
+        if (this.pausedUntil > Date.now()) return;
 
         const currentPrice = marketData.getCurrentPrice();
         if (!currentPrice) return;
@@ -348,6 +335,34 @@ class AITrader {
             if (this.lastTradeTime > 0 && timeSinceLastTrade < this.tradeCooldown) return;
 
             // ============================================================
+            // v6.5.1: HARD UTC HOUR BLOCK — No trades 08:00-17:00 UTC EVER
+            // This runs BEFORE any other checks. No exceptions.
+            // ============================================================
+            const currentHour = new Date().getUTCHours();
+            if (currentHour >= this.BLOCKED_HOURS_START && currentHour < this.BLOCKED_HOURS_END) {
+                if (!this._lastLondonLog || Date.now() - this._lastLondonLog > 120000) {
+                    console.log(`🛑 [HARD BLOCK] ${currentHour}:00 UTC — London window (${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC). No trades allowed.`);
+                    this._lastLondonLog = Date.now();
+                }
+                this.currentWatchState = {
+                    status: 'HARD_BLOCKED',
+                    action: 'WAIT',
+                    symbol: this.symbol,
+                    reason: `London window blocked (${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC). Trading resumes at ${this.BLOCKED_HOURS_END}:00 UTC.`,
+                    confidence: 0,
+                    pattern: 'none',
+                    market_price: 0,
+                    market_rsi: 50,
+                    trend: 'unknown',
+                    lastUpdate: Date.now(),
+                    is_auto_mode: this.mode === 'AUTO',
+                    confidence_threshold: 100,
+                    pending_orders: this.pendingLimitOrders.length
+                };
+                return;
+            }
+
+            // ============================================================
             // v6.5: DAILY LIMITS CHECK
             // ============================================================
             const dailyTarget = this.currentBalance * this.DAILY_PROFIT_TARGET_PCT;
@@ -381,49 +396,9 @@ class AITrader {
                     console.log(`🛑 [Daily Limit] -$${this.sessionLoss.toFixed(2)} hit (limit: $${dailyLossLimit.toFixed(2)}). Stopping for the day.`);
                     this._lastDailyLog = Date.now();
                 }
-                this.pausedUntil = Date.now() + 86400000; // 24 hours
+                this.pausedUntil = Date.now() + 86400000;
                 this.pendingLimitOrders = [];
                 return;
-            }
-
-            // ============================================================
-            // v6.4: SESSION BLOCKER — Skip London hours (08:00-17:00 UTC)
-            // ============================================================
-            const currentHour = new Date().getUTCHours();
-            if (currentHour >= 8 && currentHour < 17) {
-                try {
-                    const sessionStats = await Trade.getSessionStats(this.userId);
-                    const londonPerf = sessionStats?.find(s => s.session === 'LONDON');
-                    const londonWR = londonPerf ? parseFloat(londonPerf.win_rate) : 0;
-                    if (londonWR < 60) {
-                        if (!this._lastLondonLog || Date.now() - this._lastLondonLog > 120000) {
-                            console.log(`🛑 [Session Blocker] London hours (08-17 UTC) — skipping. London WR: ${londonWR}% (need 60%+)`);
-                            this._lastLondonLog = Date.now();
-                        }
-                        this.currentWatchState = {
-                            status: 'SESSION_BLOCKED',
-                            action: 'WAIT',
-                            symbol: this.symbol,
-                            reason: `London session blocked (${londonWR}% WR). Waiting for ASIAN or NEWYORK session.`,
-                            confidence: 0,
-                            pattern: 'none',
-                            market_price: 0,
-                            market_rsi: 50,
-                            trend: 'unknown',
-                            lastUpdate: Date.now(),
-                            is_auto_mode: this.mode === 'AUTO',
-                            confidence_threshold: 80,
-                            pending_orders: this.pendingLimitOrders.length
-                        };
-                        return;
-                    }
-                } catch (e) {
-                    if (!this._lastLondonLog || Date.now() - this._lastLondonLog > 120000) {
-                        console.log('🛑 [Session Blocker] London hours — could not verify WR. Skipping to be safe.');
-                        this._lastLondonLog = Date.now();
-                    }
-                    return;
-                }
             }
 
             const marketState = marketData.getMarketState();
@@ -443,13 +418,10 @@ class AITrader {
 
             if (!this.dataReady) this.dataReady = true;
 
-            // ============================================================
-            // v6.5: Recalculate stakes based on latest balance
-            // ============================================================
             this.recalculateStakes();
 
             // ============================================================
-            // v6.4: API SAVER — Skip DeepSeek when market is clearly neutral
+            // v6.4: API SAVER
             // ============================================================
             const isNeutralMarket = 
                 marketState.rsi >= 45 && marketState.rsi <= 55 &&
@@ -574,7 +546,7 @@ class AITrader {
                             valid: true,
                             action: action,
                             confidence: analysis.confidence,
-                            reason: `ASIAN OVERRIDE: Pattern "${analysis.pattern}" has ${currentPattern.winRate}% win rate (${currentPattern.total} trades).`,
+                            reason: `ASIAN OVERRIDE: Pattern "${analysis.pattern}" has ${currentPattern.winRate}% win rate.`,
                             confirmations: 3,
                             source: 'ASIAN_OVERRIDE',
                             sessionModifier: 0
@@ -721,40 +693,31 @@ class AITrader {
         }
     }
 
-    /**
-     * v6.5: Percentage-based staking with hard caps and safety rules
-     */
     calculateStake(confidence, patternWinRate, trend) {
-        // Recalculate stakes from latest balance
         this.recalculateStakes();
 
-        // RULE 1: Losing streak → MIN_STAKE
         if (this.consecutiveLosses >= 2) {
             console.log(`📉 [Stake] Losing streak (${this.consecutiveLosses}) — MIN STAKE ($${this.MIN_STAKE})`);
             return this.MIN_STAKE;
         }
 
-        // RULE 2: Daily profit target reached → MIN_STAKE
         if (this.sessionProfit >= this.currentBalance * this.DAILY_PROFIT_TARGET_PCT) {
             console.log(`🎯 [Stake] Daily target hit — MIN STAKE ($${this.MIN_STAKE})`);
             return this.MIN_STAKE;
         }
 
-        // RULE 3: Profit lock (>2% of account) → cap at BASE
         if (this.sessionProfit >= this.currentBalance * 0.02) {
             console.log(`🔒 [Stake] Profit lock (+$${this.sessionProfit.toFixed(2)}) — max BASE STAKE ($${this.BASE_STAKE})`);
             if (confidence >= 85 && patternWinRate >= 70) return this.BASE_STAKE;
             return this.MIN_STAKE;
         }
 
-        // RULE 4: Profit protection (>1% of account) → cap at BASE
         if (this.sessionProfit >= this.currentBalance * 0.01) {
             console.log(`🔒 [Stake] Profit protection (+$${this.sessionProfit.toFixed(2)}) — max BASE STAKE ($${this.BASE_STAKE})`);
             if (confidence >= 85 && patternWinRate >= 70) return this.BASE_STAKE;
             return this.MIN_STAKE;
         }
 
-        // RULE 5: Winning streaks — scale up
         const recentWins = this.recentResults.slice(-5).filter(r => r === 'WIN').length;
         const last3AreWins = this.recentResults.length >= 3 &&
             this.recentResults.slice(-3).every(r => r === 'WIN');
@@ -771,13 +734,11 @@ class AITrader {
             return this.BASE_STAKE;
         }
 
-        // RULE 6: High confidence proven pattern → BASE
         if (confidence >= 80 && patternWinRate >= 65 && this.consecutiveLosses === 0) {
             console.log(`📈 [Stake] High confidence proven pattern — BASE STAKE ($${this.BASE_STAKE})`);
             return this.BASE_STAKE;
         }
 
-        // RULE 7: Default conservative — MIN_STAKE
         console.log(`📉 [Stake] Default conservative — MIN STAKE ($${this.MIN_STAKE})`);
         return this.MIN_STAKE;
     }
@@ -909,7 +870,6 @@ class AITrader {
                 this.sessionLoss += Math.abs(profit);
                 console.log(`❌ LOSS #${this.consecutiveLosses} | ${this.totalWins}W/${this.totalLosses}L | Session P&L: +$${this.sessionProfit.toFixed(2)} / -$${this.sessionLoss.toFixed(2)}`);
 
-                // v6.4: HARD PAUSE — 15 minutes, clear all pending orders
                 if (this.consecutiveLosses >= 3) {
                     this.pausedUntil = Date.now() + 900000;
                     this.pendingLimitOrders = [];
@@ -917,7 +877,6 @@ class AITrader {
                 }
             }
 
-            // v6.5: Update balance from Deriv after each trade
             try {
                 const bal = await derivService.getBalance();
                 if (bal?.balance) {
