@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v6.4 - Session blocker, RSI filter, doji blocker, hard pause, stake cap, API saver
+ * v6.5 - Percentage-based staking, session blocker, RSI filter, doji blocker, hard pause, API saver
  */
 
 const marketData = require('./marketData');
@@ -63,15 +63,26 @@ class AITrader {
         // Session profit tracking
         this.sessionProfit = 0;
         this.sessionLoss = 0;
-        this.SESSION_PROFIT_LOCK = 20;
-        this.SESSION_PROFIT_CAP = 10;
 
-        // v6.4: Hard stake cap — never exceed $5
+        // v6.5: Dynamic balance from Deriv — updated on start and after each trade
+        this.currentBalance = 1000;
+
+        // v6.5: Percentage-based stake multipliers
+        this.PCT_MIN = 0.005;       // 0.5% for losing streaks / defaults
+        this.PCT_BASE = 0.01;       // 1% for normal conditions
+        this.PCT_CONFIDENT = 0.02;  // 2% for winning streaks / proven patterns
+        this.PCT_MAX = 0.03;        // 3% absolute maximum per trade
+
+        // These are recalculated from balance every time
         this.MIN_STAKE = 0.50;
         this.BASE_STAKE = 2.00;
         this.CONFIDENT_STAKE = 5.00;
         this.HIGH_STAKE = 5.00;
         this.MAX_STAKE = 5.00;
+
+        // v6.5: Daily limits (percentage-based)
+        this.DAILY_PROFIT_TARGET_PCT = 0.05;  // 5% daily target
+        this.DAILY_LOSS_LIMIT_PCT = 0.06;     // 6% daily max loss
 
         this.trendStartTime = 0;
         this.trendDirection = null;
@@ -82,6 +93,33 @@ class AITrader {
         this._lastRSILog = 0;
         this._lastSkipLog = 0;
         this._lastAnalysisLog = 0;
+        this._lastBalanceLog = 0;
+    }
+
+    /**
+     * v6.5: Round stake to nearest 0.50 for Deriv compatibility
+     */
+    roundStake(amount) {
+        return Math.max(0.50, Math.round(amount * 2) / 2);
+    }
+
+    /**
+     * v6.5: Recalculate stakes based on current balance
+     */
+    recalculateStakes() {
+        const bal = this.currentBalance || 1000;
+
+        this.MIN_STAKE = this.roundStake(bal * this.PCT_MIN);
+        this.BASE_STAKE = this.roundStake(bal * this.PCT_BASE);
+        this.CONFIDENT_STAKE = this.roundStake(bal * this.PCT_CONFIDENT);
+        this.MAX_STAKE = this.roundStake(bal * this.PCT_MAX);
+        this.HIGH_STAKE = this.MAX_STAKE;
+
+        // Log once per hour
+        if (!this._lastBalanceLog || Date.now() - this._lastBalanceLog > 3600000) {
+            console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
+            this._lastBalanceLog = Date.now();
+        }
     }
 
     async start(userId, symbol = 'R_75', mode = 'AUTO') {
@@ -109,13 +147,23 @@ class AITrader {
         this.sessionProfit = 0;
         this.sessionLoss = 0;
 
+        // v6.5: Fetch real balance from Deriv
+        try {
+            const bal = await derivService.getBalance();
+            this.currentBalance = bal?.balance || 1000;
+        } catch (e) {
+            this.currentBalance = 1000;
+        }
+        this.recalculateStakes();
+
         const session = knowledgeBase.getSessionRules();
-        console.log(`🤖 [AI Trader] Starting v6.4 HARDENED EDITION`);
+        console.log(`🤖 [AI Trader] Starting v6.5 PROFIT EDITION`);
         console.log(`📚 [AI Trader] Trading DNA loaded: ${session.name} session optimized`);
-        console.log(`💰 [AI Trader] Stakes: Min=$${this.MIN_STAKE} | Base=$${this.BASE_STAKE} | Confident=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
+        console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)} | Stakes: Min=$${this.MIN_STAKE} | Base=$${this.BASE_STAKE} | Confident=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
+        console.log(`🎯 [AI Trader] Daily target: $${(this.currentBalance * this.DAILY_PROFIT_TARGET_PCT).toFixed(2)} (5%)`);
+        console.log(`🛡️ [AI Trader] Daily loss limit: $${(this.currentBalance * this.DAILY_LOSS_LIMIT_PCT).toFixed(2)} (6%)`);
         console.log(`🛡️ [AI Trader] Session blocker: London (08-17 UTC) restricted`);
         console.log(`🛑 [AI Trader] Hard pause: 15min after 3 consecutive losses`);
-        console.log(`🔒 [AI Trader] Profit lock: +$${this.SESSION_PROFIT_LOCK} triggers minimum stakes`);
         console.log(`⏭️ [AI Trader] API Saver: Skip DeepSeek on neutral markets`);
 
         marketData.reset();
@@ -300,8 +348,46 @@ class AITrader {
             if (this.lastTradeTime > 0 && timeSinceLastTrade < this.tradeCooldown) return;
 
             // ============================================================
+            // v6.5: DAILY LIMITS CHECK
+            // ============================================================
+            const dailyTarget = this.currentBalance * this.DAILY_PROFIT_TARGET_PCT;
+            const dailyLossLimit = this.currentBalance * this.DAILY_LOSS_LIMIT_PCT;
+
+            if (this.sessionProfit >= dailyTarget) {
+                if (!this._lastDailyLog || Date.now() - this._lastDailyLog > 300000) {
+                    console.log(`🎯 [Daily Target] +$${this.sessionProfit.toFixed(2)} reached (target: $${dailyTarget.toFixed(2)}). Locking for the day.`);
+                    this._lastDailyLog = Date.now();
+                }
+                this.currentWatchState = {
+                    status: 'DAILY_TARGET_HIT',
+                    action: 'WAIT',
+                    symbol: this.symbol,
+                    reason: `Daily profit target reached (+$${this.sessionProfit.toFixed(2)}). Come back tomorrow.`,
+                    confidence: 0,
+                    pattern: 'none',
+                    market_price: 0,
+                    market_rsi: 50,
+                    trend: 'unknown',
+                    lastUpdate: Date.now(),
+                    is_auto_mode: this.mode === 'AUTO',
+                    confidence_threshold: 100,
+                    pending_orders: this.pendingLimitOrders.length
+                };
+                return;
+            }
+
+            if (this.sessionLoss >= dailyLossLimit) {
+                if (!this._lastDailyLog || Date.now() - this._lastDailyLog > 300000) {
+                    console.log(`🛑 [Daily Limit] -$${this.sessionLoss.toFixed(2)} hit (limit: $${dailyLossLimit.toFixed(2)}). Stopping for the day.`);
+                    this._lastDailyLog = Date.now();
+                }
+                this.pausedUntil = Date.now() + 86400000; // 24 hours
+                this.pendingLimitOrders = [];
+                return;
+            }
+
+            // ============================================================
             // v6.4: SESSION BLOCKER — Skip London hours (08:00-17:00 UTC)
-            // Only trade London if historical WR is 60%+
             // ============================================================
             const currentHour = new Date().getUTCHours();
             if (currentHour >= 8 && currentHour < 17) {
@@ -358,9 +444,12 @@ class AITrader {
             if (!this.dataReady) this.dataReady = true;
 
             // ============================================================
+            // v6.5: Recalculate stakes based on latest balance
+            // ============================================================
+            this.recalculateStakes();
+
+            // ============================================================
             // v6.4: API SAVER — Skip DeepSeek when market is clearly neutral
-            // RSI 45-55 + no pattern + not near S/R = nothing worth analyzing
-            // These setups historically lose money, so skip the API call
             // ============================================================
             const isNeutralMarket = 
                 marketState.rsi >= 45 && marketState.rsi <= 55 &&
@@ -371,14 +460,14 @@ class AITrader {
 
             if (isNeutralMarket && this.mode === 'AUTO') {
                 if (!this._lastSkipLog || Date.now() - this._lastSkipLog > 60000) {
-                    console.log(`⏭️ [API Saver] Skipping DeepSeek — neutral RSI (${marketState.rsi}), no pattern, no S/R. No edge to analyze.`);
+                    console.log(`⏭️ [API Saver] Skipping DeepSeek — neutral RSI (${marketState.rsi}), no pattern, no S/R.`);
                     this._lastSkipLog = Date.now();
                 }
                 this.currentWatchState = {
                     status: 'API_SAVED',
                     action: 'WAIT',
                     symbol: this.symbol,
-                    reason: `Neutral market — RSI ${marketState.rsi}, no significant pattern. Skipping analysis to save API costs.`,
+                    reason: `Neutral market — RSI ${marketState.rsi}, no significant pattern.`,
                     confidence: 0,
                     pattern: 'none',
                     market_price: currentPrice,
@@ -393,19 +482,18 @@ class AITrader {
             }
 
             // ============================================================
-            // v6.4: RSI NEUTRAL BLOCKER — Skip RSI 45-55 without S/R context
-            // (This catches cases where DeepSeek was called but RSI is still neutral)
+            // v6.4: RSI NEUTRAL BLOCKER
             // ============================================================
             if (marketState.rsi >= 45 && marketState.rsi <= 55 && !marketState.nearSupport && !marketState.nearResistance) {
                 if (!this._lastRSILog || Date.now() - this._lastRSILog > 60000) {
-                    console.log(`🛑 [RSI Filter] RSI neutral (${marketState.rsi}) without support/resistance — no edge. Waiting.`);
+                    console.log(`🛑 [RSI Filter] RSI neutral (${marketState.rsi}) without S/R — no edge.`);
                     this._lastRSILog = Date.now();
                 }
                 this.currentWatchState = {
                     status: 'RSI_BLOCKED',
                     action: 'WAIT',
                     symbol: this.symbol,
-                    reason: `RSI neutral (${marketState.rsi}) with no support/resistance context. No edge.`,
+                    reason: `RSI neutral (${marketState.rsi}) with no support/resistance context.`,
                     confidence: 0,
                     pattern: 'none',
                     market_price: currentPrice,
@@ -486,12 +574,12 @@ class AITrader {
                             valid: true,
                             action: action,
                             confidence: analysis.confidence,
-                            reason: `ASIAN OVERRIDE: Pattern "${analysis.pattern}" has ${currentPattern.winRate}% win rate (${currentPattern.total} trades). Trading despite session caution.`,
+                            reason: `ASIAN OVERRIDE: Pattern "${analysis.pattern}" has ${currentPattern.winRate}% win rate (${currentPattern.total} trades).`,
                             confirmations: 3,
                             source: 'ASIAN_OVERRIDE',
                             sessionModifier: 0
                         };
-                        console.log(`🔓 [AI Trader] ASIAN OVERRIDE: ${analysis.pattern} has ${currentPattern.winRate}% WR (${currentPattern.total} trades). Allowing ${action}!`);
+                        console.log(`🔓 [AI Trader] ASIAN OVERRIDE: ${analysis.pattern} has ${currentPattern.winRate}% WR. Allowing ${action}!`);
                     }
                 }
 
@@ -504,7 +592,7 @@ class AITrader {
                             valid: true,
                             action: action,
                             confidence: analysis.confidence,
-                            reason: `SIDEWAYS OVERRIDE: Pattern "${analysis.pattern}" has ${currentPattern.winRate}% win rate (${currentPattern.total} trades). Trading despite sideways market.`,
+                            reason: `SIDEWAYS OVERRIDE: Pattern "${analysis.pattern}" has ${currentPattern.winRate}% win rate.`,
                             confirmations: 3,
                             source: 'SIDEWAYS_OVERRIDE',
                             sessionModifier: 0
@@ -521,8 +609,7 @@ class AITrader {
                     if (kbValidation.reason?.includes('TREND CONTRADICTION') ||
                         kbValidation.reason?.includes('TREND_RULE') ||
                         kbValidation.reason?.includes('PATTERN MISMATCH')) {
-                        console.log(`🛑 [AI Trader] BLOCKED: Hard rejection — no pending order created. ${kbValidation.reason}`);
-
+                        console.log(`🛑 [AI Trader] BLOCKED: Hard rejection. ${kbValidation.reason}`);
                         this.currentWatchState = {
                             status: 'TREND_BLOCKED',
                             action: 'WAIT',
@@ -634,24 +721,40 @@ class AITrader {
         }
     }
 
+    /**
+     * v6.5: Percentage-based staking with hard caps and safety rules
+     */
     calculateStake(confidence, patternWinRate, trend) {
-        // v6.4: Hard cap — NEVER exceed MAX_STAKE ($5)
+        // Recalculate stakes from latest balance
+        this.recalculateStakes();
+
+        // RULE 1: Losing streak → MIN_STAKE
         if (this.consecutiveLosses >= 2) {
-            console.log('📉 [Stake] Losing streak detected — MIN STAKE ($' + this.MIN_STAKE + ')');
+            console.log(`📉 [Stake] Losing streak (${this.consecutiveLosses}) — MIN STAKE ($${this.MIN_STAKE})`);
             return this.MIN_STAKE;
         }
 
-        if (this.sessionProfit >= this.SESSION_PROFIT_LOCK) {
-            console.log('🔒 [Stake] Profit lock triggered (+$' + this.sessionProfit.toFixed(2) + ') — MIN STAKE ($' + this.MIN_STAKE + ')');
+        // RULE 2: Daily profit target reached → MIN_STAKE
+        if (this.sessionProfit >= this.currentBalance * this.DAILY_PROFIT_TARGET_PCT) {
+            console.log(`🎯 [Stake] Daily target hit — MIN STAKE ($${this.MIN_STAKE})`);
             return this.MIN_STAKE;
         }
 
-        if (this.sessionProfit >= this.SESSION_PROFIT_CAP) {
-            console.log('🔒 [Stake] Profit protection (+$' + this.sessionProfit.toFixed(2) + ') — max BASE STAKE ($' + this.BASE_STAKE + ')');
+        // RULE 3: Profit lock (>2% of account) → cap at BASE
+        if (this.sessionProfit >= this.currentBalance * 0.02) {
+            console.log(`🔒 [Stake] Profit lock (+$${this.sessionProfit.toFixed(2)}) — max BASE STAKE ($${this.BASE_STAKE})`);
             if (confidence >= 85 && patternWinRate >= 70) return this.BASE_STAKE;
             return this.MIN_STAKE;
         }
 
+        // RULE 4: Profit protection (>1% of account) → cap at BASE
+        if (this.sessionProfit >= this.currentBalance * 0.01) {
+            console.log(`🔒 [Stake] Profit protection (+$${this.sessionProfit.toFixed(2)}) — max BASE STAKE ($${this.BASE_STAKE})`);
+            if (confidence >= 85 && patternWinRate >= 70) return this.BASE_STAKE;
+            return this.MIN_STAKE;
+        }
+
+        // RULE 5: Winning streaks — scale up
         const recentWins = this.recentResults.slice(-5).filter(r => r === 'WIN').length;
         const last3AreWins = this.recentResults.length >= 3 &&
             this.recentResults.slice(-3).every(r => r === 'WIN');
@@ -659,21 +762,23 @@ class AITrader {
             this.recentResults.slice(-2).every(r => r === 'WIN');
 
         if (last3AreWins && this.consecutiveLosses === 0 && recentWins >= 3) {
-            console.log('📈 [Stake] 3-win streak — CONFIDENT STAKE ($' + this.CONFIDENT_STAKE + ')');
+            console.log(`📈 [Stake] 3-win streak — CONFIDENT STAKE ($${this.CONFIDENT_STAKE})`);
             return this.CONFIDENT_STAKE;
         }
 
         if (last2AreWins && this.consecutiveLosses === 0 && recentWins >= 2) {
-            console.log('📈 [Stake] 2-win streak — BASE STAKE ($' + this.BASE_STAKE + ')');
+            console.log(`📈 [Stake] 2-win streak — BASE STAKE ($${this.BASE_STAKE})`);
             return this.BASE_STAKE;
         }
 
+        // RULE 6: High confidence proven pattern → BASE
         if (confidence >= 80 && patternWinRate >= 65 && this.consecutiveLosses === 0) {
-            console.log('📈 [Stake] High confidence proven pattern — BASE STAKE ($' + this.BASE_STAKE + ')');
+            console.log(`📈 [Stake] High confidence proven pattern — BASE STAKE ($${this.BASE_STAKE})`);
             return this.BASE_STAKE;
         }
 
-        console.log('📉 [Stake] Default conservative — MIN STAKE ($' + this.MIN_STAKE + ')');
+        // RULE 7: Default conservative — MIN_STAKE
+        console.log(`📉 [Stake] Default conservative — MIN STAKE ($${this.MIN_STAKE})`);
         return this.MIN_STAKE;
     }
 
@@ -683,7 +788,7 @@ class AITrader {
         try {
             const user = await User.findById(this.userId);
             if (!user || user.trades_remaining <= 0) return;
-            if (stake < this.MIN_STAKE) return;
+            if (stake < 0.50) return;
             const token = user.is_demo ? user.demo_token : user.real_token;
             if (!derivService.authorized || derivService.currentToken !== token) {
                 await derivService.reconnectWithToken(token);
@@ -804,12 +909,22 @@ class AITrader {
                 this.sessionLoss += Math.abs(profit);
                 console.log(`❌ LOSS #${this.consecutiveLosses} | ${this.totalWins}W/${this.totalLosses}L | Session P&L: +$${this.sessionProfit.toFixed(2)} / -$${this.sessionLoss.toFixed(2)}`);
 
+                // v6.4: HARD PAUSE — 15 minutes, clear all pending orders
                 if (this.consecutiveLosses >= 3) {
                     this.pausedUntil = Date.now() + 900000;
                     this.pendingLimitOrders = [];
                     console.log('🛑 HARD PAUSE 15min — 3 consecutive losses. All pending orders cleared.');
                 }
             }
+
+            // v6.5: Update balance from Deriv after each trade
+            try {
+                const bal = await derivService.getBalance();
+                if (bal?.balance) {
+                    this.currentBalance = bal.balance;
+                }
+            } catch (e) {}
+
             broadcastTradeResult({
                 id: tradeId,
                 contract_id: contractId,
