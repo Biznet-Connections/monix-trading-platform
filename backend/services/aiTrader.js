@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v6.5.2 - Statistical confidence, stake discipline, SELL filter, extended pauses, doji blocker
+ * v6.5.3 - Fixed STAT engine with real database lookup + pattern normalization
  */
 
 const marketData = require('./marketData');
@@ -64,13 +64,12 @@ class AITrader {
         this.sessionLoss = 0;
         this.currentBalance = 1000;
 
-        // v6.5.2: Conservative percentages until proven
         this.PCT_MIN = 0.005;
         this.PCT_BASE = 0.01;
-        this.PCT_CONFIDENT_BASE = 0.01;    // Starts same as BASE
-        this.PCT_CONFIDENT_PROVEN = 0.02;   // Unlocks after proving
-        this.PCT_MAX_BASE = 0.015;          // Starts at 1.5%
-        this.PCT_MAX_PROVEN = 0.03;         // Unlocks after proving
+        this.PCT_CONFIDENT_BASE = 0.01;
+        this.PCT_CONFIDENT_PROVEN = 0.02;
+        this.PCT_MAX_BASE = 0.015;
+        this.PCT_MAX_PROVEN = 0.03;
 
         this.MIN_STAKE = 0.50;
         this.BASE_STAKE = 2.00;
@@ -84,7 +83,6 @@ class AITrader {
         this.BLOCKED_HOURS_START = 8;
         this.BLOCKED_HOURS_END = 17;
 
-        // v6.5.2: Statistical confidence weights
         this.CONF_WEIGHTS = {
             patternHistoricalWR: 25,
             sessionHistoricalWR: 15,
@@ -110,9 +108,6 @@ class AITrader {
         return Math.max(0.50, Math.round(amount * 2) / 2);
     }
 
-    /**
-     * v6.5.2: Check if bot has proven itself (60%+ WR over 20+ recent trades)
-     */
     isProven() {
         if (this.recentResults.length < 20) return false;
         const recentWins = this.recentResults.slice(-20).filter(r => r === 'WIN').length;
@@ -144,65 +139,104 @@ class AITrader {
     }
 
     /**
-     * v6.5.2: Statistical confidence based on REAL historical data
-     * Replaces AI confidence which was inverted (80% AI = 40% actual WR)
+     * v6.5.3: FIXED — Now properly matches patterns against database
+     * Uses fuzzy matching for pattern names to handle variations
      */
     calculateStatisticalConfidence(pattern, session, rsi, trend, nearSR, hourUTC) {
         let totalWeight = 0;
         let weightedScore = 0;
 
-        // 1. Pattern historical WR (25 weight)
-        const patternPerf = this._cachedPatternPerformance?.find(p =>
-            p.pattern.toLowerCase() === (pattern || '').toLowerCase()
-        );
-        if (patternPerf && patternPerf.total >= 3) {
-            const patternWR = patternPerf.winRate;
-            const patternScore = Math.min(100, Math.max(10, patternWR));
-            weightedScore += patternScore * this.CONF_WEIGHTS.patternHistoricalWR;
-            totalWeight += this.CONF_WEIGHTS.patternHistoricalWR;
+        // 1. Pattern historical WR (25 weight) — FIXED fuzzy matching
+        if (pattern && this._cachedPatternPerformance) {
+            const normalizedSearch = pattern.toLowerCase().replace(/_/g, ' ').replace(/ at .*$/, '').trim();
+            
+            // Try exact match first
+            let patternPerf = this._cachedPatternPerformance.find(p =>
+                p.pattern.toLowerCase() === normalizedSearch
+            );
+            
+            // Try fuzzy match (pattern name contains the search or vice versa)
+            if (!patternPerf) {
+                patternPerf = this._cachedPatternPerformance.find(p => {
+                    const dbPattern = p.pattern.toLowerCase().replace(/_/g, ' ');
+                    return dbPattern.includes(normalizedSearch) || normalizedSearch.includes(dbPattern);
+                });
+            }
+            
+            // Try matching individual keywords
+            if (!patternPerf) {
+                const keywords = normalizedSearch.split(' ');
+                for (const kw of keywords) {
+                    if (kw.length < 3) continue;
+                    patternPerf = this._cachedPatternPerformance.find(p =>
+                        p.pattern.toLowerCase().replace(/_/g, ' ').includes(kw)
+                    );
+                    if (patternPerf) break;
+                }
+            }
+
+            if (patternPerf && patternPerf.total >= 3) {
+                const patternWR = patternPerf.winRate;
+                const patternScore = Math.min(100, Math.max(10, patternWR));
+                weightedScore += patternScore * this.CONF_WEIGHTS.patternHistoricalWR;
+                totalWeight += this.CONF_WEIGHTS.patternHistoricalWR;
+            }
         }
 
         // 2. Session historical WR (15 weight)
-        const sessionPerf = this._cachedSessionPerformance?.find(s => s.session === session);
-        if (sessionPerf && sessionPerf.total >= 3) {
-            const sessionWR = parseFloat(sessionPerf.winRate) || 50;
-            const sessionScore = Math.min(100, Math.max(10, sessionWR));
-            weightedScore += sessionScore * this.CONF_WEIGHTS.sessionHistoricalWR;
-            totalWeight += this.CONF_WEIGHTS.sessionHistoricalWR;
+        if (session && this._cachedSessionPerformance) {
+            const sessionPerf = this._cachedSessionPerformance.find(s => s.session === session);
+            if (sessionPerf && sessionPerf.total >= 3) {
+                const sessionWR = parseFloat(sessionPerf.winRate) || 50;
+                const sessionScore = Math.min(100, Math.max(10, sessionWR));
+                weightedScore += sessionScore * this.CONF_WEIGHTS.sessionHistoricalWR;
+                totalWeight += this.CONF_WEIGHTS.sessionHistoricalWR;
+            }
         }
 
         // 3. RSI zone WR (20 weight)
-        const rsiZone = this.getRSIZone(rsi);
-        const rsiPerf = this._cachedRSIPerformance?.find(r => r.label.includes(rsiZone));
-        if (rsiPerf && rsiPerf.total >= 3) {
-            const rsiWR = rsiPerf.winRate;
-            const rsiScore = Math.min(100, Math.max(10, rsiWR));
-            weightedScore += rsiScore * this.CONF_WEIGHTS.rsiZoneWR;
-            totalWeight += this.CONF_WEIGHTS.rsiZoneWR;
+        if (rsi && this._cachedRSIPerformance) {
+            const rsiZone = this.getRSIZone(rsi);
+            const rsiPerf = this._cachedRSIPerformance.find(r => r.label && r.label.includes(rsiZone));
+            if (rsiPerf && rsiPerf.total >= 3) {
+                const rsiWR = rsiPerf.winRate;
+                const rsiScore = Math.min(100, Math.max(10, rsiWR));
+                weightedScore += rsiScore * this.CONF_WEIGHTS.rsiZoneWR;
+                totalWeight += this.CONF_WEIGHTS.rsiZoneWR;
+            }
         }
 
         // 4. Hour historical WR (15 weight)
-        const hourPerf = this._cachedHourPerformance?.find(h => h.hour === hourUTC);
-        if (hourPerf && hourPerf.total >= 3) {
-            const hourWR = hourPerf.winRate;
-            const hourScore = Math.min(100, Math.max(10, hourWR));
-            weightedScore += hourScore * this.CONF_WEIGHTS.hourHistoricalWR;
-            totalWeight += this.CONF_WEIGHTS.hourHistoricalWR;
+        if (hourUTC !== undefined && this._cachedHourPerformance) {
+            const hourPerf = this._cachedHourPerformance.find(h => h.hour === hourUTC);
+            if (hourPerf && hourPerf.total >= 3) {
+                const hourWR = hourPerf.winRate;
+                const hourScore = Math.min(100, Math.max(10, hourWR));
+                weightedScore += hourScore * this.CONF_WEIGHTS.hourHistoricalWR;
+                totalWeight += this.CONF_WEIGHTS.hourHistoricalWR;
+            }
         }
 
         // 5. Trend alignment (15 weight)
-        if (trend) {
+        if (trend && pattern) {
             const trendLower = trend.toLowerCase();
-            if ((pattern?.includes('bullish') || pattern?.includes('hammer') || pattern === 'uptrend_momentum') &&
-                (trendLower.includes('uptrend') || trendLower === 'sideways')) {
+            const patternLower = pattern.toLowerCase();
+            const isBullish = patternLower.includes('bullish') || patternLower.includes('hammer') || 
+                             patternLower.includes('uptrend') || patternLower.includes('soldiers');
+            const isBearish = patternLower.includes('bearish') || patternLower.includes('shooting') || 
+                             patternLower.includes('downtrend') || patternLower.includes('crows');
+
+            if (isBullish && !isBearish && (trendLower.includes('uptrend') || trendLower === 'sideways')) {
                 weightedScore += 75 * this.CONF_WEIGHTS.trendAlignment;
                 totalWeight += this.CONF_WEIGHTS.trendAlignment;
-            } else if ((pattern?.includes('bearish') || pattern?.includes('shooting') || pattern === 'downtrend_continuation') &&
-                (trendLower.includes('downtrend') || trendLower === 'sideways')) {
+            } else if (isBearish && !isBullish && (trendLower.includes('downtrend') || trendLower === 'sideways')) {
                 weightedScore += 75 * this.CONF_WEIGHTS.trendAlignment;
                 totalWeight += this.CONF_WEIGHTS.trendAlignment;
             } else if (trendLower.includes('strong')) {
-                weightedScore += 20 * this.CONF_WEIGHTS.trendAlignment;
+                weightedScore += 25 * this.CONF_WEIGHTS.trendAlignment;
+                totalWeight += this.CONF_WEIGHTS.trendAlignment;
+            } else {
+                weightedScore += 50 * this.CONF_WEIGHTS.trendAlignment;
                 totalWeight += this.CONF_WEIGHTS.trendAlignment;
             }
         }
@@ -262,9 +296,9 @@ class AITrader {
         this.recalculateStakes();
 
         const session = knowledgeBase.getSessionRules();
-        console.log(`🤖 [AI Trader] Starting v6.5.2 STATISTICAL EDITION`);
+        console.log(`🤖 [AI Trader] Starting v6.5.3 FIXED STAT EDITION`);
         console.log(`📚 [AI Trader] Trading DNA loaded: ${session.name} session optimized`);
-        console.log(`📊 [AI Trader] Confidence: Statistical (pattern + session + RSI + hour + trend)`);
+        console.log(`📊 [AI Trader] Confidence: Statistical WITH real database matching`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)} | Stakes: Min=$${this.MIN_STAKE} | Base=$${this.BASE_STAKE} | Confident=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
         console.log(`🎯 [AI Trader] Daily target: $${(this.currentBalance * this.DAILY_PROFIT_TARGET_PCT).toFixed(2)} (5%)`);
         console.log(`🛡️ [AI Trader] Daily loss limit: $${(this.currentBalance * this.DAILY_LOSS_LIMIT_PCT).toFixed(2)} (6%)`);
@@ -415,13 +449,6 @@ class AITrader {
                     console.log(`🛑 [HARD BLOCK] ${currentHour}:00 UTC — London window. No trades.`);
                     this._lastLondonLog = Date.now();
                 }
-                this.currentWatchState = {
-                    status: 'HARD_BLOCKED', action: 'WAIT', symbol: this.symbol,
-                    reason: `London window (${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC).`,
-                    confidence: 0, pattern: 'none', market_price: 0, market_rsi: 50,
-                    trend: 'unknown', lastUpdate: Date.now(), is_auto_mode: this.mode === 'AUTO',
-                    confidence_threshold: 100, pending_orders: this.pendingLimitOrders.length
-                };
                 return;
             }
 
@@ -431,7 +458,7 @@ class AITrader {
 
             if (this.sessionProfit >= dailyTarget) {
                 if (!this._lastDailyLog || Date.now() - this._lastDailyLog > 300000) {
-                    console.log(`🎯 [Daily Target] +$${this.sessionProfit.toFixed(2)} reached. Locked for the day.`);
+                    console.log(`🎯 [Daily Target] +$${this.sessionProfit.toFixed(2)} reached. Locked.`);
                     this._lastDailyLog = Date.now();
                 }
                 return;
@@ -460,13 +487,11 @@ class AITrader {
 
             this.recalculateStakes();
 
-            // Cache performance data for statistical confidence
+            // Cache performance data
             this._cachedPatternPerformance = await Trade.getPatternPerformance(this.userId, this.symbol);
             this._cachedRSIPerformance = await Trade.getRSIPerformance(this.userId, this.symbol);
             this._cachedSessionPerformance = await Trade.getSessionPerformance(this.userId, this.symbol);
-            this._cachedTrendPerformance = await Trade.getTrendPerformance(this.userId, this.symbol);
 
-            // Build hour performance from recent results
             this._cachedHourPerformance = [];
             const hourStats = {};
             const allTrades = await Trade.getUserTrades(this.userId, 200);
@@ -488,7 +513,7 @@ class AITrader {
                 }
             }
 
-            // API SAVER: Skip neutral markets
+            // API SAVER
             const isNeutralMarket =
                 marketState.rsi >= 45 && marketState.rsi <= 55 &&
                 !marketState.nearSupport && !marketState.nearResistance &&
@@ -498,17 +523,9 @@ class AITrader {
 
             if (isNeutralMarket && this.mode === 'AUTO') {
                 if (!this._lastSkipLog || Date.now() - this._lastSkipLog > 60000) {
-                    console.log(`⏭️ [API Saver] Neutral RSI (${marketState.rsi}), no pattern — skipping DeepSeek.`);
+                    console.log(`⏭️ [API Saver] Neutral RSI (${marketState.rsi}), no pattern — skipping.`);
                     this._lastSkipLog = Date.now();
                 }
-                this.currentWatchState = {
-                    status: 'API_SAVED', action: 'WAIT', symbol: this.symbol,
-                    reason: `Neutral market — RSI ${marketState.rsi}.`, confidence: 0,
-                    pattern: 'none', market_price: currentPrice, market_rsi: marketState.rsi,
-                    trend: marketState.trend, lastUpdate: Date.now(),
-                    is_auto_mode: this.mode === 'AUTO', confidence_threshold: 80,
-                    pending_orders: this.pendingLimitOrders.length
-                };
                 return;
             }
 
@@ -562,9 +579,15 @@ class AITrader {
                 this.symbol, currentPrice, marketState.rsi, 'neutral', null, recentTrades, topPatterns, marketContext
             );
 
+            // ============================================================
+            // v6.5.3 FIX: Normalize pattern name BEFORE statistical confidence
+            // ============================================================
+            if (analysis.pattern) {
+                analysis.pattern = deepseekService.normalizePatternName(analysis.pattern);
+            }
+
             const action = analysis.action === 'CALL' ? 'BUY' : (analysis.action === 'PUT' ? 'SELL' : 'WAIT');
 
-            // v6.5.2: Calculate STATISTICAL confidence
             const sessionName = this.getCurrentSession();
             const nearSR = marketState.nearSupport || marketState.nearResistance;
             const statisticalConfidence = this.calculateStatisticalConfidence(
@@ -575,24 +598,14 @@ class AITrader {
                 console.log(`📊 [AI Trader] DeepSeek: ${analysis.action} | AI:${analysis.confidence}% | STAT:${statisticalConfidence}% | ${analysis.pattern}`);
             }
 
-            // v6.5.2: Use STATISTICAL confidence, not AI confidence
             const effectiveConfidence = statisticalConfidence;
 
             if (action !== 'WAIT' && effectiveConfidence >= dynamicThreshold) {
-                // v6.5.2: SELL filter — require 75%+ statistical confidence
+                // SELL filter
                 if (action === 'SELL' && effectiveConfidence < 75) {
                     if (shouldLog) {
-                        console.log(`🛑 [SELL Filter] SELL requires 75%+ statistical confidence. Got ${effectiveConfidence}%. Skipping.`);
+                        console.log(`🛑 [SELL Filter] SELL requires 75%+ stat confidence. Got ${effectiveConfidence}%.`);
                     }
-                    this.currentWatchState = {
-                        status: 'SELL_FILTERED', action: 'WAIT', symbol: this.symbol,
-                        reason: `SELL requires 75%+ stat confidence (got ${effectiveConfidence}%).`,
-                        confidence: effectiveConfidence, pattern: analysis.pattern,
-                        market_price: currentPrice, market_rsi: marketState.rsi,
-                        trend: marketState.trend, lastUpdate: Date.now(),
-                        is_auto_mode: this.mode === 'AUTO', confidence_threshold: dynamicThreshold,
-                        pending_orders: this.pendingLimitOrders.length
-                    };
                     return;
                 }
 
@@ -602,7 +615,6 @@ class AITrader {
                     nearResistance: marketState.nearResistance, action: action
                 });
 
-                // ASIAN OVERRIDE
                 if (!kbValidation.valid && kbValidation.reason?.includes('SESSION')) {
                     const currentPattern = this._cachedPatternPerformance?.find(p =>
                         p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase()
@@ -613,11 +625,9 @@ class AITrader {
                             reason: `ASIAN OVERRIDE: "${analysis.pattern}" has ${currentPattern.winRate}% WR.`,
                             confirmations: 3, source: 'ASIAN_OVERRIDE', sessionModifier: 0
                         };
-                        console.log(`🔓 [AI Trader] ASIAN OVERRIDE: ${analysis.pattern} has ${currentPattern.winRate}% WR.`);
                     }
                 }
 
-                // SIDEWAYS OVERRIDE
                 if (!kbValidation.valid && kbValidation.reason?.includes('SIDEWAYS')) {
                     const currentPattern = this._cachedPatternPerformance?.find(p =>
                         p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase()
@@ -628,29 +638,23 @@ class AITrader {
                             reason: `SIDEWAYS OVERRIDE: "${analysis.pattern}" has ${currentPattern.winRate}% WR.`,
                             confirmations: 3, source: 'SIDEWAYS_OVERRIDE', sessionModifier: 0
                         };
-                        console.log(`🔓 [AI Trader] SIDEWAYS OVERRIDE: ${analysis.pattern} has ${currentPattern.winRate}% WR.`);
                     }
                 }
 
                 if (!kbValidation.valid) {
                     if (shouldLog) console.log(`🧬 [AI Trader] KB REJECTED: ${kbValidation.reason}`);
-
                     if (kbValidation.reason?.includes('TREND CONTRADICTION') ||
                         kbValidation.reason?.includes('TREND_RULE') ||
                         kbValidation.reason?.includes('PATTERN MISMATCH')) {
-                        console.log(`🛑 [AI Trader] BLOCKED: ${kbValidation.reason}`);
                         return;
                     }
-
                     if (marketState.nearSupport || marketState.nearResistance) {
                         const pendingStake = this.calculateStake(effectiveConfidence, 0, marketState.trend);
                         let entryLevel, pendingAction;
                         if (analysis.action === 'CALL' && (marketState.nearSupport || marketState.support > 0)) {
-                            pendingAction = 'BUY';
-                            entryLevel = marketState.support || currentPrice * 0.998;
+                            pendingAction = 'BUY'; entryLevel = marketState.support || currentPrice * 0.998;
                         } else if (analysis.action === 'PUT' && (marketState.nearResistance || marketState.resistance > 0)) {
-                            pendingAction = 'SELL';
-                            entryLevel = marketState.resistance || currentPrice * 1.002;
+                            pendingAction = 'SELL'; entryLevel = marketState.resistance || currentPrice * 1.002;
                         } else if (marketState.nearSupport) {
                             pendingAction = 'BUY'; entryLevel = marketState.support;
                         } else {
@@ -734,23 +738,22 @@ class AITrader {
         const last3AreWins = this.recentResults.length >= 3 && this.recentResults.slice(-3).every(r => r === 'WIN');
         const last2AreWins = this.recentResults.length >= 2 && this.recentResults.slice(-2).every(r => r === 'WIN');
 
-        // v6.5.2: Only scale to CONFIDENT if bot is PROVEN (60%+ WR over 20 trades)
         if (last3AreWins && this.consecutiveLosses === 0 && recentWins >= 3 && this.isProven()) {
-            console.log(`📈 [Stake] 3-win streak + PROVEN — CONFIDENT STAKE ($${this.CONFIDENT_STAKE})`);
+            console.log(`📈 [Stake] 3-win streak + PROVEN — CONFIDENT ($${this.CONFIDENT_STAKE})`);
             return this.CONFIDENT_STAKE;
         }
 
         if (last2AreWins && this.consecutiveLosses === 0 && recentWins >= 2) {
-            console.log(`📈 [Stake] 2-win streak — BASE STAKE ($${this.BASE_STAKE})`);
+            console.log(`📈 [Stake] 2-win streak — BASE ($${this.BASE_STAKE})`);
             return this.BASE_STAKE;
         }
 
         if (confidence >= 80 && patternWinRate >= 65 && this.consecutiveLosses === 0) {
-            console.log(`📈 [Stake] High confidence — BASE STAKE ($${this.BASE_STAKE})`);
+            console.log(`📈 [Stake] High confidence — BASE ($${this.BASE_STAKE})`);
             return this.BASE_STAKE;
         }
 
-        console.log(`📉 [Stake] Default — MIN STAKE ($${this.MIN_STAKE})`);
+        console.log(`📉 [Stake] Default — MIN ($${this.MIN_STAKE})`);
         return this.MIN_STAKE;
     }
 
@@ -831,15 +834,14 @@ class AITrader {
                 this.sessionLoss += Math.abs(profit);
                 console.log(`❌ LOSS #${this.consecutiveLosses} | ${this.totalWins}W/${this.totalLosses}L | Session: +$${this.sessionProfit.toFixed(2)} / -$${this.sessionLoss.toFixed(2)}`);
 
-                // v6.5.2: Extended pauses
                 if (this.consecutiveLosses >= 5) {
-                    this.pausedUntil = Date.now() + 1800000; // 30 MINUTES
+                    this.pausedUntil = Date.now() + 1800000;
                     this.pendingLimitOrders = [];
-                    console.log('🛑 HARD PAUSE 30min — 5 consecutive losses. All pending orders cleared.');
+                    console.log('🛑 HARD PAUSE 30min — 5 consecutive losses.');
                 } else if (this.consecutiveLosses >= 3) {
-                    this.pausedUntil = Date.now() + 900000; // 15 MINUTES
+                    this.pausedUntil = Date.now() + 900000;
                     this.pendingLimitOrders = [];
-                    console.log('🛑 HARD PAUSE 15min — 3 consecutive losses. All pending orders cleared.');
+                    console.log('🛑 HARD PAUSE 15min — 3 consecutive losses.');
                 }
             }
 
