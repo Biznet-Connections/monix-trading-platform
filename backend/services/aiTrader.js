@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v6.5.3 - Fixed STAT engine with real database lookup + pattern normalization + balance fetch retry
+ * v6.5.4 - RSI exhaustion filter, trend confirmation, combined confidence, higher threshold
  */
 
 const marketData = require('./marketData');
@@ -43,7 +43,7 @@ class AITrader {
         this.mode = 'AUTO';
         this.lastSetupNotified = false;
         this.currentSetupId = null;
-        this.confidenceThreshold = 55;
+        this.confidenceThreshold = 60; // v6.5.4: Raised from 55
         this.consecutiveLosses = 0;
         this.recentResults = [];
         this.lastTradeTime = 0;
@@ -83,6 +83,14 @@ class AITrader {
         this.BLOCKED_HOURS_START = 8;
         this.BLOCKED_HOURS_END = 17;
 
+        // v6.5.4: RSI exhaustion limits
+        this.RSI_BUY_MAX = 75;   // No BUY above this
+        this.RSI_SELL_MIN = 25;  // No SELL below this
+
+        // v6.5.4: Trend confirmation tracking
+        this._trendHistory = [];  // Last few trend readings
+        this.TREND_CONFIRM_COUNT = 2; // Need 2 same readings to confirm flip
+
         this.CONF_WEIGHTS = {
             patternHistoricalWR: 25,
             sessionHistoricalWR: 15,
@@ -102,6 +110,7 @@ class AITrader {
         this._lastAnalysisLog = 0;
         this._lastBalanceLog = 0;
         this._lastDailyLog = 0;
+        this._lastExhaustionLog = 0;
     }
 
     roundStake(amount) {
@@ -136,6 +145,30 @@ class AITrader {
             console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | ${provenTag} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
             this._lastBalanceLog = Date.now();
         }
+    }
+
+    /**
+     * v6.5.4: Confirm trend flip — requires N consecutive same readings
+     */
+    getConfirmedTrend(rawTrend) {
+        this._trendHistory.push(rawTrend);
+        if (this._trendHistory.length > 5) this._trendHistory.shift();
+
+        // Need at least TREND_CONFIRM_COUNT readings
+        if (this._trendHistory.length < this.TREND_CONFIRM_COUNT) return rawTrend;
+
+        // Check if last N readings are all the same
+        const lastN = this._trendHistory.slice(-this.TREND_CONFIRM_COUNT);
+        const allSame = lastN.every(t => t === lastN[0]);
+
+        if (allSame) return lastN[0];
+
+        // If not confirmed, return the previous confirmed trend
+        const prevN = this._trendHistory.slice(-this.TREND_CONFIRM_COUNT - 1, -1);
+        const prevSame = prevN.every(t => t === prevN[0]);
+        if (prevSame && prevN.length >= this.TREND_CONFIRM_COUNT) return prevN[0];
+
+        return rawTrend;
     }
 
     calculateStatisticalConfidence(pattern, session, rsi, trend, nearSR, hourUTC) {
@@ -276,39 +309,39 @@ class AITrader {
         this.activeTrade = null;
         this.trendStartTime = 0;
         this.trendDirection = null;
+        this._trendHistory = [];
 
         this.sessionProfit = 0;
         this.sessionLoss = 0;
 
-        // v6.5.3: Fetch balance with retry
-        try {
-            const bal = await derivService.getBalance();
-            if (bal?.balance && bal.balance > 100) {
-                this.currentBalance = bal.balance;
-            }
-        } catch (e) {
-            await new Promise(r => setTimeout(r, 3000));
+        // Fetch balance with retry
+        setTimeout(async () => {
             try {
                 const bal = await derivService.getBalance();
                 if (bal?.balance && bal.balance > 100) {
                     this.currentBalance = bal.balance;
+                    this.recalculateStakes();
+                    console.log(`💰 [Balance] Updated from Deriv: $${this.currentBalance.toFixed(2)}`);
                 }
-            } catch (e2) {
-                // Keep default $1000
+            } catch (e) {
+                console.log('⚠️ [Balance] Could not fetch from Deriv, using default');
             }
-        }
+        }, 5000);
+
         this.recalculateStakes();
 
         const session = knowledgeBase.getSessionRules();
-        console.log(`🤖 [AI Trader] Starting v6.5.3 FIXED STAT EDITION`);
+        console.log(`🤖 [AI Trader] Starting v6.5.4 EXHAUSTION FILTER EDITION`);
         console.log(`📚 [AI Trader] Trading DNA loaded: ${session.name} session optimized`);
-        console.log(`📊 [AI Trader] Confidence: Statistical WITH real database matching`);
+        console.log(`📊 [AI Trader] Confidence: Combined (AI×0.4 + STAT×0.6), threshold ${this.confidenceThreshold}%`);
+        console.log(`🛑 [AI Trader] RSI Exhaustion: No BUY > ${this.RSI_BUY_MAX}, No SELL < ${this.RSI_SELL_MIN}`);
+        console.log(`🔍 [AI Trader] Trend Confirmation: ${this.TREND_CONFIRM_COUNT} candles required for flip`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)} | Stakes: Min=$${this.MIN_STAKE} | Base=$${this.BASE_STAKE} | Confident=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
         console.log(`🎯 [AI Trader] Daily target: $${(this.currentBalance * this.DAILY_PROFIT_TARGET_PCT).toFixed(2)} (5%)`);
         console.log(`🛡️ [AI Trader] Daily loss limit: $${(this.currentBalance * this.DAILY_LOSS_LIMIT_PCT).toFixed(2)} (6%)`);
         console.log(`🛑 [AI Trader] HARD BLOCK: ${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC`);
         console.log(`🛑 [AI Trader] Pauses: 15min after 3 losses | 30min after 5 losses`);
-        console.log(`🔍 [AI Trader] SELL filter: 75%+ statistical confidence required`);
+        console.log(`🔍 [AI Trader] SELL filter: 75%+ combined confidence required`);
 
         marketData.reset();
 
@@ -491,6 +524,10 @@ class AITrader {
 
             this.recalculateStakes();
 
+            // v6.5.4: Get confirmed trend (not raw)
+            const rawTrend = marketState.trend;
+            const confirmedTrend = this.getConfirmedTrend(rawTrend);
+
             // Cache performance data
             this._cachedPatternPerformance = await Trade.getPatternPerformance(this.userId, this.symbol);
             this._cachedRSIPerformance = await Trade.getRSIPerformance(this.userId, this.symbol);
@@ -545,27 +582,28 @@ class AITrader {
             const shouldLog = !this._lastAnalysisLog || Date.now() - this._lastAnalysisLog > 30000;
             if (shouldLog) {
                 const session = knowledgeBase.getSessionRules();
-                console.log(`🔍 [AI Trader] ${this.symbol} | $${currentPrice.toFixed(2)} | RSI: ${marketState.rsi} | Trend: ${marketState.trend} | Pattern: ${marketState.lastPattern} | Session: ${session.name}`);
+                const trendNote = rawTrend !== confirmedTrend ? ` [confirmed: ${confirmedTrend}]` : '';
+                console.log(`🔍 [AI Trader] ${this.symbol} | $${currentPrice.toFixed(2)} | RSI: ${marketState.rsi} | Trend: ${rawTrend}${trendNote} | Pattern: ${marketState.lastPattern} | Session: ${session.name}`);
                 this._lastAnalysisLog = Date.now();
             }
 
             let dynamicThreshold = this.confidenceThreshold;
             if (this.recentResults.length >= 5) {
                 const recentWinRate = this.recentResults.filter(r => r === 'WIN').length / this.recentResults.length;
-                if (recentWinRate >= 0.7) dynamicThreshold = Math.max(45, this.confidenceThreshold - 10);
-                else if (recentWinRate <= 0.3) dynamicThreshold = Math.min(80, this.confidenceThreshold + 25);
+                if (recentWinRate >= 0.7) dynamicThreshold = Math.max(50, this.confidenceThreshold - 10);
+                else if (recentWinRate <= 0.3) dynamicThreshold = Math.min(80, this.confidenceThreshold + 20);
             }
             if (this.consecutiveLosses >= 2) dynamicThreshold = Math.max(dynamicThreshold, 70);
 
             const sessionRules = knowledgeBase.getSessionRules();
             dynamicThreshold += sessionRules.confidenceModifier;
-            dynamicThreshold = Math.max(50, Math.min(80, dynamicThreshold));
+            dynamicThreshold = Math.max(55, Math.min(80, dynamicThreshold));
 
             const recentTrades = await Trade.getUserTrades(this.userId, 5);
             const topPatterns = await Pattern.getTopPatterns(5);
 
             const marketContext = {
-                trend: marketState.trend || 'sideways',
+                trend: confirmedTrend,
                 volatility: marketState.volatility || 0,
                 rsiShort: marketState.rsiShort || marketState.rsi,
                 lastPattern: marketState.lastPattern || 'none',
@@ -583,36 +621,60 @@ class AITrader {
                 this.symbol, currentPrice, marketState.rsi, 'neutral', null, recentTrades, topPatterns, marketContext
             );
 
-            // Normalize pattern name BEFORE statistical confidence
+            // Normalize pattern name
             if (analysis.pattern) {
                 analysis.pattern = deepseekService.normalizePatternName(analysis.pattern);
             }
 
             const action = analysis.action === 'CALL' ? 'BUY' : (analysis.action === 'PUT' ? 'SELL' : 'WAIT');
 
+            // ============================================================
+            // v6.5.4: RSI EXHAUSTION FILTER
+            // ============================================================
+            if (action === 'BUY' && marketState.rsi >= this.RSI_BUY_MAX) {
+                if (!this._lastExhaustionLog || Date.now() - this._lastExhaustionLog > 60000) {
+                    console.log(`🛑 [RSI Exhaustion] RSI ${marketState.rsi} too high for BUY (max ${this.RSI_BUY_MAX}). Market exhausted.`);
+                    this._lastExhaustionLog = Date.now();
+                }
+                return;
+            }
+            if (action === 'SELL' && marketState.rsi <= this.RSI_SELL_MIN) {
+                if (!this._lastExhaustionLog || Date.now() - this._lastExhaustionLog > 60000) {
+                    console.log(`🛑 [RSI Exhaustion] RSI ${marketState.rsi} too low for SELL (min ${this.RSI_SELL_MIN}). Market exhausted.`);
+                    this._lastExhaustionLog = Date.now();
+                }
+                return;
+            }
+
             const sessionName = this.getCurrentSession();
             const nearSR = marketState.nearSupport || marketState.nearResistance;
             const statisticalConfidence = this.calculateStatisticalConfidence(
-                analysis.pattern, sessionName, marketState.rsi, marketState.trend, nearSR, currentHour
+                analysis.pattern, sessionName, marketState.rsi, confirmedTrend, nearSR, currentHour
             );
 
+            // ============================================================
+            // v6.5.4: COMBINED CONFIDENCE (AI × 0.4 + STAT × 0.6)
+            // ============================================================
+            const aiConf = analysis.confidence || 50;
+            const combinedConfidence = Math.round((aiConf * 0.4) + (statisticalConfidence * 0.6));
+
             if (shouldLog || action !== 'WAIT') {
-                console.log(`📊 [AI Trader] DeepSeek: ${analysis.action} | AI:${analysis.confidence}% | STAT:${statisticalConfidence}% | ${analysis.pattern}`);
+                console.log(`📊 [AI Trader] DeepSeek: ${analysis.action} | AI:${aiConf}% | STAT:${statisticalConfidence}% | COMBINED:${combinedConfidence}% | ${analysis.pattern}`);
             }
 
-            const effectiveConfidence = statisticalConfidence;
+            const effectiveConfidence = combinedConfidence;
 
             if (action !== 'WAIT' && effectiveConfidence >= dynamicThreshold) {
                 // SELL filter
                 if (action === 'SELL' && effectiveConfidence < 75) {
                     if (shouldLog) {
-                        console.log(`🛑 [SELL Filter] SELL requires 75%+ stat confidence. Got ${effectiveConfidence}%.`);
+                        console.log(`🛑 [SELL Filter] SELL requires 75%+ combined confidence. Got ${effectiveConfidence}%.`);
                     }
                     return;
                 }
 
                 let kbValidation = knowledgeBase.validateSetup({
-                    pattern: analysis.pattern, currentTrend: marketState.trend,
+                    pattern: analysis.pattern, currentTrend: confirmedTrend,
                     rsi: marketState.rsi, nearSupport: marketState.nearSupport,
                     nearResistance: marketState.nearResistance, action: action
                 });
@@ -651,7 +713,7 @@ class AITrader {
                         return;
                     }
                     if (marketState.nearSupport || marketState.nearResistance) {
-                        const pendingStake = this.calculateStake(effectiveConfidence, 0, marketState.trend);
+                        const pendingStake = this.calculateStake(effectiveConfidence, 0, confirmedTrend);
                         let entryLevel, pendingAction;
                         if (analysis.action === 'CALL' && (marketState.nearSupport || marketState.support > 0)) {
                             pendingAction = 'BUY'; entryLevel = marketState.support || currentPrice * 0.998;
@@ -677,16 +739,16 @@ class AITrader {
                     p.pattern.toLowerCase() === (analysis.pattern || '').toLowerCase()
                 );
                 const patternWinRate = currentPattern?.winRate || 0;
-                const stake = this.calculateStake(effectiveConfidence, patternWinRate, marketState.trend);
+                const stake = this.calculateStake(effectiveConfidence, patternWinRate, confirmedTrend);
 
-                console.log(`✅ [AI Trader] VALIDATED: ${action} ${this.symbol} | STAT:${effectiveConfidence}% | Stake:$${stake}`);
+                console.log(`✅ [AI Trader] VALIDATED: ${action} ${this.symbol} | COMBINED:${effectiveConfidence}% | Stake:$${stake}`);
                 console.log(`🧬 [AI Trader] Source: ${kbValidation.source} | ${kbValidation.reason}`);
 
                 if (this.mode === 'AUTO') {
                     await this.executeEntry(action, currentPrice, stake, {
                         action: analysis.action, confidence: effectiveConfidence,
                         pattern: analysis.pattern,
-                        simple_reason: `[${kbValidation.source}] ${kbValidation.reason} | STAT:${effectiveConfidence}%`
+                        simple_reason: `[${kbValidation.source}] ${kbValidation.reason} | COMB:${effectiveConfidence}%`
                     });
                 }
                 return;
@@ -694,10 +756,10 @@ class AITrader {
 
             this.currentWatchState = {
                 status: 'WATCHING', action: 'WAIT', symbol: this.symbol,
-                confidence: effectiveConfidence || analysis.confidence,
+                confidence: effectiveConfidence || combinedConfidence,
                 reason: analysis.simple_reason || 'Waiting for validated setup',
                 pattern: analysis.pattern, market_price: currentPrice,
-                market_rsi: marketState.rsi, trend: marketState.trend,
+                market_rsi: marketState.rsi, trend: confirmedTrend,
                 lastUpdate: Date.now(), is_auto_mode: this.mode === 'AUTO',
                 confidence_threshold: dynamicThreshold,
                 pending_orders: this.pendingLimitOrders.length,
@@ -887,7 +949,7 @@ class AITrader {
 
     stop() { this.isRunning = false; if (this.analysisInterval) { clearInterval(this.analysisInterval); this.analysisInterval = null; } if (this.tickHealthInterval) { clearInterval(this.tickHealthInterval); this.tickHealthInterval = null; } console.log('🤖 Stopped'); }
     setMode(mode) { this.mode = mode; this.pendingLimitOrders = []; this._lastPendingLog = {}; console.log(`Mode: ${mode}`); }
-    setSymbol(symbol) { this.symbol = symbol; this.dataReady = false; this.trendStartTime = 0; this.trendDirection = null; marketData.reset(); derivService.subscribeToTicks(symbol).catch(() => {}); this.tickCount = 0; this.pendingLimitOrders = []; this._lastPendingLog = {}; this.currentWatchState.status = 'BUILDING_DATA'; broadcastAIUpdate(this.getCurrentAnalysis()); }
+    setSymbol(symbol) { this.symbol = symbol; this.dataReady = false; this.trendStartTime = 0; this.trendDirection = null; this._trendHistory = []; marketData.reset(); derivService.subscribeToTicks(symbol).catch(() => {}); this.tickCount = 0; this.pendingLimitOrders = []; this._lastPendingLog = {}; this.currentWatchState.status = 'BUILDING_DATA'; broadcastAIUpdate(this.getCurrentAnalysis()); }
     setUserId(userId) { this.userId = userId; }
     setConfidenceThreshold(threshold) { this.confidenceThreshold = threshold; }
 
