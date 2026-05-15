@@ -201,6 +201,8 @@ TRADING RULES (HARD RULES - NEVER BREAK):
 8. Use historical data to adjust confidence.
 9. If bot has losing streak, BE CONSERVATIVE.
 10. DOJI = INDECISION. Only trade doji at support (BUY) or resistance (SELL). Mid-range doji = WAIT.
+11. DOJI in a strong trend = WAIT (trend continuation needs confirmation, not indecision).
+12. BEARISH ENGULFING at resistance = SELL. Bearish engulfing mid-range in downtrend = weak signal.
 
 Return ONLY valid JSON (no markdown, no backticks):
 {
@@ -219,7 +221,7 @@ Return ONLY valid JSON (no markdown, no backticks):
                     messages: [
                         {
                             role: 'system',
-                            content: 'You are a profit-focused professional ICT/SMC trader. You understand trend analysis, supply/demand zones, RSI, candlestick patterns WITH context, session-based strategies, and risk management. You NEVER trade against strong trends. You know that context (where the pattern forms) is more important than the pattern itself. DOJI means indecision — only trade doji at support or resistance. Return ONLY valid JSON.'
+                            content: 'You are a profit-focused professional ICT/SMC trader. You understand trend analysis, supply/demand zones, RSI, candlestick patterns WITH context, session-based strategies, and risk management. You NEVER trade against strong trends. You know that context (where the pattern forms) is more important than the pattern itself. DOJI means indecision — only trade doji at support or resistance. NEVER trade doji mid-range or in strong trends. Return ONLY valid JSON.'
                         },
                         { role: 'user', content: prompt }
                     ],
@@ -307,27 +309,57 @@ Return ONLY valid JSON (no markdown, no backticks):
         analysis.pattern = this.normalizePatternName(analysis.pattern);
 
         // ============================================================
-        // DOJI BLOCKER: Doji = indecision. Only trade at support/resistance
+        // v6.5.2: STRENGTHENED DOJI BLOCKER
+        // Doji = indecision. Only trade at support/resistance.
+        // Doji in strong trend = WAIT (trend continuation needs confirmation)
         // ============================================================
         if (analysis.pattern === 'doji' && analysis.action !== 'WAIT') {
             const nearSupport = marketContext?.nearSupport;
             const nearResistance = marketContext?.nearResistance;
+            const trend = marketContext?.trend || '';
 
+            // Block 1: Doji without S/R context
             if (!nearSupport && !nearResistance) {
-                console.log('🛑 [Doji Blocker] Doji detected but NOT at support/resistance → WAIT');
+                console.log('🛑 [Doji Blocker] Doji without support/resistance → WAIT');
                 analysis.action = 'WAIT';
                 analysis.confidence = 30;
-                analysis.simple_reason = 'Doji without support/resistance context — waiting for confirmation.';
+                analysis.simple_reason = 'Doji without support/resistance context — indecision with no anchor.';
+            }
+            // Block 2: Doji in strong trend (even at S/R)
+            else if (trend.includes('strong_')) {
+                console.log(`🛑 [Doji Blocker] Doji in ${trend} → WAIT (trend continuation needs confirmation, not indecision)`);
+                analysis.action = 'WAIT';
+                analysis.confidence = 25;
+                analysis.simple_reason = `Doji in ${trend} — indecision candle during strong momentum. Wait for clear continuation.`;
             }
         }
 
         // ============================================================
-        // RSI NEUTRAL BLOCKER: No edge at RSI 45-55
+        // v6.5.2: STRENGTHENED BEARISH ENGULFING BLOCKER
+        // Bearish engulfing mid-range in downtrend = weak signal
+        // ============================================================
+        if (analysis.pattern === 'bearish_engulfing' && analysis.action !== 'WAIT') {
+            const nearResistance = marketContext?.nearResistance;
+            const trend = marketContext?.trend || '';
+
+            // Bearish engulfing without resistance context in downtrend = continuation at bad price
+            if (!nearResistance && trend.includes('downtrend') && !trend.includes('strong_')) {
+                console.log('🛑 [Engulfing Blocker] Bearish engulfing mid-range in downtrend → downgrade');
+                analysis.confidence = Math.min(analysis.confidence, 50);
+                if (analysis.confidence < 55) {
+                    analysis.action = 'WAIT';
+                    analysis.simple_reason = 'Bearish engulfing mid-range in downtrend — chasing the move. Wait for pullback to resistance.';
+                }
+            }
+        }
+
+        // ============================================================
+        // v6.4: RSI NEUTRAL BLOCKER
         // ============================================================
         if (marketContext?.rsiShort && analysis.action !== 'WAIT') {
             const rsiVal = marketContext.rsiShort;
             if (rsiVal >= 45 && rsiVal <= 55 && !marketContext.nearSupport && !marketContext.nearResistance) {
-                console.log(`🛑 [RSI Blocker] RSI neutral (${rsiVal}) without support/resistance → WAIT`);
+                console.log(`🛑 [RSI Blocker] RSI neutral (${rsiVal}) without S/R → WAIT`);
                 analysis.action = 'WAIT';
                 analysis.confidence = 30;
                 analysis.simple_reason = 'RSI in neutral zone with no support/resistance context. No edge.';
@@ -430,6 +462,13 @@ Return ONLY valid JSON (no markdown, no backticks):
             simpleReason = 'Shooting star at resistance. High probability reversal.';
         } else {
             simpleReason = `Market neutral. ${sessionRules.name} session. Waiting for clear setup.`;
+        }
+
+        // v6.5.2: Fallback also respects doji rule
+        if (marketContext?.lastPattern === 'doji' && !marketContext?.nearSupport && !marketContext?.nearResistance) {
+            action = 'WAIT';
+            confidence = 30;
+            simpleReason = 'Doji without support/resistance. No edge in fallback.';
         }
 
         if (marketContext?.consecutiveLosses >= 2 && confidence < 70) {
