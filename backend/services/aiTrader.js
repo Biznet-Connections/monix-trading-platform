@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v6.5.3 - Fixed STAT engine with real database lookup + pattern normalization
+ * v6.5.3 - Fixed STAT engine with real database lookup + pattern normalization + balance fetch retry
  */
 
 const marketData = require('./marketData');
@@ -138,24 +138,18 @@ class AITrader {
         }
     }
 
-    /**
-     * v6.5.3: FIXED — Now properly matches patterns against database
-     * Uses fuzzy matching for pattern names to handle variations
-     */
     calculateStatisticalConfidence(pattern, session, rsi, trend, nearSR, hourUTC) {
         let totalWeight = 0;
         let weightedScore = 0;
 
-        // 1. Pattern historical WR (25 weight) — FIXED fuzzy matching
+        // 1. Pattern historical WR (25 weight)
         if (pattern && this._cachedPatternPerformance) {
             const normalizedSearch = pattern.toLowerCase().replace(/_/g, ' ').replace(/ at .*$/, '').trim();
             
-            // Try exact match first
             let patternPerf = this._cachedPatternPerformance.find(p =>
                 p.pattern.toLowerCase() === normalizedSearch
             );
             
-            // Try fuzzy match (pattern name contains the search or vice versa)
             if (!patternPerf) {
                 patternPerf = this._cachedPatternPerformance.find(p => {
                     const dbPattern = p.pattern.toLowerCase().replace(/_/g, ' ');
@@ -163,7 +157,6 @@ class AITrader {
                 });
             }
             
-            // Try matching individual keywords
             if (!patternPerf) {
                 const keywords = normalizedSearch.split(' ');
                 for (const kw of keywords) {
@@ -287,11 +280,22 @@ class AITrader {
         this.sessionProfit = 0;
         this.sessionLoss = 0;
 
+        // v6.5.3: Fetch balance with retry
         try {
             const bal = await derivService.getBalance();
-            this.currentBalance = bal?.balance || 1000;
+            if (bal?.balance && bal.balance > 100) {
+                this.currentBalance = bal.balance;
+            }
         } catch (e) {
-            this.currentBalance = 1000;
+            await new Promise(r => setTimeout(r, 3000));
+            try {
+                const bal = await derivService.getBalance();
+                if (bal?.balance && bal.balance > 100) {
+                    this.currentBalance = bal.balance;
+                }
+            } catch (e2) {
+                // Keep default $1000
+            }
         }
         this.recalculateStakes();
 
@@ -579,9 +583,7 @@ class AITrader {
                 this.symbol, currentPrice, marketState.rsi, 'neutral', null, recentTrades, topPatterns, marketContext
             );
 
-            // ============================================================
-            // v6.5.3 FIX: Normalize pattern name BEFORE statistical confidence
-            // ============================================================
+            // Normalize pattern name BEFORE statistical confidence
             if (analysis.pattern) {
                 analysis.pattern = deepseekService.normalizePatternName(analysis.pattern);
             }
