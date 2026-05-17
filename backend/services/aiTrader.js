@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v6.5.5 - Tiered staking based on confidence levels
+ * v6.5.6 - Higher threshold (65%), removed TINY tier, hour-based confidence boost
  */
 
 const marketData = require('./marketData');
@@ -43,7 +43,7 @@ class AITrader {
         this.mode = 'AUTO';
         this.lastSetupNotified = false;
         this.currentSetupId = null;
-        this.confidenceThreshold = 60;
+        this.confidenceThreshold = 65; // v6.5.6: Raised from 60 to 65
         this.consecutiveLosses = 0;
         this.recentResults = [];
         this.lastTradeTime = 0;
@@ -64,12 +64,11 @@ class AITrader {
         this.sessionLoss = 0;
         this.currentBalance = 1000;
 
-        // v6.5.5: Tiered staking percentages
-        this.PCT_TINY = 0.001;     // 0.1% — Low confidence (50-60%)
-        this.PCT_MIN = 0.0025;      // 0.25% — Below average (60-65%)
-        this.PCT_BASE = 0.005;      // 0.5% — Average confidence (65-75%)
-        this.PCT_CONFIDENT = 0.01;  // 1% — High confidence (75-85%)
-        this.PCT_MAX = 0.015;       // 1.5% — Very high confidence (85%+)
+        // v6.5.6: Tiered staking (removed TINY tier)
+        this.PCT_MIN = 0.0025;      // 0.25% — Minimum (65-70%)
+        this.PCT_BASE = 0.005;      // 0.5% — Base (70-75%)
+        this.PCT_CONFIDENT = 0.01;  // 1% — Confident (75-85%)
+        this.PCT_MAX = 0.015;       // 1.5% — Max (85%+)
 
         this.MIN_STAKE = 0.50;
         this.BASE_STAKE = 2.00;
@@ -88,6 +87,9 @@ class AITrader {
 
         this._trendHistory = [];
         this.TREND_CONFIRM_COUNT = 2;
+
+        // v6.5.6: Golden hours boost
+        this.GOLDEN_HOURS = [1, 6, 7, 18, 20, 21, 22]; // Hours with 63%+ WR
 
         this.CONF_WEIGHTS = {
             patternHistoricalWR: 25,
@@ -124,9 +126,7 @@ class AITrader {
 
     recalculateStakes() {
         const bal = this.currentBalance || 1000;
-        // v6.5.5: Stakes are now calculated per-trade based on confidence
-        // These are just reference values for logging
-        this.MIN_STAKE = this.roundStake(bal * this.PCT_TINY);
+        this.MIN_STAKE = this.roundStake(bal * this.PCT_MIN);
         this.BASE_STAKE = this.roundStake(bal * this.PCT_BASE);
         this.CONFIDENT_STAKE = this.roundStake(bal * this.PCT_CONFIDENT);
         this.MAX_STAKE = this.roundStake(bal * this.PCT_MAX);
@@ -134,7 +134,7 @@ class AITrader {
 
         if (!this._lastBalanceLog || Date.now() - this._lastBalanceLog > 3600000) {
             const provenTag = this.isProven() ? '✅ PROVEN' : '⏳ PROVING';
-            console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | ${provenTag} | TINY=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
+            console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | ${provenTag} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
             this._lastBalanceLog = Date.now();
         }
     }
@@ -294,16 +294,16 @@ class AITrader {
         this.recalculateStakes();
 
         const session = knowledgeBase.getSessionRules();
-        console.log(`🤖 [AI Trader] Starting v6.5.5 TIERED STAKING EDITION`);
+        console.log(`🤖 [AI Trader] Starting v6.5.6 PROFIT EDITION`);
         console.log(`📚 [AI Trader] Trading DNA loaded: ${session.name} session optimized`);
-        console.log(`📊 [AI Trader] Confidence: Combined (AI×0.4 + STAT×0.6), threshold ${this.confidenceThreshold}%`);
-        console.log(`💰 [AI Trader] Tiered Stakes: 50-60%→TINY | 60-65%→MIN | 65-75%→BASE | 75-85%→CONFIDENT | 85%+→MAX`);
+        console.log(`📊 [AI Trader] Threshold: ${this.confidenceThreshold}% (no trades below this)`);
+        console.log(`💰 [AI Trader] Tiers: 65-70%→MIN | 70-75%→BASE | 75-85%→CONFIDENT | 85%+→MAX`);
+        console.log(`⭐ [AI Trader] Golden Hours boost: ${this.GOLDEN_HOURS.join(', ')} UTC`);
         console.log(`🛑 [AI Trader] RSI Exhaustion: No BUY > ${this.RSI_BUY_MAX}, No SELL < ${this.RSI_SELL_MIN}`);
-        console.log(`🔍 [AI Trader] Trend Confirmation: ${this.TREND_CONFIRM_COUNT} candles required for flip`);
+        console.log(`🛑 [AI Trader] HARD BLOCK: ${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Daily target: $${(this.currentBalance * this.DAILY_PROFIT_TARGET_PCT).toFixed(2)} (5%)`);
         console.log(`🛡️ [AI Trader] Daily loss limit: $${(this.currentBalance * this.DAILY_LOSS_LIMIT_PCT).toFixed(2)} (6%)`);
-        console.log(`🛑 [AI Trader] HARD BLOCK: ${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC`);
 
         marketData.reset();
 
@@ -518,13 +518,19 @@ class AITrader {
             let dynamicThreshold = this.confidenceThreshold;
             if (this.recentResults.length >= 5) {
                 const recentWinRate = this.recentResults.filter(r => r === 'WIN').length / this.recentResults.length;
-                if (recentWinRate >= 0.7) dynamicThreshold = Math.max(50, this.confidenceThreshold - 10);
-                else if (recentWinRate <= 0.3) dynamicThreshold = Math.min(80, this.confidenceThreshold + 20);
+                if (recentWinRate >= 0.7) dynamicThreshold = Math.max(55, this.confidenceThreshold - 10);
+                else if (recentWinRate <= 0.3) dynamicThreshold = Math.min(80, this.confidenceThreshold + 15);
             }
             if (this.consecutiveLosses >= 2) dynamicThreshold = Math.max(dynamicThreshold, 70);
+
+            // v6.5.6: Golden hours — lower threshold during proven profitable hours
+            if (this.GOLDEN_HOURS.includes(currentHour)) {
+                dynamicThreshold = Math.max(55, dynamicThreshold - 5);
+            }
+
             const sessionRules = knowledgeBase.getSessionRules();
             dynamicThreshold += sessionRules.confidenceModifier;
-            dynamicThreshold = Math.max(55, Math.min(80, dynamicThreshold));
+            dynamicThreshold = Math.max(60, Math.min(80, dynamicThreshold));
 
             const recentTrades = await Trade.getUserTrades(this.userId, 5);
             const topPatterns = await Pattern.getTopPatterns(5);
@@ -563,10 +569,16 @@ class AITrader {
             const nearSR = marketState.nearSupport || marketState.nearResistance;
             const statisticalConfidence = this.calculateStatisticalConfidence(analysis.pattern, sessionName, marketState.rsi, confirmedTrend, nearSR, currentHour);
             const aiConf = analysis.confidence || 50;
-            const combinedConfidence = Math.round((aiConf * 0.4) + (statisticalConfidence * 0.6));
+            let combinedConfidence = Math.round((aiConf * 0.4) + (statisticalConfidence * 0.6));
+
+            // v6.5.6: Golden hours boost — add 5% during proven hours
+            if (this.GOLDEN_HOURS.includes(currentHour)) {
+                combinedConfidence = Math.min(95, combinedConfidence + 5);
+            }
 
             if (shouldLog || action !== 'WAIT') {
-                console.log(`📊 [AI Trader] DeepSeek: ${analysis.action} | AI:${aiConf}% | STAT:${statisticalConfidence}% | COMB:${combinedConfidence}% | ${analysis.pattern}`);
+                const goldenTag = this.GOLDEN_HOURS.includes(currentHour) ? ' ⭐' : '';
+                console.log(`📊 [AI Trader] DeepSeek: ${analysis.action} | AI:${aiConf}% | STAT:${statisticalConfidence}% | COMB:${combinedConfidence}%${goldenTag} | ${analysis.pattern}`);
             }
 
             const effectiveConfidence = combinedConfidence;
@@ -646,10 +658,9 @@ class AITrader {
     }
 
     /**
-     * v6.5.5: TIERED STAKING based on combined confidence
-     * 50-60% → TINY (0.1% of account)
-     * 60-65% → MIN (0.25%)
-     * 65-75% → BASE (0.5%)
+     * v6.5.6: Tiered staking — NO TINY tier (below 65% = no trade)
+     * 65-70% → MIN (0.25%)
+     * 70-75% → BASE (0.5%)
      * 75-85% → CONFIDENT (1%)
      * 85%+ → MAX (1.5%)
      */
@@ -657,29 +668,29 @@ class AITrader {
         this.recalculateStakes();
         const bal = this.currentBalance || 1000;
 
-        // Losing streak → TINY
+        // Losing streak → MIN
         if (this.consecutiveLosses >= 2) {
-            const tiny = this.roundStake(bal * this.PCT_TINY);
-            console.log(`📉 [Stake] Losing streak — TINY ($${tiny})`);
-            return tiny;
+            const min = this.roundStake(bal * this.PCT_MIN);
+            console.log(`📉 [Stake] Losing streak — MIN ($${min})`);
+            return min;
         }
 
-        // Daily target hit → TINY
+        // Daily target hit → MIN
         if (this.sessionProfit >= bal * this.DAILY_PROFIT_TARGET_PCT) {
-            const tiny = this.roundStake(bal * this.PCT_TINY);
-            console.log(`🎯 [Stake] Daily target hit — TINY ($${tiny})`);
-            return tiny;
+            const min = this.roundStake(bal * this.PCT_MIN);
+            console.log(`🎯 [Stake] Daily target hit — MIN ($${min})`);
+            return min;
         }
 
-        // Profit lock (>2% of account) → cap at BASE
+        // Profit lock (>2%) → cap at BASE
         if (this.sessionProfit >= bal * 0.02) {
             const base = this.roundStake(bal * this.PCT_BASE);
             console.log(`🔒 [Stake] Profit lock — max BASE ($${base})`);
             if (confidence >= 80 && patternWinRate >= 70) return base;
-            return this.roundStake(bal * this.PCT_TINY);
+            return this.roundStake(bal * this.PCT_MIN);
         }
 
-        // Profit protection (>1% of account) → cap at BASE
+        // Profit protection (>1%) → cap at BASE
         if (this.sessionProfit >= bal * 0.01) {
             const base = this.roundStake(bal * this.PCT_BASE);
             console.log(`🔒 [Stake] Profit protection — max BASE ($${base})`);
@@ -687,35 +698,29 @@ class AITrader {
             return this.roundStake(bal * this.PCT_MIN);
         }
 
-        // v6.5.5: TIERED BY CONFIDENCE
+        // v6.5.6: Tiered by confidence (NO TINY — below 65% never reaches here)
         if (confidence >= 85) {
             const max = this.roundStake(bal * this.PCT_MAX);
-            console.log(`📈 [Stake] Very High confidence (${confidence}%) — MAX ($${max})`);
+            console.log(`📈 [Stake] Very High (${confidence}%) — MAX ($${max})`);
             return max;
         }
 
         if (confidence >= 75) {
             const conf = this.roundStake(bal * this.PCT_CONFIDENT);
-            console.log(`📈 [Stake] High confidence (${confidence}%) — CONFIDENT ($${conf})`);
+            console.log(`📈 [Stake] High (${confidence}%) — CONFIDENT ($${conf})`);
             return conf;
         }
 
-        if (confidence >= 65) {
+        if (confidence >= 70) {
             const base = this.roundStake(bal * this.PCT_BASE);
-            console.log(`📈 [Stake] Medium confidence (${confidence}%) — BASE ($${base})`);
+            console.log(`📈 [Stake] Medium (${confidence}%) — BASE ($${base})`);
             return base;
         }
 
-        if (confidence >= 60) {
-            const min = this.roundStake(bal * this.PCT_MIN);
-            console.log(`📉 [Stake] Below average (${confidence}%) — MIN ($${min})`);
-            return min;
-        }
-
-        // Below 60% → TINY
-        const tiny = this.roundStake(bal * this.PCT_TINY);
-        console.log(`📉 [Stake] Low confidence (${confidence}%) — TINY ($${tiny})`);
-        return tiny;
+        // 65-70% → MIN (lowest tier, but above threshold)
+        const min = this.roundStake(bal * this.PCT_MIN);
+        console.log(`📉 [Stake] Minimum (${confidence}%) — MIN ($${min})`);
+        return min;
     }
 
     async executeEntry(action, entryPrice, stake, analysis) {
