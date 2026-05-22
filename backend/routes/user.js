@@ -16,14 +16,14 @@ router.get('/profile', authMiddleware, async (req, res) => {
 
         let derivBalance = null;
         const tokenToUse = user.is_demo ? user.demo_token : user.real_token;
-        
+
         if (tokenToUse && tokenToUse.trim().length > 0) {
             try {
                 const balanceResult = await derivService.getBalanceWithToken(tokenToUse);
-                derivBalance = { 
-                    balance: balanceResult.balance, 
-                    currency: balanceResult.currency || 'USD', 
-                    authorized: true 
+                derivBalance = {
+                    balance: balanceResult.balance,
+                    currency: balanceResult.currency || 'USD',
+                    authorized: true
                 };
                 console.log(`💰 [API] Fresh balance for ${user.is_demo ? 'DEMO' : 'REAL'} mode: ${balanceResult.balance}`);
             } catch (e) {
@@ -90,29 +90,58 @@ router.put('/settings', authMiddleware, async (req, res) => {
 
 router.put('/api-keys', authMiddleware, async (req, res) => {
     try {
-        const { demo_token, real_token } = req.body;
+        let { demo_token, real_token } = req.body;
+
+        // Clean and validate tokens
+        if (demo_token !== undefined) demo_token = demo_token?.toString().trim();
+        if (real_token !== undefined) real_token = real_token?.toString().trim();
 
         console.log(`🔑 [API] Updating API keys for user ${req.userId}`);
+        console.log(`🔑 [API] Demo token length: ${demo_token?.length || 0}, starts with: ${demo_token?.substring(0, 8) || 'none'}...`);
+        console.log(`🔑 [API] Real token length: ${real_token?.length || 0}, starts with: ${real_token?.substring(0, 8) || 'none'}...`);
 
+        // Validate minimum token length
+        if (demo_token !== undefined && demo_token !== '' && demo_token.length < 10) {
+            return res.status(400).json({ error: 'Demo token is too short. Please paste the full token from Deriv.' });
+        }
+        if (real_token !== undefined && real_token !== '' && real_token.length < 10) {
+            return res.status(400).json({ error: 'Real token is too short. Please paste the full token from Deriv.' });
+        }
+
+        // Update user in database
         const updates = {};
-        if (demo_token !== undefined) updates.demo_token = demo_token;
-        if (real_token !== undefined) updates.real_token = real_token;
+        if (demo_token !== undefined) updates.demo_token = demo_token || null;
+        if (real_token !== undefined) updates.real_token = real_token || null;
 
         await User.update(req.userId, updates);
 
+        // Re-fetch user to get current mode
         const user = await User.findById(req.userId);
+        const currentMode = user.is_demo ? 'DEMO' : 'REAL';
         const tokenToUse = user.is_demo ? user.demo_token : user.real_token;
+
+        console.log(`🔑 [API] Current mode: ${currentMode}, Token available: ${!!tokenToUse}`);
 
         let reconnectResult = { success: false };
         let balanceValue = 0;
         let currencyValue = 'USD';
 
         if (tokenToUse && tokenToUse.trim().length > 0) {
-            reconnectResult = await derivService.reconnectWithToken(tokenToUse);
-            if (reconnectResult.success) {
-                balanceValue = reconnectResult.balance;
-                currencyValue = reconnectResult.currency || 'USD';
+            try {
+                reconnectResult = await derivService.reconnectWithToken(tokenToUse);
+                if (reconnectResult.success) {
+                    balanceValue = reconnectResult.balance || 0;
+                    currencyValue = reconnectResult.currency || 'USD';
+                    console.log(`🔑 [API] Reconnected successfully. Balance: ${balanceValue} ${currencyValue}`);
+                } else {
+                    console.log(`⚠️ [API] Reconnect failed: ${reconnectResult.error || 'Unknown error'}`);
+                }
+            } catch (reconnectError) {
+                console.error(`❌ [API] Reconnect error:`, reconnectError.message);
+                reconnectResult = { success: false, error: reconnectError.message };
             }
+        } else {
+            console.log('⚠️ [API] No token available for current mode after save');
         }
 
         res.json({
@@ -121,7 +150,8 @@ router.put('/api-keys', authMiddleware, async (req, res) => {
             reconnect: reconnectResult,
             balance: balanceValue,
             currency: currencyValue,
-            mode: user.is_demo ? 'DEMO' : 'REAL'
+            mode: currentMode,
+            tokenLength: tokenToUse?.length || 0
         });
     } catch (error) {
         console.error('❌ [API] Save API keys error:', error);
