@@ -128,7 +128,9 @@ router.put('/api-keys', authMiddleware, async (req, res) => {
 
         if (tokenToUse && tokenToUse.trim().length > 0) {
             try {
-                reconnectResult = await derivService.reconnectWithToken(tokenToUse);
+                // v3: Pass isDemo flag for proper account selection
+                const isDemoMode = user.is_demo === 1 || user.is_demo === true;
+                reconnectResult = await derivService.reconnectWithToken(tokenToUse, isDemoMode);
                 if (reconnectResult.success) {
                     balanceValue = reconnectResult.balance || 0;
                     currencyValue = reconnectResult.currency || 'USD';
@@ -169,7 +171,9 @@ router.post('/reconnect', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'No API token found for current mode' });
         }
 
-        const result = await derivService.reconnectWithToken(tokenToUse);
+        // v3: Pass isDemo flag for proper account selection
+        const isDemoMode = user.is_demo === 1 || user.is_demo === true;
+        const result = await derivService.reconnectWithToken(tokenToUse, isDemoMode);
 
         if (result.success) {
             broadcastBalance(req.userId, result.balance);
@@ -205,7 +209,9 @@ router.post('/switch-mode', authMiddleware, async (req, res) => {
         let currencyValue = 'USD';
 
         if (tokenToUse && tokenToUse.trim().length > 0) {
-            reconnectResult = await derivService.reconnectWithToken(tokenToUse);
+            // v3: Pass isDemo flag for proper account selection
+            const isDemoMode = user.is_demo === 1 || user.is_demo === true;
+            reconnectResult = await derivService.reconnectWithToken(tokenToUse, isDemoMode);
             if (reconnectResult.success) {
                 balanceValue = reconnectResult.balance;
                 currencyValue = reconnectResult.currency || 'USD';
