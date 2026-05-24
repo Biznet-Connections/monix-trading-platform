@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v7.0.1 - Live balance sync, setup quality scoring, sniper mode, aggressive tiered staking, daily targets
+ * v7.1 - Per-symbol session filtering, London unblocked for new symbols, self-learning
  */
 
 const marketData = require('./marketData');
@@ -95,6 +95,7 @@ class AITrader {
         this.DAILY_PROFIT_TARGET_PCT = 0.10;
         this.DAILY_LOSS_LIMIT_PCT = 0.05;
 
+        // v7.1: London block now checks per-symbol historical data
         this.BLOCKED_HOURS_START = 8;
         this.BLOCKED_HOURS_END = 17;
 
@@ -190,8 +191,44 @@ class AITrader {
     }
 
     /**
-     * v7.0.1: Sync internal balance with live Deriv balance
+     * v7.1: Check if London should be blocked for current symbol
+     * New symbols (less than 20 trades in London) are allowed to trade
      */
+    async shouldBlockLondon() {
+        const currentHour = new Date().getUTCHours();
+        if (currentHour < this.BLOCKED_HOURS_START || currentHour >= this.BLOCKED_HOURS_END) {
+            return false; // Not London hours
+        }
+
+        // Check per-symbol London performance
+        try {
+            const sessionStats = await Trade.getSessionStats(this.userId);
+            const symbolSessionStats = await Trade.getSymbolSessionStats(this.userId, this.symbol);
+            
+            // Find London performance for THIS symbol
+            const londonPerf = symbolSessionStats?.find(s => s.session === 'LONDON');
+            
+            if (!londonPerf || londonPerf.total < 10) {
+                // New symbol or not enough data — ALLOW trading to learn
+                console.log(`🔓 [London] ${this.symbol} has ${londonPerf?.total || 0} London trades. Allowing to learn.`);
+                return false;
+            }
+
+            const londonWR = parseFloat(londonPerf.win_rate) || 0;
+            if (londonWR < 50 && londonPerf.total >= 10) {
+                console.log(`🛑 [London] ${this.symbol} has ${londonWR}% WR in London (${londonPerf.total} trades). Blocking.`);
+                return true;
+            }
+
+            console.log(`🔓 [London] ${this.symbol} has ${londonWR}% WR in London. Allowing.`);
+            return false;
+        } catch (e) {
+            // If we can't check, allow trading for new symbols
+            console.log(`🔓 [London] Could not verify ${this.symbol} London stats. Allowing to learn.`);
+            return false;
+        }
+    }
+
     async syncBalanceFromDeriv() {
         if (!derivService.authorized) return;
         
@@ -222,33 +259,25 @@ class AITrader {
 
     calculateSetupQuality(pattern, session, rsi, trend, hour, nearSR) {
         let score = 0;
-
         if (session === 'NEWYORK') score += 20;
         else if (session === 'ASIAN') score += 10;
-
         if (this.GOLDEN_HOURS.includes(hour)) score += 15;
-
         if (rsi >= 35 && rsi <= 45) score += 20;
         else if (rsi >= 25 && rsi < 35) score += 10;
         else if (rsi > 45 && rsi <= 55) score += 5;
-
         if (pattern === 'uptrend_pullback') score += 15;
         else if (pattern === 'bullish_engulfing' || pattern === 'hammer') score += 10;
         else if (pattern && !pattern.includes('doji') && !pattern.includes('bearish')) score += 5;
-
         if (trend && pattern) {
             const trendLower = trend.toLowerCase();
             const isBullish = pattern.includes('bullish') || pattern.includes('hammer') || pattern.includes('uptrend');
             const isBearish = pattern.includes('bearish') || pattern.includes('shooting') || pattern.includes('downtrend');
-
             if (isBullish && (trendLower.includes('uptrend') || trendLower === 'sideways')) score += 15;
             else if (isBearish && (trendLower.includes('downtrend') || trendLower === 'sideways')) score += 15;
             else if (!trendLower.includes('strong_')) score += 5;
         }
-
         if (nearSR) score += 10;
         if (this.consecutiveLosses === 0) score += 5;
-
         return Math.min(100, score);
     }
 
@@ -389,14 +418,13 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v7.0.1 PROFIT EDITION`);
-        console.log(`📚 [AI Trader] Trading DNA loaded: ${session.name} session optimized`);
+        console.log(`🤖 [AI Trader] Starting v7.1 PER-SYMBOL EDITION`);
+        console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
+        console.log(`🔓 [AI Trader] London: Per-symbol filtering (allows new symbols to learn)`);
         console.log(`🎯 [AI Trader] Daily Target: $${(this.currentBalance * this.DAILY_PROFIT_TARGET_PCT).toFixed(2)} (10%)`);
         console.log(`🛡️ [AI Trader] Daily Loss Limit: $${(this.currentBalance * this.DAILY_LOSS_LIMIT_PCT).toFixed(2)} (5%)`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
-        console.log(`🔫 [AI Trader] Sniper Mode: ${tier === 'SMALL' ? 'DISABLED' : 'ENABLED'} (quality 85+ → MAX stake)`);
-        console.log(`🛑 [AI Trader] HARD BLOCK: ${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC`);
-        console.log(`⏱️ [AI Trader] Trade cooldown: ${this.tradeCooldown/1000}s`);
+        console.log(`🔫 [AI Trader] Sniper Mode: ${tier === 'SMALL' ? 'DISABLED' : 'ENABLED'}`);
 
         marketData.reset();
 
@@ -426,7 +454,6 @@ class AITrader {
             }
         }, 60000);
 
-        // v7.0.1: Sync balance periodically and on startup
         this.balanceSyncInterval = setInterval(() => this.syncBalanceFromDeriv(), 60000);
 
         setTimeout(() => {
@@ -524,10 +551,12 @@ class AITrader {
             const timeSinceLastTrade = Date.now() - this.lastTradeTime;
             if (this.lastTradeTime > 0 && timeSinceLastTrade < this.tradeCooldown) return;
 
+            // v7.1: Per-symbol London check
             const currentHour = new Date().getUTCHours();
-            if (currentHour >= this.BLOCKED_HOURS_START && currentHour < this.BLOCKED_HOURS_END) {
+            const blockLondon = await this.shouldBlockLondon();
+            if (blockLondon) {
                 if (!this._lastLondonLog || Date.now() - this._lastLondonLog > 120000) {
-                    console.log(`🛑 [HARD BLOCK] ${currentHour}:00 UTC — London window.`);
+                    console.log(`🛑 [London] ${this.symbol} blocked during London window (${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC). WR too low.`);
                     this._lastLondonLog = Date.now();
                 }
                 return;
@@ -908,7 +937,6 @@ class AITrader {
                 }
             }
 
-            // v7.0.1: Sync balance after every trade
             try { 
                 const bal = await derivService.getBalance(); 
                 if (bal?.balance) {
@@ -954,18 +982,9 @@ class AITrader {
 
     stop() {
         this.isRunning = false;
-        if (this.analysisInterval) {
-            clearInterval(this.analysisInterval);
-            this.analysisInterval = null;
-        }
-        if (this.tickHealthInterval) {
-            clearInterval(this.tickHealthInterval);
-            this.tickHealthInterval = null;
-        }
-        if (this.balanceSyncInterval) {
-            clearInterval(this.balanceSyncInterval);
-            this.balanceSyncInterval = null;
-        }
+        if (this.analysisInterval) { clearInterval(this.analysisInterval); this.analysisInterval = null; }
+        if (this.tickHealthInterval) { clearInterval(this.tickHealthInterval); this.tickHealthInterval = null; }
+        if (this.balanceSyncInterval) { clearInterval(this.balanceSyncInterval); this.balanceSyncInterval = null; }
         console.log('🤖 Stopped');
     }
 

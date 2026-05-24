@@ -23,6 +23,7 @@ tradeSchema.index({ user_id: 1, symbol: 1 });
 tradeSchema.index({ user_id: 1, status: 1 });
 tradeSchema.index({ user_id: 1, pattern: 1 });
 tradeSchema.index({ contract_id: 1 });
+tradeSchema.index({ user_id: 1, symbol: 1, session: 1 });
 
 const TradeModel = mongoose.model('Trade', tradeSchema);
 
@@ -70,7 +71,7 @@ class Trade {
     static async getUserStats(userId, days = 30) {
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - days);
-        
+
         const trades = await TradeModel.find({
             user_id: userId,
             executed_at: { $gt: cutoff },
@@ -91,8 +92,8 @@ class Trade {
             total_loss: totalLoss,
             net_profit: totalProfit + totalLoss,
             win_rate: total > 0 ? ((wins / total) * 100).toFixed(1) : 0,
-            avg_win_confidence: wins > 0 
-                ? Math.round(trades.filter(t => t.status === 'WIN').reduce((sum, t) => sum + (t.confidence || 0), 0) / wins) 
+            avg_win_confidence: wins > 0
+                ? Math.round(trades.filter(t => t.status === 'WIN').reduce((sum, t) => sum + (t.confidence || 0), 0) / wins)
                 : 0,
             max_win: Math.max(...trades.map(t => t.profit || 0), 0),
             max_loss: Math.min(...trades.map(t => t.profit || 0), 0)
@@ -109,7 +110,9 @@ class Trade {
             symbols[t.symbol].total_profit += t.profit || 0;
         });
         return Object.entries(symbols).map(([symbol, data]) => ({
-            symbol, total: data.total, wins: data.wins,
+            symbol,
+            total: data.total,
+            wins: data.wins,
             total_profit: data.total_profit,
             win_rate: ((data.wins / data.total) * 100).toFixed(1)
         }));
@@ -125,9 +128,42 @@ class Trade {
             sessions[t.session].total_profit += t.profit || 0;
         });
         return Object.entries(sessions).map(([session, data]) => ({
-            session, total: data.total, wins: data.wins,
+            session,
+            total: data.total,
+            wins: data.wins,
             total_profit: data.total_profit,
             win_rate: ((data.wins / data.total) * 100).toFixed(1)
+        }));
+    }
+
+    /**
+     * v7.1: Get session stats for a specific symbol
+     * Used for per-symbol London blocking logic
+     */
+    static async getSymbolSessionStats(userId, symbol) {
+        const trades = await TradeModel.find({
+            user_id: userId,
+            symbol: symbol,
+            session: { $ne: null },
+            status: { $ne: 'PENDING' }
+        }).lean();
+
+        const sessionStats = {};
+        trades.forEach(t => {
+            if (!sessionStats[t.session]) sessionStats[t.session] = { wins: 0, losses: 0, total: 0, total_profit: 0 };
+            sessionStats[t.session].total++;
+            if (t.status === 'WIN') sessionStats[t.session].wins++;
+            else sessionStats[t.session].losses++;
+            sessionStats[t.session].total_profit += t.profit || 0;
+        });
+
+        return Object.entries(sessionStats).map(([session, data]) => ({
+            session,
+            wins: data.wins,
+            losses: data.losses,
+            total: data.total,
+            win_rate: data.total > 0 ? Math.round((data.wins / data.total) * 100) : 0,
+            total_profit: data.total_profit
         }));
     }
 
@@ -135,7 +171,7 @@ class Trade {
         const today = new Date().toISOString().split('T')[0];
         const todayStart = new Date(today);
         const todayEnd = new Date(todayStart.getTime() + 86400000);
-        
+
         const todayTrades = await TradeModel.find({
             user_id: userId,
             executed_at: { $gte: todayStart, $lt: todayEnd },
@@ -194,13 +230,13 @@ class Trade {
         }).lean();
 
         const ranges = [
-            { label: 'RSI 0-25 (deeply oversold)', min: 0, max: 25, wins: 0, losses: 0 },
-            { label: 'RSI 25-35 (oversold)', min: 25, max: 35, wins: 0, losses: 0 },
-            { label: 'RSI 35-45 (approaching oversold)', min: 35, max: 45, wins: 0, losses: 0 },
-            { label: 'RSI 45-55 (neutral)', min: 45, max: 55, wins: 0, losses: 0 },
-            { label: 'RSI 55-65 (approaching overbought)', min: 55, max: 65, wins: 0, losses: 0 },
-            { label: 'RSI 65-75 (overbought)', min: 65, max: 75, wins: 0, losses: 0 },
-            { label: 'RSI 75-100 (deeply overbought)', min: 75, max: 100, wins: 0, losses: 0 }
+            { label: 'RSI 0-25 (Deeply Oversold)', min: 0, max: 25, wins: 0, losses: 0 },
+            { label: 'RSI 25-35 (Oversold)', min: 25, max: 35, wins: 0, losses: 0 },
+            { label: 'RSI 35-45 (Approaching Oversold)', min: 35, max: 45, wins: 0, losses: 0 },
+            { label: 'RSI 45-55 (Neutral)', min: 45, max: 55, wins: 0, losses: 0 },
+            { label: 'RSI 55-65 (Approaching Overbought)', min: 55, max: 65, wins: 0, losses: 0 },
+            { label: 'RSI 65-75 (Overbought)', min: 65, max: 75, wins: 0, losses: 0 },
+            { label: 'RSI 75-100 (Deeply Overbought)', min: 75, max: 100, wins: 0, losses: 0 }
         ];
 
         trades.forEach(t => {
@@ -216,7 +252,9 @@ class Trade {
         return ranges
             .filter(r => (r.wins + r.losses) >= 2)
             .map(r => ({
-                label: r.label, wins: r.wins, losses: r.losses,
+                label: r.label,
+                wins: r.wins,
+                losses: r.losses,
                 total: r.wins + r.losses,
                 winRate: (r.wins + r.losses) > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0
             }))
@@ -237,7 +275,7 @@ class Trade {
             if (pattern.includes('downtrend')) trend = 'downtrend';
             else if (pattern.includes('uptrend')) trend = 'uptrend';
             else if (pattern.includes('sideways') || pattern.includes('neutral') || pattern.includes('range')) trend = 'sideways';
-            
+
             if (!trendStats[trend]) trendStats[trend] = { wins: 0, losses: 0 };
             if (t.status === 'WIN') trendStats[trend].wins++;
             else trendStats[trend].losses++;
@@ -245,7 +283,9 @@ class Trade {
 
         return Object.entries(trendStats)
             .map(([trend, data]) => ({
-                trend, wins: data.wins, losses: data.losses,
+                trend,
+                wins: data.wins,
+                losses: data.losses,
                 total: data.wins + data.losses,
                 winRate: (data.wins + data.losses) > 0 ? Math.round((data.wins / (data.wins + data.losses)) * 100) : 0
             }))
@@ -271,7 +311,9 @@ class Trade {
 
         return Object.entries(sessionStats)
             .map(([session, data]) => ({
-                session, wins: data.wins, losses: data.losses,
+                session,
+                wins: data.wins,
+                losses: data.losses,
                 total: data.wins + data.losses,
                 winRate: (data.wins + data.losses) > 0 ? Math.round((data.wins / (data.wins + data.losses)) * 100) : 0,
                 avgProfit: (data.wins + data.losses) > 0 ? (data.totalProfit / (data.wins + data.losses)).toFixed(2) : '0.00'
