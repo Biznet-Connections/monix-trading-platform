@@ -126,7 +126,6 @@ function showAIReasonModal(signal) {
         modalAction.className = `text-2xl font-bold ${signal.action === 'BUY' ? 'text-emerald-400' : signal.action === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`;
     }
 
-    // CRITICAL FIX: Use signal.symbol from the API response
     if (modalSymbol) {
         const displaySymbol = signal.symbol || 'R_75';
         modalSymbol.innerHTML = displaySymbol;
@@ -468,6 +467,27 @@ async function executeTrade() {
     }
 }
 
+// v7.1: Save symbol preference to backend for restart persistence
+function saveSymbolPreference(symbol) {
+    const token = localStorage.getItem('monix_token') || '';
+    if (!token || !symbol) return;
+    
+    fetch('/api/user/symbol', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ symbol: symbol })
+    }).then(res => res.json()).then(data => {
+        if (data.success) {
+            console.log('📌 Symbol preference saved:', symbol);
+        }
+    }).catch(() => {
+        // Silent fail — don't block the UI
+    });
+}
+
 async function changeSymbol(symbol) {
     uiLog(`Changing symbol to: ${symbol}`);
     try {
@@ -482,6 +502,8 @@ async function changeSymbol(symbol) {
         const data = await response.json();
         if (data.success) {
             uiLog(`Symbol changed successfully: ${symbol}`);
+            // v7.1: Save symbol preference for restart
+            saveSymbolPreference(symbol);
             if (window.showToast) window.showToast('Symbol Changed', `AI now analyzing ${symbol}`, 'success');
             setTimeout(() => fetchAIAnalysis(), 1000);
         } else {
@@ -573,17 +595,17 @@ function updatePendingOrdersDisplay(pendingOrders) {
     const container = document.getElementById('pendingOrdersContainer');
     const countBadge = document.getElementById('pendingOrdersCount');
     if (!container) return;
-    
+
     if (!pendingOrders || pendingOrders.length === 0) {
         container.innerHTML = '<p class="text-xs text-slate-500 text-center py-3">No pending limit orders</p>';
         if (countBadge) countBadge.innerText = '(0)';
         return;
     }
-    
+
     if (countBadge) countBadge.innerText = `(${pendingOrders.length})`;
-    
+
     const currentPrice = parseFloat(document.getElementById('livePrice')?.innerText?.replace('$', '') || '0');
-    
+
     container.innerHTML = pendingOrders.map(order => {
         const distance = currentPrice > 0 ? Math.abs(currentPrice - order.entryPrice) : 0;
         const distancePercent = currentPrice > 0 ? ((distance / order.entryPrice) * 100).toFixed(2) : '0';
@@ -591,7 +613,7 @@ function updatePendingOrdersDisplay(pendingOrders) {
         const isApproaching = parseFloat(distancePercent) < 0.3;
         const borderColor = isApproaching ? 'border-yellow-500' : 'border-slate-600';
         const bgColor = isApproaching ? 'bg-yellow-500/10' : '';
-        
+
         return `
             <div class="p-3 rounded-lg border ${borderColor} ${bgColor} mb-2 hover:border-indigo-400 transition">
                 <div class="flex justify-between items-center mb-1">
@@ -616,7 +638,6 @@ function updatePendingOrdersDisplay(pendingOrders) {
     }).join('');
 }
 
-// Poll for pending orders every 5 seconds
 function startPendingOrdersPolling() {
     if (pendingOrdersInterval) clearInterval(pendingOrdersInterval);
     pendingOrdersInterval = setInterval(async () => {
@@ -698,10 +719,10 @@ async function loadRecentTrades() {
         const countBadge = document.getElementById('recentTradesCount');
         if (!tbody) return;
         tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">Loading...</td></tr>';
-        
+
         const trades = await window.api.getTradeHistory(20);
         lastFetchedTrades = trades;
-        
+
         if (!trades || trades.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet</td></tr>';
             if (countBadge) countBadge.innerText = '(0)';
@@ -835,7 +856,7 @@ function updateBalanceInUI(balance) {
 // ============================================================
 function initTrading() {
     uiLog('Initializing trading module v6.0 Professional...');
-    
+
     if (stakeSlider) {
         stakeSlider.min = 0.50;
         stakeSlider.max = 20;
@@ -896,6 +917,8 @@ function initTrading() {
             const newSymbol = symbolSelect.value;
             uiLog(`Symbol select changed: ${newSymbol}`);
             clearSignal();
+            // v7.1: Save symbol preference
+            saveSymbolPreference(newSymbol);
             if (window.showToast) window.showToast('Symbol Changed', `AI analyzing ${newSymbol}...`, 'info');
             changeSymbol(newSymbol);
         });
@@ -935,3 +958,4 @@ window.changeSymbol = changeSymbol;
 window.copyAllTrades = copyAllTrades;
 window.copyTradeToClipboard = copyTradeToClipboard;
 window.updatePendingOrdersDisplay = updatePendingOrdersDisplay;
+window.saveSymbolPreference = saveSymbolPreference;
