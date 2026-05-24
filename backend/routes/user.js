@@ -19,15 +19,19 @@ router.get('/profile', authMiddleware, async (req, res) => {
 
         if (tokenToUse && tokenToUse.trim().length > 0) {
             try {
-                const balanceResult = await derivService.getBalanceWithToken(tokenToUse);
-                derivBalance = {
-                    balance: balanceResult.balance,
-                    currency: balanceResult.currency || 'USD',
-                    authorized: true
-                };
-                console.log(`💰 [API] Fresh balance for ${user.is_demo ? 'DEMO' : 'REAL'} mode: ${balanceResult.balance}`);
+                const currentBalance = derivService.getCurrentBalance();
+                if (currentBalance && currentBalance.authorized) {
+                    derivBalance = {
+                        balance: currentBalance.balance,
+                        currency: currentBalance.currency || 'USD',
+                        authorized: true
+                    };
+                    console.log(`💰 [API] Live Balance for UI: ${currentBalance.balance}`);
+                } else {
+                    derivBalance = { authorized: false, balance: 0, currency: 'USD', error: 'Deriv not authorized' };
+                }
             } catch (e) {
-                console.error('Failed to fetch fresh balance:', e.message);
+                console.error('Failed to fetch live balance:', e.message);
                 derivBalance = { authorized: false, balance: 0, currency: 'USD', error: e.message };
             }
         } else {
@@ -43,7 +47,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
                 trades_remaining: user.trades_remaining,
                 voucher_code: user.voucher_code,
                 voucher_expiry: user.voucher_expiry,
-                default_symbol: user.default_symbol,
+                default_symbol: user.default_symbol || 'R_75',
                 base_stake: user.base_stake,
                 auto_mode: user.auto_mode,
                 push_signals: user.push_signals,
@@ -88,11 +92,27 @@ router.put('/settings', authMiddleware, async (req, res) => {
     }
 });
 
+// v7.1.1: Save symbol preference
+router.put('/symbol', authMiddleware, async (req, res) => {
+    try {
+        const { symbol } = req.body;
+        if (!symbol) {
+            return res.status(400).json({ error: 'Symbol is required' });
+        }
+        
+        await User.update(req.userId, { default_symbol: symbol });
+        console.log(`💾 [API] User ${req.userId} saved symbol: ${symbol}`);
+        res.json({ success: true, symbol });
+    } catch (error) {
+        console.error('❌ [API] Save symbol error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 router.put('/api-keys', authMiddleware, async (req, res) => {
     try {
         let { demo_token, real_token } = req.body;
 
-        // Clean and validate tokens
         if (demo_token !== undefined) demo_token = demo_token?.toString().trim();
         if (real_token !== undefined) real_token = real_token?.toString().trim();
 
@@ -100,7 +120,6 @@ router.put('/api-keys', authMiddleware, async (req, res) => {
         console.log(`🔑 [API] Demo token length: ${demo_token?.length || 0}, starts with: ${demo_token?.substring(0, 8) || 'none'}...`);
         console.log(`🔑 [API] Real token length: ${real_token?.length || 0}, starts with: ${real_token?.substring(0, 8) || 'none'}...`);
 
-        // Validate minimum token length
         if (demo_token !== undefined && demo_token !== '' && demo_token.length < 10) {
             return res.status(400).json({ error: 'Demo token is too short. Please paste the full token from Deriv.' });
         }
@@ -108,14 +127,12 @@ router.put('/api-keys', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Real token is too short. Please paste the full token from Deriv.' });
         }
 
-        // Update user in database
         const updates = {};
         if (demo_token !== undefined) updates.demo_token = demo_token || null;
         if (real_token !== undefined) updates.real_token = real_token || null;
 
         await User.update(req.userId, updates);
 
-        // Re-fetch user to get current mode
         const user = await User.findById(req.userId);
         const currentMode = user.is_demo ? 'DEMO' : 'REAL';
         const tokenToUse = user.is_demo ? user.demo_token : user.real_token;
@@ -128,7 +145,6 @@ router.put('/api-keys', authMiddleware, async (req, res) => {
 
         if (tokenToUse && tokenToUse.trim().length > 0) {
             try {
-                // v3: Pass isDemo flag for proper account selection
                 const isDemoMode = user.is_demo === 1 || user.is_demo === true;
                 reconnectResult = await derivService.reconnectWithToken(tokenToUse, isDemoMode);
                 if (reconnectResult.success) {
@@ -171,7 +187,6 @@ router.post('/reconnect', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'No API token found for current mode' });
         }
 
-        // v3: Pass isDemo flag for proper account selection
         const isDemoMode = user.is_demo === 1 || user.is_demo === true;
         const result = await derivService.reconnectWithToken(tokenToUse, isDemoMode);
 
@@ -209,7 +224,6 @@ router.post('/switch-mode', authMiddleware, async (req, res) => {
         let currencyValue = 'USD';
 
         if (tokenToUse && tokenToUse.trim().length > 0) {
-            // v3: Pass isDemo flag for proper account selection
             const isDemoMode = user.is_demo === 1 || user.is_demo === true;
             reconnectResult = await derivService.reconnectWithToken(tokenToUse, isDemoMode);
             if (reconnectResult.success) {
