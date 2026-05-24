@@ -295,7 +295,6 @@ class DerivService extends EventEmitter {
     }
 
     async authorize(token) {
-        // v3 uses OTP pre-auth, this is a no-op for compatibility
         return { authorize: { balance: this.currentBalance, currency: this.currentCurrency } };
     }
 
@@ -313,12 +312,30 @@ class DerivService extends EventEmitter {
     async placeTrade(symbol, action, stake, duration = 5, durationUnit = 'm') {
         if (!this.authorized) throw new Error('Not authorized');
         if (stake < 0.35) throw new Error('Minimum stake is $0.35');
+        
         const derivSymbol = this.convertSymbol(symbol);
         const contractType = action === 'BUY' ? 'CALL' : 'PUT';
-        console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake}`);
+        
+        // R_10, R_25, R_50 require seconds ('s') instead of minutes ('m')
+        let unit = durationUnit;
+        if (['R_10', 'R_25', 'R_50'].includes(symbol)) {
+            unit = 's';
+        }
+
+        console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake} (${duration}${unit})`);
+        
         return this.sendRequest({
-            buy: 1, price: stake,
-            parameters: { amount: stake, basis: 'stake', contract_type: contractType, currency: this.currentCurrency, duration, duration_unit: durationUnit, symbol: derivSymbol }
+            buy: 1,
+            price: stake,
+            parameters: {
+                amount: stake,
+                basis: 'stake',
+                contract_type: contractType,
+                currency: 'USD',
+                duration: duration,
+                duration_unit: unit,
+                symbol: derivSymbol
+            }
         });
     }
 
