@@ -471,7 +471,7 @@ async function executeTrade() {
 function saveSymbolPreference(symbol) {
     const token = localStorage.getItem('monix_token') || '';
     if (!token || !symbol) return;
-    
+
     fetch('/api/user/symbol', {
         method: 'PUT',
         headers: {
@@ -486,6 +486,28 @@ function saveSymbolPreference(symbol) {
     }).catch(() => {
         // Silent fail — don't block the UI
     });
+}
+
+// v7.1.1: Load saved symbol from backend on startup
+async function loadSavedSymbol() {
+    try {
+        const token = localStorage.getItem('monix_token');
+        if (!token) return;
+        
+        const response = await fetch('/api/user/profile', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (data.user && data.user.default_symbol) {
+            const savedSymbol = data.user.default_symbol;
+            if (symbolSelect) {
+                symbolSelect.value = savedSymbol;
+                console.log('💾 Frontend loaded saved symbol:', savedSymbol);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load saved symbol:', e);
+    }
 }
 
 async function changeSymbol(symbol) {
@@ -857,6 +879,9 @@ function updateBalanceInUI(balance) {
 function initTrading() {
     uiLog('Initializing trading module v6.0 Professional...');
 
+    // v7.1.1: Load saved symbol from backend before anything else
+    loadSavedSymbol();
+
     if (stakeSlider) {
         stakeSlider.min = 0.50;
         stakeSlider.max = 20;
@@ -959,3 +984,4 @@ window.copyAllTrades = copyAllTrades;
 window.copyTradeToClipboard = copyTradeToClipboard;
 window.updatePendingOrdersDisplay = updatePendingOrdersDisplay;
 window.saveSymbolPreference = saveSymbolPreference;
+window.loadSavedSymbol = loadSavedSymbol;
