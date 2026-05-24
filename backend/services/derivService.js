@@ -15,6 +15,7 @@ class DerivService extends EventEmitter {
         this.maxReconnectAttempts = 20;
         this.authorized = false;
         this.currentToken = null;
+        this.currentUrlIndex = 0;
         this.currentBalance = 0;
         this.currentCurrency = 'USD';
         this.reconnectInProgress = false;
@@ -48,6 +49,12 @@ class DerivService extends EventEmitter {
             "ESP35 (IBEX 35)": "ESP35", "NETH25 (AEX)": "NETH25",
             "HK50 (Hang Seng)": "HK50", "JP225 (Nikkei)": "JP225", "AUS200 (ASX 200)": "AUS200"
         };
+
+        this.wsUrls = [
+            process.env.DERIV_WS_URL || 'wss://ws.derivws.com/websockets/v3',
+            process.env.DERIV_WS_FALLBACK_1 || 'wss://ws.binaryws.com/websockets/v3',
+            process.env.DERIV_WS_FALLBACK_2 || 'wss://frontend.binary.com/websockets/v3'
+        ];
     }
 
     convertSymbol(uiSymbol) {
@@ -234,6 +241,17 @@ class DerivService extends EventEmitter {
     }
 
     async forceReconnectForTicks(symbol) {
+        // v7.1.2: Clean up all subscriptions before reconnecting
+        try {
+            for (const existingSymbol of this.subscriptions) {
+                try {
+                    await this.sendRequest({ forget: existingSymbol });
+                    console.log(`📡 [Deriv] Cleaned up subscription: ${existingSymbol}`);
+                } catch (e) {}
+            }
+            this.subscriptions.clear();
+        } catch (e) {}
+
         const isDemoMode = this.activeAccountId ? this.activeAccountId.startsWith('D') : true;
         await this.connect(this.currentToken, true, isDemoMode);
         await this.subscribeToTicks(symbol);
@@ -263,7 +281,9 @@ class DerivService extends EventEmitter {
 
     handleMessage(response) {
         const msgType = response.msg_type;
-        if (msgType === 'tick') this.emit('tick', response.tick);
+        if (msgType === 'tick') {
+            this.emit('tick', response.tick);
+        }
         if (msgType === 'balance') {
             this.currentBalance = response.balance.balance;
             this.currentCurrency = response.balance.currency;
@@ -300,11 +320,28 @@ class DerivService extends EventEmitter {
 
     async subscribeToTicks(symbol) {
         const derivSymbol = this.convertSymbol(symbol);
+
+        // v7.1.2: Unsubscribe from ALL existing tick subscriptions first
+        // This prevents mixed tick data from multiple symbols
+        for (const existingSymbol of this.subscriptions) {
+            try {
+                await this.sendRequest({ forget: existingSymbol });
+                console.log(`📡 [Deriv] Unsubscribed from ${existingSymbol}`);
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+        }
+        this.subscriptions.clear();
+
         this.lastSubscribedSymbol = symbol;
+
         try {
-            return await this.sendRequest({ ticks: derivSymbol, subscribe: 1 });
+            const result = await this.sendRequest({ ticks: derivSymbol, subscribe: 1 });
+            this.subscriptions.add(derivSymbol);
+            console.log(`📡 [Deriv] Subscribed to ${derivSymbol}`);
+            return result;
         } catch (error) {
-            console.error(`❌ Subscribe failed for ${derivSymbol}:`, error.message);
+            console.error(`❌ [Deriv] Subscribe failed for ${derivSymbol}:`, error.message);
             throw error;
         }
     }
@@ -312,18 +349,9 @@ class DerivService extends EventEmitter {
     async placeTrade(symbol, action, stake, duration = 5, durationUnit = 'm') {
         if (!this.authorized) throw new Error('Not authorized');
         if (stake < 0.35) throw new Error('Minimum stake is $0.35');
-        
         const derivSymbol = this.convertSymbol(symbol);
         const contractType = action === 'BUY' ? 'CALL' : 'PUT';
-        
-        // R_10, R_25, R_50 require seconds ('s') instead of minutes ('m')
-        let unit = durationUnit;
-        if (['R_10', 'R_25', 'R_50'].includes(symbol)) {
-            unit = 's';
-        }
-
-        console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake} (${duration}${unit})`);
-        
+        console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake}`);
         return this.sendRequest({
             buy: 1,
             price: stake,
@@ -331,9 +359,9 @@ class DerivService extends EventEmitter {
                 amount: stake,
                 basis: 'stake',
                 contract_type: contractType,
-                currency: 'USD',
-                duration: duration,
-                duration_unit: unit,
+                currency: this.currentCurrency,
+                duration,
+                duration_unit: durationUnit,
                 symbol: derivSymbol
             }
         });
