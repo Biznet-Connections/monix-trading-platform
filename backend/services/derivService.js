@@ -65,7 +65,8 @@ class DerivService extends EventEmitter {
     }
 
     async fetchAccountsViaRest(token) {
-        const response = await fetch(`${process.env.DERIV_API_BASE}/accounts`, {
+        // FIXED: Correct endpoint for Deriv v3 accounts
+        const response = await fetch('https://api.derivws.com/trading/v1/options/accounts', {
             method: 'GET',
             headers: {
                 'Deriv-App-ID': process.env.DERIV_APP_ID,
@@ -79,15 +80,17 @@ class DerivService extends EventEmitter {
     }
 
     async fetchWebSocketOtpUrl(token, accountId) {
+        // FIXED: Correct endpoint for OTP generation
         console.log(`🔑 [Deriv REST] Requesting session OTP for account: ${accountId}`);
-        const response = await fetch(`${process.env.DERIV_API_BASE}/accounts/${accountId}/otp`, {
+        const response = await fetch('https://api.derivws.com/trading/v1/options/otp', {
             method: 'POST',
             headers: {
                 'Deriv-App-ID': process.env.DERIV_APP_ID,
                 'Deriv-Client-ID': process.env.DERIV_CLIENT_ID,
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({ account_id: accountId })
         });
         if (!response.ok) {
             const errText = await response.text();
@@ -95,6 +98,31 @@ class DerivService extends EventEmitter {
         }
         const payload = await response.json();
         return payload.data?.url;
+    }
+
+    async getCandles(symbol, granularity = 60, count = 20) {
+        // NEW: Get historical candles for seeding
+        const derivSymbol = this.convertSymbol(symbol);
+        const endEpoch = Math.floor(Date.now() / 1000);
+        const startEpoch = endEpoch - (granularity * count);
+        
+        try {
+            const result = await this.sendRequest({
+                candles: derivSymbol,
+                end: endEpoch,
+                start: startEpoch,
+                granularity: granularity,
+                style: 'candles'
+            });
+            
+            if (result && result.candles) {
+                return { candles: result.candles };
+            }
+            return { candles: [] };
+        } catch (error) {
+            console.error(`❌ [Deriv] Failed to get candles:`, error.message);
+            return { candles: [] };
+        }
     }
 
     connect(token = null, forceNew = false, preferDemo = true) {
@@ -142,18 +170,18 @@ class DerivService extends EventEmitter {
                     this.isConnecting = false;
                     this.authorized = true;
                     this.reconnectAttempts = 0;
-                    
+
                     if (this.reconnectInterval) {
                         clearInterval(this.reconnectInterval);
                         this.reconnectInterval = null;
                     }
-                    
+
                     this.startHeartbeat();
-                    
+
                     if (this.lastSubscribedSymbol) {
                         this.subscribeToTicks(this.lastSubscribedSymbol).catch(() => {});
                     }
-                    
+
                     this.emit('connected');
                     this.emit('authorized', { balance: this.currentBalance, currency: this.currentCurrency });
                     resolve();
@@ -241,7 +269,6 @@ class DerivService extends EventEmitter {
     }
 
     async forceReconnectForTicks(symbol) {
-        // v7.1.2: Clean up all subscriptions before reconnecting
         try {
             for (const existingSymbol of this.subscriptions) {
                 try {
@@ -321,15 +348,11 @@ class DerivService extends EventEmitter {
     async subscribeToTicks(symbol) {
         const derivSymbol = this.convertSymbol(symbol);
 
-        // v7.1.2: Unsubscribe from ALL existing tick subscriptions first
-        // This prevents mixed tick data from multiple symbols
         for (const existingSymbol of this.subscriptions) {
             try {
                 await this.sendRequest({ forget: existingSymbol });
                 console.log(`📡 [Deriv] Unsubscribed from ${existingSymbol}`);
-            } catch (e) {
-                // Ignore cleanup errors
-            }
+            } catch (e) {}
         }
         this.subscriptions.clear();
 
