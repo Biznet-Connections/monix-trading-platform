@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v7.1.5 - FIXED: Removed candle blocker, trades immediately on any symbol with tick data
+ * v7.1.6 - FIXED: Deriv token connection, tick-based trading, no candle wait
  */
 
 const marketData = require('./marketData');
@@ -379,17 +379,43 @@ class AITrader {
         
         try {
             const user = await User.findById(userId);
-            if (user && user.default_symbol) {
+            if (!user) {
+                console.error(`❌ [AI Trader] User ${userId} not found`);
+                return;
+            }
+            
+            // Load saved symbol
+            if (user.default_symbol) {
                 this.symbol = user.default_symbol;
                 console.log(`💾 [AI Trader] Loaded saved symbol: ${this.symbol}`);
             } else {
                 this.symbol = symbol || 'R_75';
             }
-        } catch (e) {
-            this.symbol = symbol || 'R_75';
+            
+            this.mode = mode;
+            
+            // ✅ CRITICAL FIX: Get the Deriv token from user
+            const token = user.is_demo ? user.demo_token : user.real_token;
+            
+            if (!token) {
+                console.error(`❌ [AI Trader] No Deriv token found for user ${userId}. Demo: ${user.is_demo}`);
+                console.error(`❌ [AI Trader] Please add token to user record`);
+                return;
+            }
+            
+            console.log(`🔑 [AI Trader] Connecting to Deriv with ${user.is_demo ? 'DEMO' : 'REAL'} account...`);
+            
+            // Connect to Deriv
+            await derivService.connect(token, false, user.is_demo);
+            
+            console.log(`✅ [AI Trader] Connected to Deriv successfully!`);
+            
+        } catch (err) {
+            console.error(`❌ [AI Trader] Failed to connect to Deriv:`, err.message);
+            return;
         }
         
-        this.mode = mode;
+        // Reset state
         this.isRunning = true;
         this.isExecuting = false;
         this.pendingManualSetup = null;
@@ -409,7 +435,6 @@ class AITrader {
         this.sniperTradeActive = false;
         this.lastStakeWasMax = false;
         this.tradesSinceBigLoss = 0;
-
         this.sessionProfit = 0;
         this.sessionLoss = 0;
 
@@ -430,7 +455,7 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v7.1.5 FIXED EDITION`);
+        console.log(`🤖 [AI Trader] Starting v7.1.6 FIXED EDITION`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
         console.log(`🔓 [AI Trader] London: Per-symbol filtering`);
         console.log(`🚀 [AI Trader] TICK-BASED TRADING (no candle wait)`);
@@ -442,13 +467,19 @@ class AITrader {
 
         const derivSymbol = derivService.symbolMap?.[this.symbol] || this.symbol;
         if (!derivService.subscriptions?.has(derivSymbol)) {
-            try { await derivService.subscribeToTicks(this.symbol); } catch (err) {}
+            try { await derivService.subscribeToTicks(this.symbol); } catch (err) {
+                console.error(`❌ [AI Trader] Failed to subscribe to ticks:`, err.message);
+            }
         }
 
         derivService.on('tick', (tick) => {
             marketData.addTick(tick);
             this.tickCount++;
             this.lastTickTime = Date.now();
+            if (this.tickCount === 1) {
+                console.log(`🎉 [AI Trader] FIRST TICK RECEIVED! Price: $${tick.quote?.toFixed(2)}`);
+                this.dataReady = true;
+            }
             if (this.tickCount % 50 === 0) console.log(`📈 [AI Trader] Tick #${this.tickCount} - $${tick.quote?.toFixed(2)}`);
             this.onMarketUpdate();
         });
@@ -470,7 +501,6 @@ class AITrader {
 
         this.balanceSyncInterval = setInterval(() => this.syncBalanceFromDeriv(), 60000);
 
-        // v7.1.5: Tick heartbeat monitor
         this.tickHeartbeat = setInterval(() => {
             if (this.tickCount === this._lastTickCount && this.isRunning && this.tickCount > 0) {
                 console.warn(`⚠️ [AI Trader] No new ticks in 30 seconds! Forcing reconnect...`);
@@ -606,8 +636,7 @@ class AITrader {
             const marketState = marketData.getMarketState();
             const currentPrice = marketState.price;
             
-            // v7.1.5 FIX: Don't wait for candles — trade immediately with any tick data
-            // This is the critical fix for the "0/3 candles" stuck issue
+            // v7.1.6 FIX: Don't wait for candles — trade immediately with any tick data
             if (this.tickCount === 0) {
                 if (!this._lastSkipLog || Date.now() - this._lastSkipLog > 30000) {
                     console.log(`⏳ [AI Trader] Waiting for first ticks... (${this.tickCount} ticks, ${marketState.candleCount} candles)`);
@@ -1014,10 +1043,6 @@ class AITrader {
 
     setMode(mode) { this.mode = mode; this.pendingLimitOrders = []; this._lastPendingLog = {}; console.log(`Mode: ${mode}`); }
 
-    /**
-     * v7.1.5 FIXED: Properly re-subscribe to ticks when switching symbols
-     * Prevents the "stuck at 0 candles" bug by resetting state and forcing tick subscription
-     */
     setSymbol(symbol) {
         if (this.symbol === symbol && this.dataReady && this.tickCount > 0) {
             console.log(`📡 [AI Trader] Already on ${symbol} with ${this.tickCount} ticks, skipping reset`);
@@ -1026,7 +1051,6 @@ class AITrader {
 
         console.log(`🔄 [AI Trader] Switching symbol from ${this.symbol} to ${symbol}`);
         
-        // Reset all state for new symbol
         this.symbol = symbol;
         this.dataReady = false;
         this.trendStartTime = 0;
@@ -1034,20 +1058,14 @@ class AITrader {
         this._trendHistory = [];
         this.pendingLimitOrders = [];
         this._lastPendingLog = {};
-        
-        // Don't reset tickCount completely — we need to track new symbol's ticks
-        // But we do reset the marketData which clears candles
-        const oldTickCount = this.tickCount;
         this.tickCount = 0;
         this.lastTickTime = Date.now();
 
         marketData.reset();
 
-        // Force unsub from old symbol and sub to new one
         derivService.subscribeToTicks(symbol)
             .then(() => {
                 console.log(`✅ [AI Trader] Successfully subscribed to ${symbol} ticks`);
-                // Verify subscription worked after 5 seconds
                 setTimeout(() => {
                     if (this.tickCount === 0) {
                         console.error(`❌ [AI Trader] NO TICKS after 5 seconds for ${symbol}! Re-subscribing...`);
@@ -1060,13 +1078,11 @@ class AITrader {
             })
             .catch(err => {
                 console.error(`❌ [AI Trader] Failed to subscribe to ${symbol}:`, err.message);
-                // Retry once
                 setTimeout(() => {
                     derivService.subscribeToTicks(symbol).catch(e => console.error(`Retry failed: ${e.message}`));
                 }, 3000);
             });
 
-        // Seed candles from history after subscription
         setTimeout(() => this.seedCandlesFromHistory(), 1500);
 
         this.currentWatchState.status = 'BUILDING_DATA';
