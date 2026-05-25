@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v7.1.3 - Fast start with candle seeding, per-symbol London filtering, sniper mode
+ * v7.1.4 - Fixed MarketData reset on symbol switch, proper tick re-subscription
  */
 
 const marketData = require('./marketData');
@@ -55,7 +55,7 @@ class AITrader {
         this.forceReconnecting = false;
         this.lastReconnectAttempt = 0;
         this.RECONNECT_COOLDOWN = 120000;
-        this.MIN_CANDLES_FOR_TRADE = 3; // v7.1.3: Reduced from 10 for faster start
+        this.MIN_CANDLES_FOR_TRADE = 3;
         this.dataReady = false;
         this.totalTrades = 0;
         this.totalWins = 0;
@@ -190,9 +190,7 @@ class AITrader {
 
     async shouldBlockLondon() {
         const currentHour = new Date().getUTCHours();
-        if (currentHour < this.BLOCKED_HOURS_START || currentHour >= this.BLOCKED_HOURS_END) {
-            return false;
-        }
+        if (currentHour < this.BLOCKED_HOURS_START || currentHour >= this.BLOCKED_HOURS_END) return false;
 
         try {
             const symbolSessionStats = await Trade.getSymbolSessionStats(this.userId, this.symbol);
@@ -231,9 +229,6 @@ class AITrader {
         }
     }
 
-    /**
-     * v7.1.3: Seed candles from Deriv history for faster startup
-     */
     async seedCandlesFromHistory() {
         try {
             const result = await derivService.getCandles(this.symbol, 60, 20);
@@ -241,10 +236,7 @@ class AITrader {
                 let seeded = 0;
                 result.candles.forEach(c => {
                     if (c.close) {
-                        marketData.addTick({
-                            epoch: c.epoch,
-                            quote: c.close
-                        });
+                        marketData.addTick({ epoch: c.epoch, quote: c.close });
                         seeded++;
                     }
                 });
@@ -384,7 +376,6 @@ class AITrader {
 
         this.userId = userId;
         
-        // v7.1: Load saved symbol from user settings
         try {
             const user = await User.findById(userId);
             if (user && user.default_symbol) {
@@ -438,25 +429,23 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v7.1.3 FAST START EDITION`);
+        console.log(`🤖 [AI Trader] Starting v7.1.4 FIXED EDITION`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
         console.log(`🔓 [AI Trader] London: Per-symbol filtering`);
         console.log(`🚀 [AI Trader] Min candles: ${this.MIN_CANDLES_FOR_TRADE} | Seeding from history`);
         console.log(`🎯 [AI Trader] Daily Target: $${(this.currentBalance * this.DAILY_PROFIT_TARGET_PCT).toFixed(2)} (10%)`);
         console.log(`🛡️ [AI Trader] Daily Loss Limit: $${(this.currentBalance * this.DAILY_LOSS_LIMIT_PCT).toFixed(2)} (5%)`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
-        console.log(`🔫 [AI Trader] Sniper Mode: ${tier === 'SMALL' ? 'DISABLED' : 'ENABLED'}`);
 
         marketData.reset();
 
+        // Subscribe to ticks and set up the listener
         const derivSymbol = derivService.symbolMap?.[this.symbol] || this.symbol;
         if (!derivService.subscriptions?.has(derivSymbol)) {
             try { await derivService.subscribeToTicks(this.symbol); } catch (err) {}
         }
 
-        // v7.1.3: Seed candles from history for fast startup
-        setTimeout(() => this.seedCandlesFromHistory(), 2000);
-
+        // CRITICAL: Register tick handler
         derivService.on('tick', (tick) => {
             marketData.addTick(tick);
             this.tickCount++;
@@ -464,6 +453,9 @@ class AITrader {
             if (this.tickCount % 50 === 0) console.log(`📈 [AI Trader] Tick #${this.tickCount} - $${tick.quote?.toFixed(2)}`);
             this.onMarketUpdate();
         });
+
+        // Seed candles from history for fast startup
+        setTimeout(() => this.seedCandlesFromHistory(), 2000);
 
         this.analysisInterval = setInterval(() => this.analyzeMarket(), 10000);
 
@@ -1005,7 +997,47 @@ class AITrader {
     }
 
     setMode(mode) { this.mode = mode; this.pendingLimitOrders = []; this._lastPendingLog = {}; console.log(`Mode: ${mode}`); }
-    setSymbol(symbol) { this.symbol = symbol; this.dataReady = false; this.trendStartTime = 0; this.trendDirection = null; this._trendHistory = []; marketData.reset(); derivService.subscribeToTicks(symbol).catch(() => {}); this.tickCount = 0; this.pendingLimitOrders = []; this._lastPendingLog = {}; this.currentWatchState.status = 'BUILDING_DATA'; broadcastAIUpdate(this.getCurrentAnalysis()); }
+
+    /**
+     * v7.1.4 FIXED: Properly re-subscribe to ticks when switching symbols
+     * Prevents the "stuck at 0 candles" bug
+     */
+    setSymbol(symbol) {
+        // Don't reset if we're already on this symbol
+        if (this.symbol === symbol && this.dataReady) {
+            console.log(`📡 [AI Trader] Already on ${symbol}, skipping reset`);
+            return;
+        }
+
+        console.log(`🔄 [AI Trader] Switching symbol from ${this.symbol} to ${symbol}`);
+        this.symbol = symbol;
+        this.dataReady = false;
+        this.trendStartTime = 0;
+        this.trendDirection = null;
+        this._trendHistory = [];
+        this.tickCount = 0;
+        this.lastTickTime = Date.now();
+        this.pendingLimitOrders = [];
+        this._lastPendingLog = {};
+
+        marketData.reset();
+
+        // Re-subscribe to ticks for the new symbol
+        derivService.subscribeToTicks(symbol)
+            .then(() => {
+                console.log(`📡 [AI Trader] Re-subscribed to ${symbol} ticks`);
+                this.lastTickTime = Date.now();
+                // Seed candles from history after subscription
+                setTimeout(() => this.seedCandlesFromHistory(), 1500);
+            })
+            .catch(err => {
+                console.error(`❌ [AI Trader] Failed to subscribe to ${symbol}:`, err.message);
+            });
+
+        this.currentWatchState.status = 'BUILDING_DATA';
+        broadcastAIUpdate(this.getCurrentAnalysis());
+    }
+
     setUserId(userId) { this.userId = userId; }
     setConfidenceThreshold(threshold) { this.confidenceThreshold = threshold; }
 
