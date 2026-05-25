@@ -15,13 +15,11 @@ class DerivService extends EventEmitter {
         this.maxReconnectAttempts = 20;
         this.authorized = false;
         this.currentToken = null;
-        this.currentUrlIndex = 0;
         this.currentBalance = 0;
         this.currentCurrency = 'USD';
         this.reconnectInProgress = false;
         this.isClosing = false;
         this.heartbeatInterval = null;
-        this.keepAliveInterval = null;
         this.lastSubscribedSymbol = null;
         this.activeAccountId = null;
 
@@ -30,78 +28,16 @@ class DerivService extends EventEmitter {
             "R_10_2S": "R_10_2S", "R_25_2S": "R_25_2S", "R_50_2S": "R_50_2S", "R_75_2S": "R_75_2S", "R_100_2S": "R_100_2S",
             "Boom 300": "BOOM300", "Boom 500": "BOOM500", "Boom 1000": "BOOM1000",
             "Crash 300": "CRASH300", "Crash 500": "CRASH500", "Crash 1000": "CRASH1000",
-            "Step 200": "STEP200", "Step 300": "STEP300", "Step 400": "STEP400", "Step 500": "STEP500",
-            "1HZ10": "1HZ10", "1HZ25": "1HZ25", "1HZ50": "1HZ50", "1HZ75": "1HZ75", "1HZ100": "1HZ100",
-            "EUR/USD": "frxEURUSD", "GBP/USD": "frxGBPUSD", "USD/JPY": "frxUSDJPY",
-            "AUD/USD": "frxAUDUSD", "USD/CAD": "frxUSDCAD", "NZD/USD": "frxNZDUSD", "USD/CHF": "frxUSDCHF",
-            "EUR/GBP": "frxEURGBP", "EUR/JPY": "frxEURJPY", "GBP/JPY": "frxGBPJPY",
-            "AUD/JPY": "frxAUDJPY", "CAD/JPY": "frxCADJPY", "CHF/JPY": "frxCHFJPY",
-            "EUR/AUD": "frxEURAUD", "GBP/AUD": "frxGBPAUD",
-            "XAU/USD (Gold)": "frxXAUUSD", "XAG/USD (Silver)": "frxXAGUSD",
-            "XPT/USD (Platinum)": "frxXPTUSD", "XPD/USD (Palladium)": "frxXPDUSD",
-            "WTI (Oil)": "frxWTI", "Brent (Oil)": "frxBrent",
-            "BTC/USD (Bitcoin)": "frxBTCUSD", "ETH/USD (Ethereum)": "frxETHUSD",
-            "LTC/USD (Litecoin)": "frxLTCUSD", "XRP/USD (Ripple)": "frxXRPUSD",
-            "ADA/USD (Cardano)": "frxADAUSD", "DOT/USD (Polkadot)": "frxDOTUSD",
-            "SOL/USD (Solana)": "frxSOLUSD", "DOGE/USD (Dogecoin)": "frxDOGEUSD",
-            "US500 (S&P 500)": "US500", "USTEC (Nasdaq)": "USTEC", "US30 (Dow Jones)": "US30",
-            "GER40 (DAX)": "GER40", "UK100 (FTSE)": "UK100", "FRA40 (CAC 40)": "FRA40",
-            "ESP35 (IBEX 35)": "ESP35", "NETH25 (AEX)": "NETH25",
-            "HK50 (Hang Seng)": "HK50", "JP225 (Nikkei)": "JP225", "AUS200 (ASX 200)": "AUS200"
         };
-
-        this.wsUrls = [
-            process.env.DERIV_WS_URL || 'wss://ws.derivws.com/websockets/v3',
-            process.env.DERIV_WS_FALLBACK_1 || 'wss://ws.binaryws.com/websockets/v3',
-            process.env.DERIV_WS_FALLBACK_2 || 'wss://frontend.binary.com/websockets/v3'
-        ];
     }
 
     convertSymbol(uiSymbol) {
         const derivSymbol = this.symbolMap[uiSymbol];
         if (derivSymbol) return derivSymbol;
-        console.log(`⚠️ [Deriv] Unknown symbol: ${uiSymbol}, using as-is`);
         return uiSymbol;
     }
 
-    async fetchAccountsViaRest(token) {
-        // FIXED: Correct endpoint for Deriv v3 accounts
-        const response = await fetch('https://api.derivws.com/trading/v1/options/accounts', {
-            method: 'GET',
-            headers: {
-                'Deriv-App-ID': process.env.DERIV_APP_ID,
-                'Deriv-Client-ID': process.env.DERIV_CLIENT_ID,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        if (!response.ok) throw new Error(`REST Account Fetch Failed: ${response.status}`);
-        return await response.json();
-    }
-
-    async fetchWebSocketOtpUrl(token, accountId) {
-        // FIXED: Correct endpoint for OTP generation
-        console.log(`🔑 [Deriv REST] Requesting session OTP for account: ${accountId}`);
-        const response = await fetch('https://api.derivws.com/trading/v1/options/otp', {
-            method: 'POST',
-            headers: {
-                'Deriv-App-ID': process.env.DERIV_APP_ID,
-                'Deriv-Client-ID': process.env.DERIV_CLIENT_ID,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ account_id: accountId })
-        });
-        if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`OTP Generation Failed: ${errText}`);
-        }
-        const payload = await response.json();
-        return payload.data?.url;
-    }
-
     async getCandles(symbol, granularity = 60, count = 20) {
-        // NEW: Get historical candles for seeding
         const derivSymbol = this.convertSymbol(symbol);
         const endEpoch = Math.floor(Date.now() / 1000);
         const startEpoch = endEpoch - (granularity * count);
@@ -114,20 +50,15 @@ class DerivService extends EventEmitter {
                 granularity: granularity,
                 style: 'candles'
             });
-            
-            if (result && result.candles) {
-                return { candles: result.candles };
-            }
+            if (result && result.candles) return { candles: result.candles };
             return { candles: [] };
         } catch (error) {
-            console.error(`❌ [Deriv] Failed to get candles:`, error.message);
             return { candles: [] };
         }
     }
 
     connect(token = null, forceNew = false, preferDemo = true) {
         if (this.isConnecting) {
-            console.log('⚠️ [Deriv] Connection setup already in progress');
             return Promise.resolve();
         }
 
@@ -141,20 +72,11 @@ class DerivService extends EventEmitter {
             try {
                 if (!token) throw new Error('Cannot connect without valid PAT token');
 
-                const accountData = await this.fetchAccountsViaRest(token);
-                const targetType = preferDemo ? 'demo' : 'real';
-                const selectedAccount = accountData.data?.find(acc => acc.account_type === targetType);
-
-                if (!selectedAccount) throw new Error(`No ${targetType} account found on profile.`);
-
-                this.activeAccountId = selectedAccount.account_id;
-                this.currentBalance = parseFloat(selectedAccount.balance);
-                this.currentCurrency = selectedAccount.currency || 'USD';
-
-                const secureWsUrl = await this.fetchWebSocketOtpUrl(token, this.activeAccountId);
-                console.log(`🔌 [Deriv WS] Connecting to pre-authenticated session...`);
-
-                this.ws = new WebSocket(secureWsUrl, { handshakeTimeout: 15000, timeout: 60000 });
+                const wsUrl = process.env.DERIV_WS_URL || 'wss://ws.derivws.com/websockets/v3';
+                
+                console.log(`🔌 [Deriv WS] Connecting to ${wsUrl}...`);
+                
+                this.ws = new WebSocket(wsUrl, { handshakeTimeout: 15000, timeout: 60000 });
 
                 this.ws.on('error', (error) => {
                     if (!this.isClosing) console.error(`❌ [Deriv WS] Error:`, error.message);
@@ -164,27 +86,45 @@ class DerivService extends EventEmitter {
                     }
                 });
 
-                this.ws.on('open', () => {
-                    console.log(`✅ [Deriv WS] Session active and pre-authenticated!`);
-                    this.isConnected = true;
-                    this.isConnecting = false;
-                    this.authorized = true;
-                    this.reconnectAttempts = 0;
-
-                    if (this.reconnectInterval) {
-                        clearInterval(this.reconnectInterval);
-                        this.reconnectInterval = null;
+                this.ws.on('open', async () => {
+                    console.log(`✅ [Deriv WS] Connected! Authorizing...`);
+                    
+                    try {
+                        const authResult = await this.sendRequest({ authorize: token });
+                        
+                        if (authResult.authorize) {
+                            this.authorized = true;
+                            this.currentBalance = parseFloat(authResult.authorize.balance);
+                            this.currentCurrency = authResult.authorize.currency;
+                            this.activeAccountId = authResult.authorize.account_id;
+                            
+                            console.log(`✅ [Deriv WS] Authorized! Account: ${this.activeAccountId}, Balance: $${this.currentBalance.toFixed(2)}`);
+                            this.isConnected = true;
+                            this.isConnecting = false;
+                            this.reconnectAttempts = 0;
+                            
+                            if (this.reconnectInterval) {
+                                clearInterval(this.reconnectInterval);
+                                this.reconnectInterval = null;
+                            }
+                            
+                            this.startHeartbeat();
+                            
+                            if (this.lastSubscribedSymbol) {
+                                this.subscribeToTicks(this.lastSubscribedSymbol).catch(() => {});
+                            }
+                            
+                            this.emit('connected');
+                            this.emit('authorized', { balance: this.currentBalance, currency: this.currentCurrency });
+                            resolve();
+                        } else {
+                            throw new Error('Authorization failed');
+                        }
+                    } catch (err) {
+                        console.error(`❌ [Deriv WS] Auth failed:`, err.message);
+                        this.isConnecting = false;
+                        reject(err);
                     }
-
-                    this.startHeartbeat();
-
-                    if (this.lastSubscribedSymbol) {
-                        this.subscribeToTicks(this.lastSubscribedSymbol).catch(() => {});
-                    }
-
-                    this.emit('connected');
-                    this.emit('authorized', { balance: this.currentBalance, currency: this.currentCurrency });
-                    resolve();
                 });
 
                 this.ws.on('message', (data) => {
@@ -225,7 +165,6 @@ class DerivService extends EventEmitter {
 
     stopHeartbeat() {
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
-        if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
     }
 
     safeClose() {
@@ -273,14 +212,12 @@ class DerivService extends EventEmitter {
             for (const existingSymbol of this.subscriptions) {
                 try {
                     await this.sendRequest({ forget: existingSymbol });
-                    console.log(`📡 [Deriv] Cleaned up subscription: ${existingSymbol}`);
                 } catch (e) {}
             }
             this.subscriptions.clear();
         } catch (e) {}
 
-        const isDemoMode = this.activeAccountId ? this.activeAccountId.startsWith('D') : true;
-        await this.connect(this.currentToken, true, isDemoMode);
+        await this.connect(this.currentToken, true, true);
         await this.subscribeToTicks(symbol);
         return true;
     }
@@ -294,8 +231,7 @@ class DerivService extends EventEmitter {
             }
             this.reconnectAttempts++;
             try {
-                const isDemoMode = this.activeAccountId ? this.activeAccountId.startsWith('D') : true;
-                await this.connect(this.currentToken, true, isDemoMode);
+                await this.connect(this.currentToken, true, true);
                 if (this.isConnected && this.reconnectInterval) {
                     clearInterval(this.reconnectInterval);
                     this.reconnectInterval = null;
@@ -341,17 +277,12 @@ class DerivService extends EventEmitter {
         });
     }
 
-    async authorize(token) {
-        return { authorize: { balance: this.currentBalance, currency: this.currentCurrency } };
-    }
-
     async subscribeToTicks(symbol) {
         const derivSymbol = this.convertSymbol(symbol);
 
         for (const existingSymbol of this.subscriptions) {
             try {
                 await this.sendRequest({ forget: existingSymbol });
-                console.log(`📡 [Deriv] Unsubscribed from ${existingSymbol}`);
             } catch (e) {}
         }
         this.subscriptions.clear();
@@ -392,10 +323,6 @@ class DerivService extends EventEmitter {
 
     async getBalance() {
         return { balance: this.currentBalance, currency: this.currentCurrency };
-    }
-
-    async getBalanceWithToken(token) {
-        return this.getBalance();
     }
 
     async getClosedContract(contractId) {
