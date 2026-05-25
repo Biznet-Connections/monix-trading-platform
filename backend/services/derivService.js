@@ -52,8 +52,50 @@ class DerivService extends EventEmitter {
     convertSymbol(uiSymbol) {
         const derivSymbol = this.symbolMap[uiSymbol];
         if (derivSymbol) return derivSymbol;
-        console.log(`⚠️ [Deriv] Unknown symbol: ${uiSymbol}, using as-is`);
         return uiSymbol;
+    }
+
+    async fetchAccountsViaRest(token) {
+        const response = await fetch('https://api.derivws.com/trading/v1/options/accounts', {
+            method: 'GET',
+            headers: {
+                'Deriv-App-ID': process.env.DERIV_APP_ID,
+                'Deriv-Client-ID': process.env.DERIV_CLIENT_ID,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) throw new Error(`REST Account Fetch Failed: ${response.status}`);
+        return await response.json();
+    }
+
+    async fetchWebSocketOtpUrl(token, accountId) {
+        console.log(`🔑 [Deriv REST] Requesting OTP URL for account: ${accountId}`);
+        
+        const response = await fetch(`https://api.derivws.com/trading/v1/options/accounts/${accountId}/otp`, {
+            method: 'POST',
+            headers: {
+                'Deriv-App-ID': process.env.DERIV_APP_ID,
+                'Deriv-Client-ID': process.env.DERIV_CLIENT_ID,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`OTP Generation Failed: ${errText}`);
+        }
+        
+        const payload = await response.json();
+        const wsUrl = payload.data?.url;
+        
+        if (!wsUrl) {
+            throw new Error('No WebSocket URL in OTP response');
+        }
+        
+        console.log(`✅ [Deriv REST] Got OTP URL (length: ${wsUrl.length})`);
+        return wsUrl;
     }
 
     async getCandles(symbol, granularity = 60, count = 20) {
@@ -72,14 +114,12 @@ class DerivService extends EventEmitter {
             if (result && result.candles) return { candles: result.candles };
             return { candles: [] };
         } catch (error) {
-            console.error(`❌ [Deriv] Failed to get candles:`, error.message);
             return { candles: [] };
         }
     }
 
     connect(token = null, forceNew = false, preferDemo = true) {
         if (this.isConnecting) {
-            console.log('⚠️ [Deriv] Connection already in progress');
             return Promise.resolve();
         }
 
@@ -93,9 +133,21 @@ class DerivService extends EventEmitter {
             try {
                 if (!token) throw new Error('Cannot connect without valid PAT token');
 
-                const wsUrl = 'wss://ws.derivws.com/websockets/v3';
+                // Step 1: Get accounts
+                const accountData = await this.fetchAccountsViaRest(token);
+                const targetType = preferDemo ? 'demo' : 'real';
+                const selectedAccount = accountData.data?.find(acc => acc.account_type === targetType);
+
+                if (!selectedAccount) throw new Error(`No ${targetType} account found.`);
+
+                this.activeAccountId = selectedAccount.account_id;
+                this.currentBalance = parseFloat(selectedAccount.balance);
+                this.currentCurrency = selectedAccount.currency || 'USD';
+
+                // Step 2: Get OTP URL
+                const wsUrl = await this.fetchWebSocketOtpUrl(token, this.activeAccountId);
                 
-                console.log(`🔌 [Deriv WS] Connecting to ${wsUrl}...`);
+                console.log(`🔌 [Deriv WS] Connecting to OTP URL...`);
                 
                 this.ws = new WebSocket(wsUrl, { handshakeTimeout: 15000, timeout: 60000 });
 
@@ -107,60 +159,38 @@ class DerivService extends EventEmitter {
                     }
                 });
 
-                this.ws.on('open', async () => {
-                    console.log(`✅ [Deriv WS] Connected! Authorizing...`);
+                this.ws.on('open', () => {
+                    console.log(`✅ [Deriv WS] Connected and pre-authenticated!`);
+                    this.isConnected = true;
+                    this.isConnecting = false;
+                    this.authorized = true;
+                    this.reconnectAttempts = 0;
                     
-                    try {
-                        const authResult = await this.sendRequest({ authorize: token });
-                        
-                        if (authResult.authorize) {
-                            this.authorized = true;
-                            this.currentBalance = parseFloat(authResult.authorize.balance);
-                            this.currentCurrency = authResult.authorize.currency;
-                            this.activeAccountId = authResult.authorize.account_id;
-                            
-                            console.log(`✅ [Deriv WS] Authorized! Account: ${this.activeAccountId}, Balance: $${this.currentBalance.toFixed(2)}`);
-                            this.isConnected = true;
-                            this.isConnecting = false;
-                            this.reconnectAttempts = 0;
-                            
-                            if (this.reconnectInterval) {
-                                clearInterval(this.reconnectInterval);
-                                this.reconnectInterval = null;
-                            }
-                            
-                            this.startHeartbeat();
-                            
-                            if (this.lastSubscribedSymbol) {
-                                this.subscribeToTicks(this.lastSubscribedSymbol).catch(() => {});
-                            }
-                            
-                            this.emit('connected');
-                            this.emit('authorized', { balance: this.currentBalance, currency: this.currentCurrency });
-                            resolve();
-                        } else {
-                            throw new Error('Authorization failed - invalid response');
-                        }
-                    } catch (err) {
-                        console.error(`❌ [Deriv WS] Auth failed:`, err.message);
-                        this.isConnected = false;
-                        this.isConnecting = false;
-                        this.authorized = false;
-                        reject(err);
+                    if (this.reconnectInterval) {
+                        clearInterval(this.reconnectInterval);
+                        this.reconnectInterval = null;
                     }
+                    
+                    this.startHeartbeat();
+                    
+                    if (this.lastSubscribedSymbol) {
+                        this.subscribeToTicks(this.lastSubscribedSymbol).catch(() => {});
+                    }
+                    
+                    this.emit('connected');
+                    this.emit('authorized', { balance: this.currentBalance, currency: this.currentCurrency });
+                    resolve();
                 });
 
                 this.ws.on('message', (data) => {
                     try {
                         const response = JSON.parse(data);
                         this.handleMessage(response);
-                    } catch (err) {
-                        console.error('❌ [Deriv] Failed to parse message:', err.message);
-                    }
+                    } catch (err) {}
                 });
 
-                this.ws.on('close', (code, reason) => {
-                    console.log(`🔌 [Deriv WS] Session closed: ${code} - ${reason || 'no reason'}`);
+                this.ws.on('close', (code) => {
+                    console.log(`🔌 [Deriv WS] Session closed: ${code}`);
                     this.isConnected = false;
                     this.isConnecting = false;
                     this.authorized = false;
@@ -189,10 +219,7 @@ class DerivService extends EventEmitter {
     }
 
     stopHeartbeat() {
-        if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval);
-            this.heartbeatInterval = null;
-        }
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
     }
 
     safeClose() {
@@ -240,7 +267,6 @@ class DerivService extends EventEmitter {
             for (const existingSymbol of this.subscriptions) {
                 try {
                     await this.sendRequest({ forget: existingSymbol });
-                    console.log(`📡 [Deriv] Cleaned up subscription: ${existingSymbol}`);
                 } catch (e) {}
             }
             this.subscriptions.clear();
@@ -255,13 +281,10 @@ class DerivService extends EventEmitter {
         if (this.reconnectInterval || this.isClosing) return;
         this.reconnectInterval = setInterval(async () => {
             if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                console.log('🛑 [Deriv] Max reconnection attempts reached, stopping');
                 clearInterval(this.reconnectInterval);
-                this.reconnectInterval = null;
                 return;
             }
             this.reconnectAttempts++;
-            console.log(`🔄 [Deriv] Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
             try {
                 await this.connect(this.currentToken, true, true);
                 if (this.isConnected && this.reconnectInterval) {
@@ -288,22 +311,12 @@ class DerivService extends EventEmitter {
         }
         
         if (msgType === 'buy') {
-            if (response.error) {
-                console.error('❌ [Deriv] Trade error:', response.error.message);
-                this.emit('trade_error', response.error);
-            } else {
-                console.log('✅ [Deriv] Trade executed:', response.buy.contract_id);
-                this.emit('trade_executed', response.buy);
-            }
+            if (response.error) this.emit('trade_error', response.error);
+            else this.emit('trade_executed', response.buy);
         }
         
         if (msgType === 'proposal_open_contract') {
             this.emit('contract_update', response.proposal_open_contract);
-        }
-
-        if (response.error && response.error.code === 'InvalidToken') {
-            console.error('❌ [Deriv] Invalid token! Please update your API token.');
-            this.emit('invalid_token');
         }
 
         if (response.req_id && this.pendingRequests.has(response.req_id)) {
@@ -328,11 +341,9 @@ class DerivService extends EventEmitter {
     async subscribeToTicks(symbol) {
         const derivSymbol = this.convertSymbol(symbol);
 
-        // Unsubscribe from all existing subscriptions
         for (const existingSymbol of this.subscriptions) {
             try {
                 await this.sendRequest({ forget: existingSymbol });
-                console.log(`📡 [Deriv] Unsubscribed from ${existingSymbol}`);
             } catch (e) {}
         }
         this.subscriptions.clear();
@@ -353,12 +364,9 @@ class DerivService extends EventEmitter {
     async placeTrade(symbol, action, stake, duration = 5, durationUnit = 'm') {
         if (!this.authorized) throw new Error('Not authorized');
         if (stake < 0.35) throw new Error('Minimum stake is $0.35');
-        
         const derivSymbol = this.convertSymbol(symbol);
         const contractType = action === 'BUY' ? 'CALL' : 'PUT';
-        
         console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake}`);
-        
         return this.sendRequest({
             buy: 1,
             price: stake,
@@ -375,7 +383,7 @@ class DerivService extends EventEmitter {
     }
 
     async getBalance() {
-        return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized };
+        return { balance: this.currentBalance, currency: this.currentCurrency };
     }
 
     async getClosedContract(contractId) {
@@ -391,7 +399,6 @@ class DerivService extends EventEmitter {
     }
 
     disconnect() {
-        console.log('🔌 [Deriv] Disconnecting...');
         this.isClosing = true;
         this.safeClose();
     }
