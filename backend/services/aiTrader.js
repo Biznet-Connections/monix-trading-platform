@@ -1,7 +1,7 @@
 /**
  * AI Trader Service - The Professional
  * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v7.1 - Per-symbol session filtering, London unblocked for new symbols, self-learning
+ * v7.1.3 - Fast start with candle seeding, per-symbol London filtering, sniper mode
  */
 
 const marketData = require('./marketData');
@@ -55,7 +55,7 @@ class AITrader {
         this.forceReconnecting = false;
         this.lastReconnectAttempt = 0;
         this.RECONNECT_COOLDOWN = 120000;
-        this.MIN_CANDLES_FOR_TRADE = 10;
+        this.MIN_CANDLES_FOR_TRADE = 3; // v7.1.3: Reduced from 10 for faster start
         this.dataReady = false;
         this.totalTrades = 0;
         this.totalWins = 0;
@@ -65,7 +65,6 @@ class AITrader {
         this.sessionLoss = 0;
         this.currentBalance = 1000;
 
-        // v7.0: Dynamic stake percentages based on account size
         this.PCT_MIN_SMALL = 0.02;
         this.PCT_BASE_SMALL = 0.05;
         this.PCT_CONFIDENT_SMALL = 0.08;
@@ -95,7 +94,6 @@ class AITrader {
         this.DAILY_PROFIT_TARGET_PCT = 0.10;
         this.DAILY_LOSS_LIMIT_PCT = 0.05;
 
-        // v7.1: London block now checks per-symbol historical data
         this.BLOCKED_HOURS_START = 8;
         this.BLOCKED_HOURS_END = 17;
 
@@ -190,26 +188,17 @@ class AITrader {
         }
     }
 
-    /**
-     * v7.1: Check if London should be blocked for current symbol
-     * New symbols (less than 20 trades in London) are allowed to trade
-     */
     async shouldBlockLondon() {
         const currentHour = new Date().getUTCHours();
         if (currentHour < this.BLOCKED_HOURS_START || currentHour >= this.BLOCKED_HOURS_END) {
-            return false; // Not London hours
+            return false;
         }
 
-        // Check per-symbol London performance
         try {
-            const sessionStats = await Trade.getSessionStats(this.userId);
             const symbolSessionStats = await Trade.getSymbolSessionStats(this.userId, this.symbol);
-            
-            // Find London performance for THIS symbol
             const londonPerf = symbolSessionStats?.find(s => s.session === 'LONDON');
             
             if (!londonPerf || londonPerf.total < 10) {
-                // New symbol or not enough data — ALLOW trading to learn
                 console.log(`🔓 [London] ${this.symbol} has ${londonPerf?.total || 0} London trades. Allowing to learn.`);
                 return false;
             }
@@ -223,7 +212,6 @@ class AITrader {
             console.log(`🔓 [London] ${this.symbol} has ${londonWR}% WR in London. Allowing.`);
             return false;
         } catch (e) {
-            // If we can't check, allow trading for new symbols
             console.log(`🔓 [London] Could not verify ${this.symbol} London stats. Allowing to learn.`);
             return false;
         }
@@ -231,7 +219,6 @@ class AITrader {
 
     async syncBalanceFromDeriv() {
         if (!derivService.authorized) return;
-        
         try {
             const balanceResult = await derivService.getBalance();
             if (balanceResult && balanceResult.balance > 0) {
@@ -241,6 +228,33 @@ class AITrader {
             }
         } catch (error) {
             console.error('❌ [AI Trader] Failed to sync balance:', error.message);
+        }
+    }
+
+    /**
+     * v7.1.3: Seed candles from Deriv history for faster startup
+     */
+    async seedCandlesFromHistory() {
+        try {
+            const result = await derivService.getCandles(this.symbol, 60, 20);
+            if (result?.candles && result.candles.length > 0) {
+                let seeded = 0;
+                result.candles.forEach(c => {
+                    if (c.close) {
+                        marketData.addTick({
+                            epoch: c.epoch,
+                            quote: c.close
+                        });
+                        seeded++;
+                    }
+                });
+                if (seeded > 0) {
+                    console.log(`📊 [AI Trader] Seeded ${seeded} candles from history for ${this.symbol}`);
+                    this.dataReady = true;
+                }
+            }
+        } catch (e) {
+            console.log(`⚠️ [AI Trader] Could not seed candles from history: ${e.message}`);
         }
     }
 
@@ -284,7 +298,6 @@ class AITrader {
     calculateStatisticalConfidence(pattern, session, rsi, trend, nearSR, hourUTC) {
         let totalWeight = 0;
         let weightedScore = 0;
-
         if (pattern && this._cachedPatternPerformance) {
             const normalizedSearch = pattern.toLowerCase().replace(/_/g, ' ').replace(/ at .*$/, '').trim();
             let patternPerf = this._cachedPatternPerformance.find(p => p.pattern.toLowerCase() === normalizedSearch);
@@ -308,7 +321,6 @@ class AITrader {
                 totalWeight += this.CONF_WEIGHTS.patternHistoricalWR;
             }
         }
-
         if (session && this._cachedSessionPerformance) {
             const sessionPerf = this._cachedSessionPerformance.find(s => s.session === session);
             if (sessionPerf && sessionPerf.total >= 3) {
@@ -317,7 +329,6 @@ class AITrader {
                 totalWeight += this.CONF_WEIGHTS.sessionHistoricalWR;
             }
         }
-
         if (rsi && this._cachedRSIPerformance) {
             const rsiZone = this.getRSIZone(rsi);
             const rsiPerf = this._cachedRSIPerformance.find(r => r.label && r.label.includes(rsiZone));
@@ -326,7 +337,6 @@ class AITrader {
                 totalWeight += this.CONF_WEIGHTS.rsiZoneWR;
             }
         }
-
         if (hourUTC !== undefined && this._cachedHourPerformance) {
             const hourPerf = this._cachedHourPerformance.find(h => h.hour === hourUTC);
             if (hourPerf && hourPerf.total >= 3) {
@@ -334,7 +344,6 @@ class AITrader {
                 totalWeight += this.CONF_WEIGHTS.hourHistoricalWR;
             }
         }
-
         if (trend && pattern) {
             const trendLower = trend.toLowerCase();
             const patternLower = pattern.toLowerCase();
@@ -351,12 +360,10 @@ class AITrader {
                 totalWeight += this.CONF_WEIGHTS.trendAlignment;
             }
         }
-
         if (nearSR) {
             weightedScore += 70 * this.CONF_WEIGHTS.nearSR;
             totalWeight += this.CONF_WEIGHTS.nearSR;
         }
-
         if (totalWeight === 0) return 50;
         return Math.min(95, Math.max(5, Math.round(weightedScore / totalWeight)));
     }
@@ -376,7 +383,20 @@ class AITrader {
         if (this.isRunning) return;
 
         this.userId = userId;
-        this.symbol = symbol;
+        
+        // v7.1: Load saved symbol from user settings
+        try {
+            const user = await User.findById(userId);
+            if (user && user.default_symbol) {
+                this.symbol = user.default_symbol;
+                console.log(`💾 [AI Trader] Loaded saved symbol: ${this.symbol}`);
+            } else {
+                this.symbol = symbol || 'R_75';
+            }
+        } catch (e) {
+            this.symbol = symbol || 'R_75';
+        }
+        
         this.mode = mode;
         this.isRunning = true;
         this.isExecuting = false;
@@ -418,9 +438,10 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v7.1 PER-SYMBOL EDITION`);
+        console.log(`🤖 [AI Trader] Starting v7.1.3 FAST START EDITION`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
-        console.log(`🔓 [AI Trader] London: Per-symbol filtering (allows new symbols to learn)`);
+        console.log(`🔓 [AI Trader] London: Per-symbol filtering`);
+        console.log(`🚀 [AI Trader] Min candles: ${this.MIN_CANDLES_FOR_TRADE} | Seeding from history`);
         console.log(`🎯 [AI Trader] Daily Target: $${(this.currentBalance * this.DAILY_PROFIT_TARGET_PCT).toFixed(2)} (10%)`);
         console.log(`🛡️ [AI Trader] Daily Loss Limit: $${(this.currentBalance * this.DAILY_LOSS_LIMIT_PCT).toFixed(2)} (5%)`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
@@ -428,10 +449,13 @@ class AITrader {
 
         marketData.reset();
 
-        const derivSymbol = derivService.symbolMap?.[symbol] || symbol;
+        const derivSymbol = derivService.symbolMap?.[this.symbol] || this.symbol;
         if (!derivService.subscriptions?.has(derivSymbol)) {
-            try { await derivService.subscribeToTicks(symbol); } catch (err) {}
+            try { await derivService.subscribeToTicks(this.symbol); } catch (err) {}
         }
+
+        // v7.1.3: Seed candles from history for fast startup
+        setTimeout(() => this.seedCandlesFromHistory(), 2000);
 
         derivService.on('tick', (tick) => {
             marketData.addTick(tick);
@@ -551,12 +575,11 @@ class AITrader {
             const timeSinceLastTrade = Date.now() - this.lastTradeTime;
             if (this.lastTradeTime > 0 && timeSinceLastTrade < this.tradeCooldown) return;
 
-            // v7.1: Per-symbol London check
             const currentHour = new Date().getUTCHours();
             const blockLondon = await this.shouldBlockLondon();
             if (blockLondon) {
                 if (!this._lastLondonLog || Date.now() - this._lastLondonLog > 120000) {
-                    console.log(`🛑 [London] ${this.symbol} blocked during London window (${this.BLOCKED_HOURS_START}:00-${this.BLOCKED_HOURS_END}:00 UTC). WR too low.`);
+                    console.log(`🛑 [London] ${this.symbol} blocked during London window. WR too low.`);
                     this._lastLondonLog = Date.now();
                 }
                 return;
@@ -587,7 +610,7 @@ class AITrader {
 
             const candleCount = marketState.candleCount;
             if (candleCount < this.MIN_CANDLES_FOR_TRADE) {
-                if (candleCount % 3 === 0) console.log(`🔍 [AI Trader] Building: ${candleCount}/${this.MIN_CANDLES_FOR_TRADE} candles`);
+                if (candleCount % 3 === 0 || candleCount === 1) console.log(`🔍 [AI Trader] Building: ${candleCount}/${this.MIN_CANDLES_FOR_TRADE} candles`);
                 return;
             }
             if (!this.dataReady) this.dataReady = true;
@@ -909,9 +932,7 @@ class AITrader {
             }
             if (this.lastStakeWasMax) {
                 this.tradesSinceBigLoss++;
-                if (this.tradesSinceBigLoss >= 3) {
-                    this.lastStakeWasMax = false;
-                }
+                if (this.tradesSinceBigLoss >= 3) this.lastStakeWasMax = false;
             }
 
             await Trade.updateResult(tradeId, exitPrice, profit, status);
@@ -937,12 +958,7 @@ class AITrader {
                 }
             }
 
-            try { 
-                const bal = await derivService.getBalance(); 
-                if (bal?.balance) {
-                    this.currentBalance = bal.balance;
-                }
-            } catch (e) {}
+            try { const bal = await derivService.getBalance(); if (bal?.balance) this.currentBalance = bal.balance; } catch (e) {}
 
             broadcastTradeResult({ id: tradeId, contract_id: contractId, symbol: this.symbol, action: this.activeTrade?.action, entry_price: entryPrice, exit_price: exitPrice, profit, stake, status });
             const winRate = this.recentResults.length > 0 ? Math.round((this.recentResults.filter(r => r === 'WIN').length / this.recentResults.length) * 100) : 0;
