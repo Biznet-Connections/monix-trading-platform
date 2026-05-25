@@ -28,12 +28,31 @@ class DerivService extends EventEmitter {
             "R_10_2S": "R_10_2S", "R_25_2S": "R_25_2S", "R_50_2S": "R_50_2S", "R_75_2S": "R_75_2S", "R_100_2S": "R_100_2S",
             "Boom 300": "BOOM300", "Boom 500": "BOOM500", "Boom 1000": "BOOM1000",
             "Crash 300": "CRASH300", "Crash 500": "CRASH500", "Crash 1000": "CRASH1000",
+            "Step 200": "STEP200", "Step 300": "STEP300", "Step 400": "STEP400", "Step 500": "STEP500",
+            "1HZ10": "1HZ10", "1HZ25": "1HZ25", "1HZ50": "1HZ50", "1HZ75": "1HZ75", "1HZ100": "1HZ100",
+            "EUR/USD": "frxEURUSD", "GBP/USD": "frxGBPUSD", "USD/JPY": "frxUSDJPY",
+            "AUD/USD": "frxAUDUSD", "USD/CAD": "frxUSDCAD", "NZD/USD": "frxNZDUSD", "USD/CHF": "frxUSDCHF",
+            "EUR/GBP": "frxEURGBP", "EUR/JPY": "frxEURJPY", "GBP/JPY": "frxGBPJPY",
+            "AUD/JPY": "frxAUDJPY", "CAD/JPY": "frxCADJPY", "CHF/JPY": "frxCHFJPY",
+            "EUR/AUD": "frxEURAUD", "GBP/AUD": "frxGBPAUD",
+            "XAU/USD (Gold)": "frxXAUUSD", "XAG/USD (Silver)": "frxXAGUSD",
+            "XPT/USD (Platinum)": "frxXPTUSD", "XPD/USD (Palladium)": "frxXPDUSD",
+            "WTI (Oil)": "frxWTI", "Brent (Oil)": "frxBrent",
+            "BTC/USD (Bitcoin)": "frxBTCUSD", "ETH/USD (Ethereum)": "frxETHUSD",
+            "LTC/USD (Litecoin)": "frxLTCUSD", "XRP/USD (Ripple)": "frxXRPUSD",
+            "ADA/USD (Cardano)": "frxADAUSD", "DOT/USD (Polkadot)": "frxDOTUSD",
+            "SOL/USD (Solana)": "frxSOLUSD", "DOGE/USD (Dogecoin)": "frxDOGEUSD",
+            "US500 (S&P 500)": "US500", "USTEC (Nasdaq)": "USTEC", "US30 (Dow Jones)": "US30",
+            "GER40 (DAX)": "GER40", "UK100 (FTSE)": "UK100", "FRA40 (CAC 40)": "FRA40",
+            "ESP35 (IBEX 35)": "ESP35", "NETH25 (AEX)": "NETH25",
+            "HK50 (Hang Seng)": "HK50", "JP225 (Nikkei)": "JP225", "AUS200 (ASX 200)": "AUS200"
         };
     }
 
     convertSymbol(uiSymbol) {
         const derivSymbol = this.symbolMap[uiSymbol];
         if (derivSymbol) return derivSymbol;
+        console.log(`⚠️ [Deriv] Unknown symbol: ${uiSymbol}, using as-is`);
         return uiSymbol;
     }
 
@@ -53,12 +72,14 @@ class DerivService extends EventEmitter {
             if (result && result.candles) return { candles: result.candles };
             return { candles: [] };
         } catch (error) {
+            console.error(`❌ [Deriv] Failed to get candles:`, error.message);
             return { candles: [] };
         }
     }
 
     connect(token = null, forceNew = false, preferDemo = true) {
         if (this.isConnecting) {
+            console.log('⚠️ [Deriv] Connection already in progress');
             return Promise.resolve();
         }
 
@@ -72,7 +93,7 @@ class DerivService extends EventEmitter {
             try {
                 if (!token) throw new Error('Cannot connect without valid PAT token');
 
-                const wsUrl = process.env.DERIV_WS_URL || 'wss://ws.derivws.com/websockets/v3';
+                const wsUrl = 'wss://ws.derivws.com/websockets/v3';
                 
                 console.log(`🔌 [Deriv WS] Connecting to ${wsUrl}...`);
                 
@@ -118,11 +139,13 @@ class DerivService extends EventEmitter {
                             this.emit('authorized', { balance: this.currentBalance, currency: this.currentCurrency });
                             resolve();
                         } else {
-                            throw new Error('Authorization failed');
+                            throw new Error('Authorization failed - invalid response');
                         }
                     } catch (err) {
                         console.error(`❌ [Deriv WS] Auth failed:`, err.message);
+                        this.isConnected = false;
                         this.isConnecting = false;
+                        this.authorized = false;
                         reject(err);
                     }
                 });
@@ -131,11 +154,13 @@ class DerivService extends EventEmitter {
                     try {
                         const response = JSON.parse(data);
                         this.handleMessage(response);
-                    } catch (err) {}
+                    } catch (err) {
+                        console.error('❌ [Deriv] Failed to parse message:', err.message);
+                    }
                 });
 
-                this.ws.on('close', (code) => {
-                    console.log(`🔌 [Deriv WS] Session closed: ${code}`);
+                this.ws.on('close', (code, reason) => {
+                    console.log(`🔌 [Deriv WS] Session closed: ${code} - ${reason || 'no reason'}`);
                     this.isConnected = false;
                     this.isConnecting = false;
                     this.authorized = false;
@@ -164,7 +189,10 @@ class DerivService extends EventEmitter {
     }
 
     stopHeartbeat() {
-        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
     }
 
     safeClose() {
@@ -212,6 +240,7 @@ class DerivService extends EventEmitter {
             for (const existingSymbol of this.subscriptions) {
                 try {
                     await this.sendRequest({ forget: existingSymbol });
+                    console.log(`📡 [Deriv] Cleaned up subscription: ${existingSymbol}`);
                 } catch (e) {}
             }
             this.subscriptions.clear();
@@ -226,10 +255,13 @@ class DerivService extends EventEmitter {
         if (this.reconnectInterval || this.isClosing) return;
         this.reconnectInterval = setInterval(async () => {
             if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                console.log('🛑 [Deriv] Max reconnection attempts reached, stopping');
                 clearInterval(this.reconnectInterval);
+                this.reconnectInterval = null;
                 return;
             }
             this.reconnectAttempts++;
+            console.log(`🔄 [Deriv] Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
             try {
                 await this.connect(this.currentToken, true, true);
                 if (this.isConnected && this.reconnectInterval) {
@@ -244,19 +276,35 @@ class DerivService extends EventEmitter {
 
     handleMessage(response) {
         const msgType = response.msg_type;
+        
         if (msgType === 'tick') {
             this.emit('tick', response.tick);
         }
+        
         if (msgType === 'balance') {
             this.currentBalance = response.balance.balance;
             this.currentCurrency = response.balance.currency;
             this.emit('balance', { balance: response.balance.balance, currency: response.balance.currency });
         }
+        
         if (msgType === 'buy') {
-            if (response.error) this.emit('trade_error', response.error);
-            else this.emit('trade_executed', response.buy);
+            if (response.error) {
+                console.error('❌ [Deriv] Trade error:', response.error.message);
+                this.emit('trade_error', response.error);
+            } else {
+                console.log('✅ [Deriv] Trade executed:', response.buy.contract_id);
+                this.emit('trade_executed', response.buy);
+            }
         }
-        if (msgType === 'proposal_open_contract') this.emit('contract_update', response.proposal_open_contract);
+        
+        if (msgType === 'proposal_open_contract') {
+            this.emit('contract_update', response.proposal_open_contract);
+        }
+
+        if (response.error && response.error.code === 'InvalidToken') {
+            console.error('❌ [Deriv] Invalid token! Please update your API token.');
+            this.emit('invalid_token');
+        }
 
         if (response.req_id && this.pendingRequests.has(response.req_id)) {
             const { resolve, reject } = this.pendingRequests.get(response.req_id);
@@ -280,9 +328,11 @@ class DerivService extends EventEmitter {
     async subscribeToTicks(symbol) {
         const derivSymbol = this.convertSymbol(symbol);
 
+        // Unsubscribe from all existing subscriptions
         for (const existingSymbol of this.subscriptions) {
             try {
                 await this.sendRequest({ forget: existingSymbol });
+                console.log(`📡 [Deriv] Unsubscribed from ${existingSymbol}`);
             } catch (e) {}
         }
         this.subscriptions.clear();
@@ -303,9 +353,12 @@ class DerivService extends EventEmitter {
     async placeTrade(symbol, action, stake, duration = 5, durationUnit = 'm') {
         if (!this.authorized) throw new Error('Not authorized');
         if (stake < 0.35) throw new Error('Minimum stake is $0.35');
+        
         const derivSymbol = this.convertSymbol(symbol);
         const contractType = action === 'BUY' ? 'CALL' : 'PUT';
+        
         console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake}`);
+        
         return this.sendRequest({
             buy: 1,
             price: stake,
@@ -322,7 +375,7 @@ class DerivService extends EventEmitter {
     }
 
     async getBalance() {
-        return { balance: this.currentBalance, currency: this.currentCurrency };
+        return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized };
     }
 
     async getClosedContract(contractId) {
@@ -338,6 +391,7 @@ class DerivService extends EventEmitter {
     }
 
     disconnect() {
+        console.log('🔌 [Deriv] Disconnecting...');
         this.isClosing = true;
         this.safeClose();
     }
