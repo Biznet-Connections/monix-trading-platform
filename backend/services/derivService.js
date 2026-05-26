@@ -71,7 +71,6 @@ class DerivService extends EventEmitter {
 
     async fetchWebSocketOtpUrl(token, accountId) {
         console.log(`🔑 [Deriv REST] Requesting OTP URL for account: ${accountId}`);
-        
         const response = await fetch(`https://api.derivws.com/trading/v1/options/accounts/${accountId}/otp`, {
             method: 'POST',
             headers: {
@@ -81,20 +80,14 @@ class DerivService extends EventEmitter {
                 'Content-Type': 'application/json'
             }
         });
-        
         if (!response.ok) {
             const errText = await response.text();
             throw new Error(`OTP Generation Failed: ${errText}`);
         }
-        
         const payload = await response.json();
         const wsUrl = payload.data?.url;
-        
-        if (!wsUrl) {
-            throw new Error('No WebSocket URL in OTP response');
-        }
-        
-        console.log(`✅ [Deriv REST] Got OTP URL (length: ${wsUrl.length})`);
+        if (!wsUrl) throw new Error('No WebSocket URL in OTP response');
+        console.log(`✅ [Deriv REST] Got OTP URL`);
         return wsUrl;
     }
 
@@ -102,7 +95,6 @@ class DerivService extends EventEmitter {
         const derivSymbol = this.convertSymbol(symbol);
         const endEpoch = Math.floor(Date.now() / 1000);
         const startEpoch = endEpoch - (granularity * count);
-        
         try {
             const result = await this.sendRequest({
                 candles: derivSymbol,
@@ -119,86 +111,58 @@ class DerivService extends EventEmitter {
     }
 
     connect(token = null, forceNew = false, preferDemo = true) {
-        if (this.isConnecting) {
-            return Promise.resolve();
-        }
-
+        if (this.isConnecting) return Promise.resolve();
         this.isConnecting = true;
         this.isClosing = false;
         this.currentToken = token;
-
         if (forceNew) this.safeClose();
 
         return new Promise(async (resolve, reject) => {
             try {
                 if (!token) throw new Error('Cannot connect without valid PAT token');
-
                 const accountData = await this.fetchAccountsViaRest(token);
                 const targetType = preferDemo ? 'demo' : 'real';
                 const selectedAccount = accountData.data?.find(acc => acc.account_type === targetType);
-
                 if (!selectedAccount) throw new Error(`No ${targetType} account found.`);
-
                 this.activeAccountId = selectedAccount.account_id;
                 this.currentBalance = parseFloat(selectedAccount.balance);
                 this.currentCurrency = selectedAccount.currency || 'USD';
 
                 const wsUrl = await this.fetchWebSocketOtpUrl(token, this.activeAccountId);
-                
-                console.log(`🔌 [Deriv WS] Connecting to OTP URL...`);
-                
+                console.log(`🔌 [Deriv WS] Connecting...`);
                 this.ws = new WebSocket(wsUrl, { handshakeTimeout: 15000, timeout: 60000 });
 
                 this.ws.on('error', (error) => {
                     if (!this.isClosing) console.error(`❌ [Deriv WS] Error:`, error.message);
-                    if (!this.isConnected) {
-                        this.isConnecting = false;
-                        reject(error);
-                    }
+                    if (!this.isConnected) { this.isConnecting = false; reject(error); }
                 });
 
                 this.ws.on('open', () => {
-                    console.log(`✅ [Deriv WS] Connected and pre-authenticated!`);
+                    console.log(`✅ [Deriv WS] Connected!`);
                     this.isConnected = true;
                     this.isConnecting = false;
                     this.authorized = true;
                     this.reconnectAttempts = 0;
-                    
-                    if (this.reconnectInterval) {
-                        clearInterval(this.reconnectInterval);
-                        this.reconnectInterval = null;
-                    }
-                    
+                    if (this.reconnectInterval) clearInterval(this.reconnectInterval);
                     this.startHeartbeat();
-                    
-                    if (this.lastSubscribedSymbol) {
-                        this.subscribeToTicks(this.lastSubscribedSymbol).catch(() => {});
-                    }
-                    
+                    if (this.lastSubscribedSymbol) this.subscribeToTicks(this.lastSubscribedSymbol).catch(() => {});
                     this.emit('connected');
                     this.emit('authorized', { balance: this.currentBalance, currency: this.currentCurrency });
                     resolve();
                 });
 
                 this.ws.on('message', (data) => {
-                    try {
-                        const response = JSON.parse(data);
-                        this.handleMessage(response);
-                    } catch (err) {}
+                    try { const response = JSON.parse(data); this.handleMessage(response); } catch (err) {}
                 });
 
                 this.ws.on('close', (code) => {
-                    console.log(`🔌 [Deriv WS] Session closed: ${code}`);
+                    console.log(`🔌 [Deriv WS] Closed: ${code}`);
                     this.isConnected = false;
                     this.isConnecting = false;
                     this.authorized = false;
                     this.stopHeartbeat();
-                    if (!this.isClosing) {
-                        this.emit('disconnected');
-                        this.reconnect();
-                    }
+                    if (!this.isClosing) { this.emit('disconnected'); this.reconnect(); }
                 });
-
             } catch (err) {
                 console.error('❌ [Deriv Init Failed]:', err.message);
                 this.isConnecting = false;
@@ -216,60 +180,29 @@ class DerivService extends EventEmitter {
         }, 25000);
     }
 
-    stopHeartbeat() {
-        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
-    }
+    stopHeartbeat() { if (this.heartbeatInterval) clearInterval(this.heartbeatInterval); }
 
     safeClose() {
         this.isClosing = true;
         this.stopHeartbeat();
-        if (this.ws) {
-            try {
-                this.ws.removeAllListeners();
-                if (this.ws.readyState === WebSocket.OPEN) this.ws.close();
-            } catch (e) {}
-            this.ws = null;
-        }
-        this.isConnected = false;
-        this.isConnecting = false;
-        this.authorized = false;
-        this.subscriptions.clear();
+        if (this.ws) { try { this.ws.removeAllListeners(); if (this.ws.readyState === WebSocket.OPEN) this.ws.close(); } catch (e) {} this.ws = null; }
+        this.isConnected = false; this.isConnecting = false; this.authorized = false; this.subscriptions.clear();
         setTimeout(() => { this.isClosing = false; }, 500);
     }
 
     async reconnectWithToken(newToken, isDemo = true) {
-        if (this.reconnectInProgress) return { success: false, error: 'Reconnect already in progress' };
+        if (this.reconnectInProgress) return { success: false, error: 'Reconnect in progress' };
         this.reconnectInProgress = true;
         this.safeClose();
-
-        for (const [reqId, { reject }] of this.pendingRequests) {
-            reject(new Error('Connection closed for reset'));
-            this.pendingRequests.delete(reqId);
-        }
-
+        for (const [reqId, { reject }] of this.pendingRequests) { reject(new Error('Connection closed')); this.pendingRequests.delete(reqId); }
         this.currentToken = newToken;
         await new Promise(resolve => setTimeout(resolve, 1000));
-
-        try {
-            await this.connect(newToken, true, isDemo);
-            this.reconnectInProgress = false;
-            return { success: true, balance: this.currentBalance, currency: this.currentCurrency };
-        } catch (error) {
-            this.reconnectInProgress = false;
-            return { success: false, error: error.message };
-        }
+        try { await this.connect(newToken, true, isDemo); this.reconnectInProgress = false; return { success: true, balance: this.currentBalance, currency: this.currentCurrency }; }
+        catch (error) { this.reconnectInProgress = false; return { success: false, error: error.message }; }
     }
 
     async forceReconnectForTicks(symbol) {
-        try {
-            for (const existingSymbol of this.subscriptions) {
-                try {
-                    await this.sendRequest({ forget: existingSymbol });
-                } catch (e) {}
-            }
-            this.subscriptions.clear();
-        } catch (e) {}
-
+        try { for (const existingSymbol of this.subscriptions) { try { await this.sendRequest({ forget: existingSymbol }); } catch (e) {} } this.subscriptions.clear(); } catch (e) {}
         await this.connect(this.currentToken, true, true);
         await this.subscribeToTicks(symbol);
         return true;
@@ -278,67 +211,25 @@ class DerivService extends EventEmitter {
     reconnect() {
         if (this.reconnectInterval || this.isClosing) return;
         this.reconnectInterval = setInterval(async () => {
-            if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                clearInterval(this.reconnectInterval);
-                return;
-            }
+            if (this.reconnectAttempts >= this.maxReconnectAttempts) { clearInterval(this.reconnectInterval); return; }
             this.reconnectAttempts++;
-            try {
-                await this.connect(this.currentToken, true, true);
-                if (this.isConnected && this.reconnectInterval) {
-                    clearInterval(this.reconnectInterval);
-                    this.reconnectInterval = null;
-                }
-            } catch (error) {
-                console.error(`🔄 [Deriv] Reconnect failed:`, error.message);
-            }
+            try { await this.connect(this.currentToken, true, true); if (this.isConnected && this.reconnectInterval) { clearInterval(this.reconnectInterval); this.reconnectInterval = null; } }
+            catch (error) { console.error(`🔄 [Deriv] Reconnect failed:`, error.message); }
         }, 10000);
     }
 
     handleMessage(response) {
         const msgType = response.msg_type;
-        
-        if (msgType === 'tick') {
-            this.emit('tick', response.tick);
-        }
-        
-        if (msgType === 'balance') {
-            this.currentBalance = response.balance.balance;
-            this.currentCurrency = response.balance.currency;
-            this.emit('balance', { balance: response.balance.balance, currency: response.balance.currency });
-        }
-        
-        if (msgType === 'buy') {
-            if (response.error) {
-                console.error(`❌ [Deriv] Trade error:`, response.error.message);
-                this.emit('trade_error', response.error);
-            } else {
-                console.log(`✅ [Deriv] Trade executed! Contract ID: ${response.buy.contract_id}`);
-                this.emit('trade_executed', response.buy);
-            }
-        }
-        
-        // FIXED FOR V3: Map the inner contract reference safely
-        if (msgType === 'proposal_open_contract') {
-            const contractData = response.proposal_open_contract?.contract || response.contract;
-            if (contractData) {
-                this.emit('contract_update', contractData);
-            }
-        }
-
-        if (response.req_id && this.pendingRequests.has(response.req_id)) {
-            const { resolve, reject } = this.pendingRequests.get(response.req_id);
-            this.pendingRequests.delete(response.req_id);
-            if (response.error) reject(new Error(response.error.message));
-            else resolve(response);
-        }
+        if (msgType === 'tick') this.emit('tick', response.tick);
+        if (msgType === 'balance') { this.currentBalance = response.balance.balance; this.currentCurrency = response.balance.currency; this.emit('balance', { balance: response.balance.balance, currency: response.balance.currency }); }
+        if (msgType === 'buy') { if (response.error) { console.error(`❌ Trade error:`, response.error.message); this.emit('trade_error', response.error); } else { console.log(`✅ Trade executed!`); this.emit('trade_executed', response.buy); } }
+        if (msgType === 'proposal_open_contract') { const contractData = response.proposal_open_contract?.contract || response.contract; if (contractData) this.emit('contract_update', contractData); }
+        if (response.req_id && this.pendingRequests.has(response.req_id)) { const { resolve, reject } = this.pendingRequests.get(response.req_id); this.pendingRequests.delete(response.req_id); if (response.error) reject(new Error(response.error.message)); else resolve(response); }
     }
 
     sendRequest(request) {
         return new Promise((resolve, reject) => {
-            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-                return reject(new Error('WebSocket not connected'));
-            }
+            if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return reject(new Error('WebSocket not connected'));
             const req_id = ++this.requestId;
             this.pendingRequests.set(req_id, { resolve, reject });
             this.ws.send(JSON.stringify({ ...request, req_id }));
@@ -347,28 +238,14 @@ class DerivService extends EventEmitter {
 
     async subscribeToTicks(symbol) {
         const derivSymbol = this.convertSymbol(symbol);
-
-        for (const existingSymbol of this.subscriptions) {
-            try {
-                await this.sendRequest({ forget: existingSymbol });
-            } catch (e) {}
-        }
+        for (const existingSymbol of this.subscriptions) { try { await this.sendRequest({ forget: existingSymbol }); } catch (e) {} }
         this.subscriptions.clear();
-
         this.lastSubscribedSymbol = symbol;
-
-        try {
-            const result = await this.sendRequest({ ticks: derivSymbol, subscribe: 1 });
-            this.subscriptions.add(derivSymbol);
-            console.log(`📡 [Deriv] Subscribed to ${derivSymbol}`);
-            return result;
-        } catch (error) {
-            console.error(`❌ [Deriv] Subscribe failed for ${derivSymbol}:`, error.message);
-            throw error;
-        }
+        try { const result = await this.sendRequest({ ticks: derivSymbol, subscribe: 1 }); this.subscriptions.add(derivSymbol); console.log(`📡 [Deriv] Subscribed to ${derivSymbol}`); return result; }
+        catch (error) { console.error(`❌ [Deriv] Subscribe failed:`, error.message); throw error; }
     }
 
-    // FIXED: Deriv v3 flow - Get proposal first, then buy
+    // ✅ CORRECT Deriv v3 flow: Proposal first, then buy
     async placeTrade(symbol, action, stake, duration = 2, durationUnit = 'm') {
         if (!this.authorized) throw new Error('Not authorized');
         if (stake < 0.35) throw new Error('Minimum stake is $0.35');
@@ -376,9 +253,9 @@ class DerivService extends EventEmitter {
         const derivSymbol = this.convertSymbol(symbol);
         const contractType = action === 'BUY' ? 'CALL' : 'PUT';
         
-        console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake} for ${duration}${durationUnit}`);
+        console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake}`);
         
-        // Step 1: Get proposal
+        // STEP 1: Get proposal
         const proposalRequest = {
             proposal: 1,
             amount: stake,
@@ -400,7 +277,7 @@ class DerivService extends EventEmitter {
         const proposalId = proposal.proposal.id;
         console.log(`✅ Got proposal ID: ${proposalId}`);
         
-        // Step 2: Buy the proposal
+        // STEP 2: Buy the proposal
         const buyRequest = {
             buy: proposalId,
             price: stake
@@ -409,32 +286,14 @@ class DerivService extends EventEmitter {
         console.log(`📤 Buying contract...`);
         const tradeResult = await this.sendRequest(buyRequest);
         
+        console.log(`✅ Trade placed! Contract: ${tradeResult.buy.contract_id}`);
         return tradeResult;
     }
 
-    async getBalance() {
-        return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized };
-    }
-
-    async getClosedContract(contractId) {
-        try {
-            const result = await this.sendRequest({ proposal_open_contract: contractId });
-            // Extract the contract data properly
-            return result.proposal_open_contract?.contract || result.contract || null;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    getCurrentBalance() {
-        return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized };
-    }
-
-    disconnect() {
-        console.log('🔌 [Deriv] Disconnecting...');
-        this.isClosing = true;
-        this.safeClose();
-    }
+    async getBalance() { return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized }; }
+    async getClosedContract(contractId) { try { const result = await this.sendRequest({ proposal_open_contract: contractId }); return result.proposal_open_contract?.contract || result.contract || null; } catch (e) { return null; } }
+    getCurrentBalance() { return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized }; }
+    disconnect() { console.log('🔌 [Deriv] Disconnecting...'); this.isClosing = true; this.safeClose(); }
 }
 
 module.exports = new DerivService();
