@@ -49,6 +49,14 @@ wss.on('connection', (ws) => {
             if (data.type === 'ping') {
                 ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
             }
+            if (data.type === 'get_balance') {
+                (async () => {
+                    try {
+                        const balance = await derivService.getBalance();
+                        ws.send(JSON.stringify({ type: 'balance_update', balance: balance.balance, currency: balance.currency }));
+                    } catch (e) {}
+                })();
+            }
         } catch (error) {}
     });
     ws.on('close', () => {
@@ -57,6 +65,19 @@ wss.on('connection', (ws) => {
     });
     ws.send(JSON.stringify({ type: 'connected', message: 'Connected to MONIX WebSocket' }));
 });
+
+// Broadcast balance update to all clients
+global.broadcastBalance = async () => {
+    try {
+        const balance = await derivService.getBalance();
+        const message = JSON.stringify({ type: 'balance_update', balance: balance.balance, currency: balance.currency, timestamp: Date.now() });
+        global.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
+        });
+    } catch (e) {}
+};
 
 app.get('/health', (req, res) => {
     const tickAge = lastTickTime ? Math.floor((Date.now() - lastTickTime) / 1000) : 999;
@@ -125,7 +146,6 @@ async function startServer() {
         await initDatabase();
         console.log('✅ MongoDB connected');
 
-        // Initialize Trading DNA
         const session = knowledgeBase.getSessionRules();
         console.log(`🧬 Trading DNA loaded successfully`);
         console.log(`📚 Session: ${session.name} | ${session.personality} | ${session.bestStrategy}`);
@@ -145,8 +165,10 @@ async function startServer() {
                 broadcastPrice(tick);
             });
 
-            derivService.on('trade_executed', (result) => {
+            derivService.on('trade_executed', async (result) => {
                 broadcastNotification('Trade Executed', `Contract ${String(result.contract_id).substring(0, 8)}...`, 'success');
+                // Broadcast balance update after trade
+                setTimeout(() => global.broadcastBalance(), 2000);
             });
 
             derivService.on('trade_error', (error) => {
@@ -161,6 +183,7 @@ async function startServer() {
                         lastTickTime = Date.now();
                     }).catch(() => {});
                 }
+                global.broadcastBalance();
             });
 
             setInterval(async () => {
@@ -176,6 +199,9 @@ async function startServer() {
                     forceReconnecting = false;
                 }
             }, 60000);
+            
+            // Broadcast balance every 10 seconds
+            setInterval(() => global.broadcastBalance(), 10000);
 
         } catch (error) {
             console.error('❌ Deriv connection failed:', error.message);

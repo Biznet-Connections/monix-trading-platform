@@ -2,6 +2,7 @@
 let currentUser = null;
 let currentPage = 'dashboard';
 let isReconnecting = false;
+let autoBalanceInterval = null;
 
 console.log('🔵 MONIX App Initializing...');
 
@@ -68,6 +69,83 @@ function showToast(title, message, type = 'info') {
 }
 
 window.showToast = showToast;
+
+// ============ AUTO BALANCE REFRESH ============
+async function refreshBalance() {
+    try {
+        if (!currentUser) return;
+        
+        const profile = await window.api.getUserProfile();
+        if (profile && profile.derivBalance && profile.derivBalance.balance !== undefined) {
+            const balanceNum = typeof profile.derivBalance.balance === 'number' 
+                ? profile.derivBalance.balance 
+                : parseFloat(profile.derivBalance.balance);
+            
+            // Update main balance display
+            const balanceEl = document.getElementById('balanceAmount');
+            if (balanceEl) {
+                balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
+            }
+            
+            // Update total balance in locked panel
+            const totalEl = document.getElementById('totalBalance');
+            if (totalEl) {
+                totalEl.textContent = `$${balanceNum.toFixed(2)}`;
+            }
+            
+            // Get locked balance and update available
+            const lockedEl = document.getElementById('lockedBalance');
+            const locked = parseFloat(lockedEl?.textContent?.replace('$', '') || 0);
+            const availableEl = document.getElementById('availableBalance');
+            if (availableEl) {
+                availableEl.textContent = `$${(balanceNum - locked).toFixed(2)}`;
+            }
+            
+            // Update today's profit if we have stats
+            if (profile.stats?.today_profit !== undefined) {
+                const todayProfitEl = document.getElementById('todayProfit');
+                const todayProfit = profile.stats.today_profit || 0;
+                if (todayProfitEl) {
+                    todayProfitEl.innerHTML = `<i class="fas fa-arrow-${todayProfit >= 0 ? 'up' : 'down'}"></i> Today: ${todayProfit >= 0 ? '+' : ''}$${todayProfit.toFixed(2)}`;
+                    todayProfitEl.className = todayProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
+                }
+            }
+            
+            // Update win rate
+            if (profile.stats?.win_rate !== undefined) {
+                const winRateEl = document.getElementById('winRateDisplay');
+                if (winRateEl) {
+                    winRateEl.innerHTML = `Win Rate: ${profile.stats.win_rate}%`;
+                }
+            }
+            
+            logToTerminal(`💰 Auto-refresh balance: $${balanceNum.toFixed(2)}`);
+        }
+        
+        // Also refresh locked balance
+        if (window.updateLockedBalance) {
+            await window.updateLockedBalance();
+        }
+    } catch (error) {
+        // Silent fail - don't spam console
+    }
+}
+
+function startAutoBalanceRefresh() {
+    if (autoBalanceInterval) clearInterval(autoBalanceInterval);
+    autoBalanceInterval = setInterval(() => {
+        if (currentUser && document.getElementById('dashboardPage')?.classList.contains('hidden') === false) {
+            refreshBalance();
+        }
+    }, 5000); // Refresh every 5 seconds
+}
+
+function stopAutoBalanceRefresh() {
+    if (autoBalanceInterval) {
+        clearInterval(autoBalanceInterval);
+        autoBalanceInterval = null;
+    }
+}
 
 // ============ MOBILE DRAWER ============
 function initMobileDrawer() {
@@ -257,6 +335,7 @@ function setupModals() {
                 }
                 document.getElementById('apiKeysModal').classList.add('hidden');
                 await loadUserData();
+                await refreshBalance();
             } catch (error) {
                 showToast('Error', error.message, 'error');
             }
@@ -367,6 +446,11 @@ function switchPage(page) {
     if (page === 'leaderboard') setTimeout(() => loadLeaderboard(), 100);
     if (page === 'insights') setTimeout(() => loadFullInsights(), 100);
 
+    // Refresh balance when switching to dashboard
+    if (page === 'dashboard') {
+        setTimeout(() => refreshBalance(), 100);
+    }
+
     setTimeout(() => setupPageCloseButtons(), 200);
 }
 
@@ -407,7 +491,7 @@ async function loadUserData() {
                     if (connectionText) connectionText.innerHTML = 'Connecting to REAL...';
                     if (marketStatus) marketStatus.innerHTML = 'CONNECTING';
                     logToTerminal('⚠️ REAL mode but balance is 0 - forcing reconnect');
-                    
+
                     try {
                         const reconnectResult = await window.api.reconnectDeriv();
                         if (reconnectResult.success && reconnectResult.balance !== undefined) {
@@ -472,7 +556,7 @@ async function loadUserData() {
             const jackpotToggle = document.getElementById('jackpotToggle');
             const stakeSlider = document.getElementById('stakeSlider');
             const stakeValue = document.getElementById('stakeValue');
-            
+
             if (pushSignalsToggle) pushSignalsToggle.checked = profile.user.push_signals === 1;
             if (autoModeToggle) autoModeToggle.checked = profile.user.auto_mode === 1;
             if (jackpotToggle) jackpotToggle.checked = profile.user.jackpot_mode === 1;
@@ -533,7 +617,7 @@ async function loadFullHistory() {
             if (statusFilter && statusFilter.value) filtered = filtered.filter(t => t.status === statusFilter.value);
 
             if (filtered.length === 0) {
-                                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No trades found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No trades found</td></tr>';
                 return;
             }
 
@@ -763,6 +847,9 @@ function showApp() {
 
     updateServerTime();
     setInterval(updateServerTime, 1000);
+    
+    // Start auto-balance refresh
+    startAutoBalanceRefresh();
 }
 
 function showAuthModal() {
@@ -800,16 +887,16 @@ async function initApp() {
     showAuthModal();
 }
 
-// Global function for dashboard navigation from insights
-window.switchPageToDashboard = function() {
-    switchPage('dashboard');
-};
+// Global functions
+window.switchPageToDashboard = function() { switchPage('dashboard'); };
 window.switchPage = switchPage;
 window.loadFullInsights = loadFullInsights;
+window.refreshBalance = refreshBalance;
 
 if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
         logToTerminal('🚪 User logout');
+        stopAutoBalanceRefresh();
         window.api.logout();
     });
 }
