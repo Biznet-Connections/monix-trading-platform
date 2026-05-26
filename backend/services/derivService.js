@@ -52,7 +52,6 @@ class DerivService extends EventEmitter {
     convertSymbol(uiSymbol) {
         const derivSymbol = this.symbolMap[uiSymbol];
         if (derivSymbol) return derivSymbol;
-        console.log(`⚠️ [Deriv] Unknown symbol: ${uiSymbol}, using as-is`);
         return uiSymbol;
     }
 
@@ -319,8 +318,12 @@ class DerivService extends EventEmitter {
             }
         }
         
+        // FIXED FOR V3: Map the inner contract reference safely
         if (msgType === 'proposal_open_contract') {
-            this.emit('contract_update', response.proposal_open_contract);
+            const contractData = response.proposal_open_contract?.contract || response.contract;
+            if (contractData) {
+                this.emit('contract_update', contractData);
+            }
         }
 
         if (response.req_id && this.pendingRequests.has(response.req_id)) {
@@ -365,7 +368,7 @@ class DerivService extends EventEmitter {
         }
     }
 
-    // FIXED: Deriv v3 API format - flat object, no nested parameters
+    // FIXED: Deriv v3 flow - Get proposal first, then buy
     async placeTrade(symbol, action, stake, duration = 2, durationUnit = 'm') {
         if (!this.authorized) throw new Error('Not authorized');
         if (stake < 0.35) throw new Error('Minimum stake is $0.35');
@@ -375,22 +378,38 @@ class DerivService extends EventEmitter {
         
         console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake} for ${duration}${durationUnit}`);
         
-        // Deriv v3 API format - flat object, no nested parameters
-        const tradeRequest = {
-            buy: 1,
-            price: stake,
+        // Step 1: Get proposal
+        const proposalRequest = {
+            proposal: 1,
             amount: stake,
             basis: 'stake',
             contract_type: contractType,
             currency: this.currentCurrency,
             duration: duration,
             duration_unit: durationUnit,
-            symbol: derivSymbol
+            underlying_symbol: derivSymbol
         };
         
-        console.log(`📤 Trade request:`, JSON.stringify(tradeRequest));
+        console.log(`📤 Getting proposal...`);
+        const proposal = await this.sendRequest(proposalRequest);
         
-        return this.sendRequest(tradeRequest);
+        if (!proposal.proposal || !proposal.proposal.id) {
+            throw new Error('Failed to get proposal');
+        }
+        
+        const proposalId = proposal.proposal.id;
+        console.log(`✅ Got proposal ID: ${proposalId}`);
+        
+        // Step 2: Buy the proposal
+        const buyRequest = {
+            buy: proposalId,
+            price: stake
+        };
+        
+        console.log(`📤 Buying contract...`);
+        const tradeResult = await this.sendRequest(buyRequest);
+        
+        return tradeResult;
     }
 
     async getBalance() {
@@ -399,7 +418,9 @@ class DerivService extends EventEmitter {
 
     async getClosedContract(contractId) {
         try {
-            return await this.sendRequest({ proposal_open_contract: contractId });
+            const result = await this.sendRequest({ proposal_open_contract: contractId });
+            // Extract the contract data properly
+            return result.proposal_open_contract?.contract || result.contract || null;
         } catch (e) {
             return null;
         }
