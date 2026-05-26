@@ -52,6 +52,7 @@ class DerivService extends EventEmitter {
     convertSymbol(uiSymbol) {
         const derivSymbol = this.symbolMap[uiSymbol];
         if (derivSymbol) return derivSymbol;
+        console.log(`⚠️ [Deriv] Unknown symbol: ${uiSymbol}, using as-is`);
         return uiSymbol;
     }
 
@@ -133,7 +134,6 @@ class DerivService extends EventEmitter {
             try {
                 if (!token) throw new Error('Cannot connect without valid PAT token');
 
-                // Step 1: Get accounts
                 const accountData = await this.fetchAccountsViaRest(token);
                 const targetType = preferDemo ? 'demo' : 'real';
                 const selectedAccount = accountData.data?.find(acc => acc.account_type === targetType);
@@ -144,7 +144,6 @@ class DerivService extends EventEmitter {
                 this.currentBalance = parseFloat(selectedAccount.balance);
                 this.currentCurrency = selectedAccount.currency || 'USD';
 
-                // Step 2: Get OTP URL
                 const wsUrl = await this.fetchWebSocketOtpUrl(token, this.activeAccountId);
                 
                 console.log(`🔌 [Deriv WS] Connecting to OTP URL...`);
@@ -311,8 +310,13 @@ class DerivService extends EventEmitter {
         }
         
         if (msgType === 'buy') {
-            if (response.error) this.emit('trade_error', response.error);
-            else this.emit('trade_executed', response.buy);
+            if (response.error) {
+                console.error(`❌ [Deriv] Trade error:`, response.error.message);
+                this.emit('trade_error', response.error);
+            } else {
+                console.log(`✅ [Deriv] Trade executed! Contract ID: ${response.buy.contract_id}`);
+                this.emit('trade_executed', response.buy);
+            }
         }
         
         if (msgType === 'proposal_open_contract') {
@@ -361,29 +365,36 @@ class DerivService extends EventEmitter {
         }
     }
 
-    async placeTrade(symbol, action, stake, duration = 5, durationUnit = 'm') {
+    // FIXED: Deriv v3 API format - flat object, no nested parameters
+    async placeTrade(symbol, action, stake, duration = 2, durationUnit = 'm') {
         if (!this.authorized) throw new Error('Not authorized');
         if (stake < 0.35) throw new Error('Minimum stake is $0.35');
+        
         const derivSymbol = this.convertSymbol(symbol);
         const contractType = action === 'BUY' ? 'CALL' : 'PUT';
-        console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake}`);
-        return this.sendRequest({
+        
+        console.log(`📊 [Deriv] Trade: ${action} ${derivSymbol} $${stake} for ${duration}${durationUnit}`);
+        
+        // Deriv v3 API format - flat object, no nested parameters
+        const tradeRequest = {
             buy: 1,
             price: stake,
-            parameters: {
-                amount: stake,
-                basis: 'stake',
-                contract_type: contractType,
-                currency: this.currentCurrency,
-                duration,
-                duration_unit: durationUnit,
-                symbol: derivSymbol
-            }
-        });
+            amount: stake,
+            basis: 'stake',
+            contract_type: contractType,
+            currency: this.currentCurrency,
+            duration: duration,
+            duration_unit: durationUnit,
+            symbol: derivSymbol
+        };
+        
+        console.log(`📤 Trade request:`, JSON.stringify(tradeRequest));
+        
+        return this.sendRequest(tradeRequest);
     }
 
     async getBalance() {
-        return { balance: this.currentBalance, currency: this.currentCurrency };
+        return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized };
     }
 
     async getClosedContract(contractId) {
@@ -399,6 +410,7 @@ class DerivService extends EventEmitter {
     }
 
     disconnect() {
+        console.log('🔌 [Deriv] Disconnecting...');
         this.isClosing = true;
         this.safeClose();
     }
