@@ -5,41 +5,45 @@ let wsReconnectInterval = null;
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}`;
-
+    
+    console.log(`🔌 [WS] Connecting to ${wsUrl}...`);
+    
     ws = new WebSocket(wsUrl);
-
+    
     ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('✅ [WS] WebSocket connected!');
         wsReconnectAttempts = 0;
         if (wsReconnectInterval) {
             clearInterval(wsReconnectInterval);
             wsReconnectInterval = null;
         }
         updateConnectionStatus(true);
-
+        
+        // Send ping every 30 seconds
         setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'ping' }));
             }
         }, 30000);
     };
-
+    
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
+            console.log(`📨 [WS] Received: ${data.type}`);
             handleWebSocketMessage(data);
         } catch (error) {
-            console.error('WebSocket parse error:', error);
+            console.error('❌ [WS] Parse error:', error);
         }
     };
-
+    
     ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('❌ [WS] Error:', error);
         updateConnectionStatus(false);
     };
-
+    
     ws.onclose = () => {
-        console.log('WebSocket disconnected');
+        console.log('🔌 [WS] Disconnected');
         updateConnectionStatus(false);
         reconnectWebSocket();
     };
@@ -47,19 +51,19 @@ function connectWebSocket() {
 
 function reconnectWebSocket() {
     if (wsReconnectInterval) return;
-
+    
     wsReconnectInterval = setInterval(() => {
-        if (wsReconnectAttempts >= 10) {
-            console.error('Max reconnection attempts reached');
+        if (wsReconnectAttempts >= 20) {
+            console.error('❌ [WS] Max reconnection attempts reached');
             clearInterval(wsReconnectInterval);
             wsReconnectInterval = null;
             return;
         }
-
+        
         wsReconnectAttempts++;
-        console.log(`Reconnecting WebSocket... Attempt ${wsReconnectAttempts}`);
+        console.log(`🔄 [WS] Reconnect attempt ${wsReconnectAttempts}/20`);
         connectWebSocket();
-    }, 3000);
+    }, 5000);
 }
 
 function playBellSound() {
@@ -94,6 +98,8 @@ function playBellSound() {
 }
 
 function handleWebSocketMessage(data) {
+    console.log(`📨 [WS] Handling: ${data.type}`);
+    
     switch (data.type) {
         case 'price':
             const livePriceEl = document.getElementById('livePrice');
@@ -104,9 +110,18 @@ function handleWebSocketMessage(data) {
                 }
             }
             break;
-
+            
+        case 'ai_update':
+            console.log(`🤖 [WS] AI UPDATE received!`, data.data);
+            if (data.data && window.updateAIDisplay) {
+                window.updateAIDisplay(data.data);
+            } else {
+                console.warn('⚠️ [WS] No updateAIDisplay function found');
+            }
+            break;
+            
         case 'new_setup':
-            console.log('🔔 New setup detected!', data.setup);
+            console.log('🔔 [WS] New setup detected!', data.setup);
             playBellSound();
 
             if (Notification.permission === 'granted') {
@@ -126,12 +141,11 @@ function handleWebSocketMessage(data) {
                 );
             }
 
-            // Update signal panel with new setup
             if (window.updateAIDisplay && data.setup) {
                 window.updateAIDisplay({ watch_state: data.setup });
             }
             break;
-
+            
         case 'signal':
             if (data.signal && window.displaySignal) {
                 window.displaySignal(data.signal);
@@ -139,12 +153,13 @@ function handleWebSocketMessage(data) {
                 if (window.playSound) window.playSound('signal');
             }
             break;
-
+            
         case 'notification':
             if (window.showToast) window.showToast(data.title, data.message, data.notificationType);
             break;
-
+            
         case 'trade_result':
+            console.log(`📊 [WS] Trade result: ${data.trade?.status}`);
             if (data.trade) {
                 if (window.addTradeToTable) window.addTradeToTable(data.trade);
                 if (window.refreshUserData) window.refreshUserData();
@@ -162,8 +177,9 @@ function handleWebSocketMessage(data) {
                 );
             }
             break;
-
+            
         case 'balance':
+            console.log(`💰 [WS] Balance update: $${data.balance}`);
             if (data.balance !== undefined) {
                 if (window.updateBalanceInUI) window.updateBalanceInUI(data.balance);
                 else {
@@ -172,22 +188,21 @@ function handleWebSocketMessage(data) {
                 }
             }
             break;
-
+            
         case 'trade_update':
             if (data.trade && window.loadRecentTrades) window.loadRecentTrades();
             break;
-
-        case 'ai_update':
-            if (data.data && window.updateAIDisplay) {
-                window.updateAIDisplay(data.data);
-            }
+            
+        case 'connected':
+            console.log(`✅ [WS] Connected message: ${data.message}`);
             break;
-
+            
         case 'pong':
+            console.log(`🏓 [WS] Pong received`);
             break;
-
+            
         default:
-            console.log('Unknown WebSocket message:', data);
+            console.log(`❓ [WS] Unknown message type: ${data.type}`, data);
     }
 }
 
@@ -292,10 +307,15 @@ function sendNotification(title, body, tag = 'trade') {
 
 // FIXED: Enhanced updateAIDisplay with complete signal panel updates
 function updateAIDisplay(aiData) {
-    const watchState = aiData.watch_state;
-    if (!watchState) return;
+    console.log('🖥️ [UI] updateAIDisplay called with:', aiData);
+    
+    const watchState = aiData.watch_state || aiData;
+    if (!watchState) {
+        console.warn('⚠️ [UI] No watch_state in aiData');
+        return;
+    }
 
-    console.log(`🖥️ [Frontend] Updating display for symbol: ${watchState.symbol}, action: ${watchState.action}, confidence: ${watchState.confidence}`);
+    console.log(`🖥️ [UI] Updating display for symbol: ${watchState.symbol}, action: ${watchState.action}, confidence: ${watchState.confidence}, rsi: ${watchState.market_rsi}`);
 
     // Update AI Reasoning text
     const signalReasoning = document.getElementById('signalReasoning');
@@ -390,7 +410,7 @@ function updateAIDisplay(aiData) {
 
     // Update RSI
     const rsiValue = document.getElementById('rsiValue');
-    if (rsiValue && watchState.market_rsi) {
+    if (rsiValue && watchState.market_rsi !== undefined) {
         rsiValue.innerHTML = watchState.market_rsi;
     } else if (rsiValue) {
         rsiValue.innerHTML = '--';
@@ -451,7 +471,7 @@ function updateAIDisplay(aiData) {
         confidence_threshold: watchState.confidence_threshold || 55
     };
 
-    console.log(`🖥️ [Frontend] Display signal updated for symbol: ${displaySignal.symbol}, action: ${displaySignal.action}`);
+    console.log(`🖥️ [UI] Display signal updated for symbol: ${displaySignal.symbol}, action: ${displaySignal.action}`);
     window.currentDisplaySignal = displaySignal;
 }
 

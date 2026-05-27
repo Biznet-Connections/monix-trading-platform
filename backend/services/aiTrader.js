@@ -1,6 +1,7 @@
 /**
  * AI Trader Service - The Professional
- * v10.2.0 - FIXED: Correct profit/loss calculation from Deriv contracts
+ * Pre-loaded trading DNA + AI enhancement + Perfect memory
+ * v13.0.0 - FULL DEBUG + WebSocket broadcasting
  */
 
 const marketData = require('./marketData');
@@ -435,7 +436,7 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v10.2.0`);
+        console.log(`🤖 [AI Trader] Starting v13.0.0`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
 
@@ -708,17 +709,47 @@ class AITrader {
             }
 
             this.currentWatchState = {
-                status: 'WATCHING', action: 'WAIT', symbol: this.symbol,
+                status: 'WATCHING', 
+                action: action === 'BUY' ? 'BUY' : (action === 'SELL' ? 'SELL' : 'WAIT'),
+                action_display: action === 'BUY' ? '📈 BUY (UP)' : (action === 'SELL' ? '📉 SELL (DOWN)' : '⏳ WAITING'),
+                symbol: this.symbol,
                 confidence: effectiveConfidence || combinedConfidence,
-                reason: analysis.simple_reason || 'Waiting for setup',
-                pattern: analysis.pattern, market_price: currentPrice,
-                market_rsi: marketState.rsi, trend: confirmedTrend,
-                lastUpdate: Date.now(), is_auto_mode: this.mode === 'AUTO',
+                reason: analysis.simple_reason || 'Waiting for validated setup',
+                pattern: analysis.pattern, 
+                market_price: currentPrice,
+                market_rsi: marketState.rsi, 
+                market_support: marketState.support,
+                market_resistance: marketState.resistance,
+                market_feeling: marketState.condition === 'oversold' ? 'Price is low' : (marketState.condition === 'overbought' ? 'Price is high' : 'Market is stable'),
+                entry_price: currentPrice,
+                take_profit: currentPrice * (action === 'BUY' ? 1.005 : 0.995),
+                stop_loss: currentPrice * (action === 'BUY' ? 0.998 : 1.002),
+                entry_condition: action !== 'WAIT' ? `${action} at market price` : null,
+                estimated_entry_time: action !== 'WAIT' ? 'Now' : null,
+                trend: confirmedTrend,
+                lastUpdate: Date.now(), 
+                is_auto_mode: this.mode === 'AUTO',
                 confidence_threshold: dynamicThreshold,
-                pending_orders: this.pendingLimitOrders.length,
-                total_trades: this.totalTrades, total_wins: this.totalWins, total_losses: this.totalLosses,
-                session_profit: this.sessionProfit, session_loss: this.sessionLoss
+                pending_orders: this.pendingLimitOrders.map(o => ({
+                    action: o.action,
+                    entryPrice: o.entryPrice,
+                    stake: o.stake,
+                    confidence: o.confidence,
+                    pattern: o.pattern,
+                    reason: o.reason,
+                    expires: o.expiresAt
+                })),
+                total_trades: this.totalTrades, 
+                total_wins: this.totalWins, 
+                total_losses: this.totalLosses,
+                session_profit: this.sessionProfit, 
+                session_loss: this.sessionLoss
             };
+            
+            // BROADCAST AI UPDATE TO FRONTEND
+            console.log(`📡 [AI Trader] Broadcasting AI update: action=${this.currentWatchState.action}, confidence=${this.currentWatchState.confidence}, symbol=${this.currentWatchState.symbol}, rsi=${this.currentWatchState.market_rsi}`);
+            broadcastAIUpdate(this.currentWatchState);
+            
         } catch (error) {
             console.error('❌ Analysis error:', error.message);
         }
@@ -808,7 +839,6 @@ class AITrader {
         broadcastAIUpdate({ type: 'active_trade_update', trade: { ...this.activeTrade, current_price: marketData.getCurrentPrice(), time_remaining: Math.floor(timeLeft / 1000) } });
     }
 
-    // FIXED: Correct profit calculation from Deriv contract
     async checkTradeResult(tradeId, contractId, entryPrice, stake) {
         try {
             let contractResult = null;
@@ -825,53 +855,41 @@ class AITrader {
                 retries--;
             }
             
-            let profit = -stake; // Default to full loss
+            let profit = -stake;
             let exitPrice = entryPrice;
             let status = 'LOSS';
             let actualProfit = 0;
             
             if (contractResult) {
-                // Extract contract data - handles both response formats
                 const contract = contractResult.proposal_open_contract?.contract || contractResult.contract || contractResult;
                 
                 if (contract) {
-                    // Get exit price
                     if (contract.exit_tick?.quote) exitPrice = contract.exit_tick.quote;
                     else if (contract.sell_price) exitPrice = contract.sell_price;
                     
-                    // Calculate profit based on trade direction
-                    const isCall = contract.contract_type === 'CALL' || contract.contract_type === 'CALL';
-                    const isPut = contract.contract_type === 'PUT' || contract.contract_type === 'PUT';
+                    const isCall = contract.contract_type === 'CALL';
                     
                     if (contract.profit !== undefined && contract.profit !== null) {
-                        // Direct profit value from Deriv
                         actualProfit = parseFloat(contract.profit);
                         profit = actualProfit;
                     } else if (contract.sell_price && contract.buy_price) {
-                        // Calculate from prices
                         actualProfit = contract.sell_price - contract.buy_price;
                         profit = actualProfit;
                     } else {
-                        // Fallback: determine by price movement
                         const priceChange = exitPrice - entryPrice;
                         if (isCall) {
-                            // BUY trade - profit if price went UP
                             actualProfit = priceChange > 0 ? stake * (priceChange / entryPrice) : -stake;
-                        } else if (isPut) {
-                            // SELL trade - profit if price went DOWN
-                            actualProfit = priceChange < 0 ? stake * Math.abs(priceChange / entryPrice) : -stake;
                         } else {
-                            actualProfit = -stake;
+                            actualProfit = priceChange < 0 ? stake * Math.abs(priceChange / entryPrice) : -stake;
                         }
                         profit = actualProfit;
                     }
                     
-                    // Determine win/loss status
                     if (profit > 0) {
                         status = 'WIN';
                     } else if (profit < 0) {
                         status = 'LOSS';
-                        profit = profit; // Keep negative value
+                        profit = profit;
                     } else {
                         status = 'LOSS';
                         profit = -stake;
@@ -928,7 +946,6 @@ class AITrader {
                 }
             }
 
-            // Refresh balance after trade
             try { 
                 const bal = await derivService.getBalance(); 
                 if (bal?.balance) {
@@ -963,16 +980,20 @@ class AITrader {
 
     getCurrentAnalysis() {
         return {
-            type: 'ai_update', watch_state: this.currentWatchState,
-            in_trade: !!this.activeTrade, active_trade: this.activeTrade,
-            pending_orders: this.pendingLimitOrders.map(o => ({
-                id: o.id, action: o.action, entryPrice: o.entryPrice, stake: o.stake,
-                confidence: o.confidence, pattern: o.pattern, reason: o.reason,
-                created: o.createdAt, expires: o.expiresAt
-            })),
-            data_ready: this.dataReady, mode: this.mode, tick_count: this.tickCount,
-            total_trades: this.totalTrades, total_wins: this.totalWins, total_losses: this.totalLosses,
-            session_profit: this.sessionProfit, session_loss: this.sessionLoss, timestamp: Date.now()
+            type: 'ai_update', 
+            watch_state: this.currentWatchState,
+            in_trade: !!this.activeTrade, 
+            active_trade: this.activeTrade,
+            pending_orders: this.pendingLimitOrders,
+            data_ready: this.dataReady, 
+            mode: this.mode, 
+            tick_count: this.tickCount,
+            total_trades: this.totalTrades, 
+            total_wins: this.totalWins, 
+            total_losses: this.totalLosses,
+            session_profit: this.sessionProfit, 
+            session_loss: this.sessionLoss, 
+            timestamp: Date.now()
         };
     }
 
