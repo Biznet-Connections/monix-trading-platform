@@ -21,7 +21,6 @@ const symbolSelect = document.getElementById('symbolSelect');
 const refreshTradesBtn = document.getElementById('refreshTradesBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 
-// Debug log helper - sends to console AND backend
 function uiLog(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
     console.log(`🖱️ [${timestamp}] ${message}`);
@@ -30,11 +29,6 @@ function uiLog(message, type = 'info') {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: `🖱️ ${message}`, type, timestamp: new Date().toISOString() })
     }).catch(() => {});
-}
-
-if (getSignalBtn) {
-    getSignalBtn.innerHTML = '🧠 AI REASONING';
-    getSignalBtn.title = 'View current AI market analysis (No automatic trade)';
 }
 
 function playSound(type) {
@@ -98,10 +92,7 @@ function sendNotification(title, body, tag = 'trade') {
 function showAIReasonModal(signal) {
     uiLog(`Opening AI Reason Modal: ${signal.symbol} action=${signal.action}`);
     const modal = document.getElementById('aiReasonModal');
-    if (!modal) {
-        console.error('Modal element not found!');
-        return;
-    }
+    if (!modal) return;
 
     const isAutoMode = autoModeToggle && autoModeToggle.checked;
     const isWaiting = signal.is_waiting;
@@ -126,11 +117,7 @@ function showAIReasonModal(signal) {
         modalAction.className = `text-2xl font-bold ${signal.action === 'BUY' ? 'text-emerald-400' : signal.action === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`;
     }
 
-    if (modalSymbol) {
-        const displaySymbol = signal.symbol || 'R_75';
-        modalSymbol.innerHTML = displaySymbol;
-    }
-
+    if (modalSymbol) modalSymbol.innerHTML = signal.symbol || 'R_75';
     if (modalPrice) modalPrice.innerHTML = `$${signal.entry_price?.toFixed(2) || signal.support?.toFixed(2) || '0.00'}`;
     if (modalMarketFeeling) modalMarketFeeling.innerHTML = signal.market_feeling || (signal.rsi > 65 ? 'Price is high' : (signal.rsi < 35 ? 'Price is low' : 'Market is stable'));
     if (modalPattern) modalPattern.innerHTML = signal.pattern || 'Pattern detected';
@@ -150,8 +137,7 @@ function showAIReasonModal(signal) {
     if (isWaiting || signal.action === 'WAIT') {
         if (buttonsDiv) buttonsDiv.classList.add('hidden');
         if (autoModeNote) {
-            const watchSymbol = signal.symbol || 'R_75';
-            autoModeNote.innerHTML = `⏳ No active setup. AI watching ${watchSymbol}... Need ${signal.confidence_threshold || 55}%+ confidence.`;
+            autoModeNote.innerHTML = `⏳ No active setup. AI watching ${signal.symbol || 'R_75'}... Need ${signal.confidence_threshold || 55}%+ confidence.`;
             autoModeNote.classList.remove('hidden');
         }
     } else if (isAutoMode) {
@@ -310,7 +296,7 @@ function displaySignal(signal) {
     const signalExit = document.getElementById('signalExit');
 
     if (signalAction) {
-        signalAction.innerHTML = signal.action === 'BUY' ? '📈 BUY (Price will go UP)' : '🔻 SELL (Price will go DOWN)';
+        signalAction.innerHTML = signal.action === 'BUY' ? '📈 BUY' : '🔻 SELL';
         signalAction.className = `text-4xl font-black ${signal.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}`;
     }
     if (signalConfidence) signalConfidence.innerHTML = `${signal.confidence}%`;
@@ -318,15 +304,12 @@ function displaySignal(signal) {
     if (signalEntry) signalEntry.innerHTML = `$${signal.entry_price.toFixed(2)}`;
     if (signalTP) signalTP.innerHTML = `$${signal.take_profit?.toFixed(2) || '—'}`;
     if (signalSL) signalSL.innerHTML = `$${signal.stop_loss?.toFixed(2) || '—'}`;
-
     if (signalReasoning) {
-        const reasonText = signal.simple_reason || signal.reasoning || 'AI analysis complete';
-        signalReasoning.innerHTML = reasonText;
+        signalReasoning.innerHTML = signal.simple_reason || signal.reasoning || 'AI analysis complete';
         signalReasoning.style.cursor = 'pointer';
         signalReasoning.style.textDecoration = 'underline';
         signalReasoning.onclick = () => window.showAIReasonModal(signal);
     }
-
     if (supportLevel && signal.support) supportLevel.innerHTML = `$${signal.support.toFixed(2)}`;
     if (resistanceLevel && signal.resistance) resistanceLevel.innerHTML = `$${signal.resistance.toFixed(2)}`;
     if (rsiValue && signal.rsi) rsiValue.innerHTML = signal.rsi;
@@ -379,8 +362,6 @@ function clearSignal() {
         signalReasoning.innerHTML = 'Click AI REASONING to view market analysis';
         signalReasoning.style.cursor = 'pointer';
         signalReasoning.style.textDecoration = 'underline';
-        signalReasoning.style.color = '';
-        signalReasoning.style.fontWeight = 'normal';
     }
     if (signalExit) signalExit.innerHTML = '5 min';
 
@@ -467,7 +448,6 @@ async function executeTrade() {
     }
 }
 
-// v7.1: Save symbol preference to backend for restart persistence
 function saveSymbolPreference(symbol) {
     const token = localStorage.getItem('monix_token') || '';
     if (!token || !symbol) return;
@@ -479,21 +459,14 @@ function saveSymbolPreference(symbol) {
             'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ symbol: symbol })
-    }).then(res => res.json()).then(data => {
-        if (data.success) {
-            console.log('📌 Symbol preference saved:', symbol);
-        }
-    }).catch(() => {
-        // Silent fail — don't block the UI
-    });
+    }).catch(() => {});
 }
 
-// v7.1.1: Load saved symbol from backend on startup
 async function loadSavedSymbol() {
     try {
         const token = localStorage.getItem('monix_token');
         if (!token) return;
-        
+
         const response = await fetch('/api/user/profile', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -524,7 +497,6 @@ async function changeSymbol(symbol) {
         const data = await response.json();
         if (data.success) {
             uiLog(`Symbol changed successfully: ${symbol}`);
-            // v7.1: Save symbol preference for restart
             saveSymbolPreference(symbol);
             if (window.showToast) window.showToast('Symbol Changed', `AI now analyzing ${symbol}`, 'success');
             setTimeout(() => fetchAIAnalysis(), 1000);
@@ -608,9 +580,8 @@ async function updateSetting(setting, value) {
 }
 
 // ============================================================
-// PENDING ORDERS DISPLAY
+// FIXED: PENDING ORDERS DISPLAY
 // ============================================================
-let lastFetchedTrades = [];
 let pendingOrdersInterval = null;
 
 function updatePendingOrdersDisplay(pendingOrders) {
@@ -631,7 +602,7 @@ function updatePendingOrdersDisplay(pendingOrders) {
     container.innerHTML = pendingOrders.map(order => {
         const distance = currentPrice > 0 ? Math.abs(currentPrice - order.entryPrice) : 0;
         const distancePercent = currentPrice > 0 ? ((distance / order.entryPrice) * 100).toFixed(2) : '0';
-        const timeLeft = order.expires ? Math.max(0, Math.floor((order.expires - Date.now()) / 60000)) : 0;
+        const timeLeft = order.expires ? Math.max(0, Math.floor((order.expires - Date.now()) / 60000)) : 45;
         const isApproaching = parseFloat(distancePercent) < 0.3;
         const borderColor = isApproaching ? 'border-yellow-500' : 'border-slate-600';
         const bgColor = isApproaching ? 'bg-yellow-500/10' : '';
@@ -640,7 +611,7 @@ function updatePendingOrdersDisplay(pendingOrders) {
             <div class="p-3 rounded-lg border ${borderColor} ${bgColor} mb-2 hover:border-indigo-400 transition">
                 <div class="flex justify-between items-center mb-1">
                     <span class="font-bold text-sm ${order.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}">${order.action} LIMIT</span>
-                    <span class="text-xs text-slate-500">⏰ ${timeLeft}min</span>
+                    <span class="text-xs text-slate-500">⏰ ${timeLeft}min left</span>
                 </div>
                 <div class="flex justify-between text-xs mb-1">
                     <span class="text-slate-400">Entry: <span class="text-white font-mono">$${order.entryPrice?.toFixed(2) || '0.00'}</span></span>
@@ -726,8 +697,7 @@ async function copyAllTrades() {
 }
 
 window.copyTradeById = async function(tradeId) {
-    const trades = lastFetchedTrades.length > 0 ? lastFetchedTrades : await window.api.getTradeHistory(50);
-    lastFetchedTrades = trades;
+    const trades = await window.api.getTradeHistory(50);
     const trade = trades.find(t => t._id === tradeId);
     if (trade) copyTradeToClipboard(trade);
 };
@@ -743,12 +713,10 @@ async function loadRecentTrades() {
         tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">Loading...</td></tr>';
 
         const trades = await window.api.getTradeHistory(20);
-        lastFetchedTrades = trades;
 
         if (!trades || trades.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet</td></tr>';
             if (countBadge) countBadge.innerText = '(0)';
-            uiLog('Recent trades: No trades found');
             return;
         }
 
@@ -776,9 +744,6 @@ async function loadRecentTrades() {
     }
 }
 
-// ============================================================
-// REFRESH USER DATA
-// ============================================================
 async function refreshUserData() {
     try {
         const profile = await window.api.getUserProfile();
@@ -792,8 +757,6 @@ async function refreshUserData() {
 
             const balanceEl = document.getElementById('balanceAmount');
             if (balanceEl && profile.derivBalance?.authorized) {
-                balanceEl.innerHTML = `$${profile.derivBalance.balance.toFixed(2)}`;
-            } else if (balanceEl && profile.derivBalance?.balance !== undefined) {
                 balanceEl.innerHTML = `$${profile.derivBalance.balance.toFixed(2)}`;
             }
 
@@ -829,9 +792,6 @@ async function refreshUserData() {
     }
 }
 
-// ============================================================
-// ADD TRADE TO TABLE
-// ============================================================
 function addTradeToTable(trade) {
     const tbody = document.getElementById('recentTradesBody');
     if (!tbody) return;
@@ -863,15 +823,65 @@ function addTradeToTable(trade) {
     }
 }
 
-// ============================================================
-// UPDATE BALANCE IN UI
-// ============================================================
 function updateBalanceInUI(balance) {
     const balanceEl = document.getElementById('balanceAmount');
-    if (balanceEl) {
-        balanceEl.innerHTML = `$${balance.toFixed(2)}`;
+    if (balanceEl) balanceEl.innerHTML = `$${balance.toFixed(2)}`;
+}
+
+// ============================================================
+// FIXED: Collapsible Drawer - Stays Open
+// ============================================================
+function initCollapsibles() {
+    const pendingOrdersHeader = document.querySelector('#pendingOrdersContent')?.parentElement?.querySelector('.p-5.border-b');
+    const recentTradesHeader = document.querySelector('#recentTradesContent')?.parentElement?.querySelector('.p-5.border-b');
+    
+    // Restore saved states
+    const pendingState = localStorage.getItem('pendingOrdersOpen');
+    const recentState = localStorage.getItem('recentTradesOpen');
+    
+    const pendingContent = document.getElementById('pendingOrdersContent');
+    const recentContent = document.getElementById('recentTradesContent');
+    const pendingIcon = document.getElementById('pendingOrdersIcon');
+    const recentIcon = document.getElementById('recentTradesIcon');
+    
+    if (pendingContent && pendingIcon) {
+        if (pendingState === 'closed') {
+            pendingContent.style.display = 'none';
+            pendingIcon.style.transform = 'rotate(0deg)';
+        } else {
+            pendingContent.style.display = 'block';
+            pendingIcon.style.transform = 'rotate(180deg)';
+        }
+    }
+    
+    if (recentContent && recentIcon) {
+        if (recentState === 'closed') {
+            recentContent.style.display = 'none';
+            recentIcon.style.transform = 'rotate(0deg)';
+        } else {
+            recentContent.style.display = 'block';
+            recentIcon.style.transform = 'rotate(180deg)';
+        }
     }
 }
+
+window.toggleCollapsible = function(contentId, iconId) {
+    const content = document.getElementById(contentId);
+    const icon = document.getElementById(iconId);
+    if (!content || !icon) return;
+    
+    const isHidden = content.style.display === 'none' || !content.style.display;
+    content.style.display = isHidden ? 'block' : 'none';
+    icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+    
+    // Save state
+    if (contentId === 'pendingOrdersContent') {
+        localStorage.setItem('pendingOrdersOpen', isHidden ? 'open' : 'closed');
+    }
+    if (contentId === 'recentTradesContent') {
+        localStorage.setItem('recentTradesOpen', isHidden ? 'open' : 'closed');
+    }
+};
 
 // ============================================================
 // INIT TRADING
@@ -879,8 +889,8 @@ function updateBalanceInUI(balance) {
 function initTrading() {
     uiLog('Initializing trading module v6.0 Professional...');
 
-    // v7.1.1: Load saved symbol from backend before anything else
     loadSavedSymbol();
+    initCollapsibles();
 
     if (stakeSlider) {
         stakeSlider.min = 0.50;
@@ -942,7 +952,6 @@ function initTrading() {
             const newSymbol = symbolSelect.value;
             uiLog(`Symbol select changed: ${newSymbol}`);
             clearSignal();
-            // v7.1: Save symbol preference
             saveSymbolPreference(newSymbol);
             if (window.showToast) window.showToast('Symbol Changed', `AI analyzing ${newSymbol}...`, 'info');
             changeSymbol(newSymbol);
@@ -985,3 +994,4 @@ window.copyTradeToClipboard = copyTradeToClipboard;
 window.updatePendingOrdersDisplay = updatePendingOrdersDisplay;
 window.saveSymbolPreference = saveSymbolPreference;
 window.loadSavedSymbol = loadSavedSymbol;
+window.toggleCollapsible = toggleCollapsible;

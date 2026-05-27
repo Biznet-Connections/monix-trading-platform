@@ -81,63 +81,25 @@ async function refreshBalance() {
                 ? profile.derivBalance.balance 
                 : parseFloat(profile.derivBalance.balance);
             
-            // Update main balance display
             const balanceEl = document.getElementById('balanceAmount');
-            if (balanceEl) {
-                balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
-            }
+            if (balanceEl) balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
             
-            // Update total balance in locked panel
             const totalEl = document.getElementById('totalBalance');
-            if (totalEl) {
-                totalEl.textContent = `$${balanceNum.toFixed(2)}`;
-            }
+            if (totalEl) totalEl.textContent = `$${balanceNum.toFixed(2)}`;
             
-            // Get locked balance and update available
             const lockedEl = document.getElementById('lockedBalance');
             const locked = parseFloat(lockedEl?.textContent?.replace('$', '') || 0);
             const availableEl = document.getElementById('availableBalance');
-            if (availableEl) {
-                availableEl.textContent = `$${(balanceNum - locked).toFixed(2)}`;
-            }
+            if (availableEl) availableEl.textContent = `$${(balanceNum - locked).toFixed(2)}`;
             
-            // Update today's profit if we have stats
-            if (profile.stats?.today_profit !== undefined) {
-                const todayProfitEl = document.getElementById('todayProfit');
-                const todayProfit = profile.stats.today_profit || 0;
-                if (todayProfitEl) {
-                    todayProfitEl.innerHTML = `<i class="fas fa-arrow-${todayProfit >= 0 ? 'up' : 'down'}"></i> Today: ${todayProfit >= 0 ? '+' : ''}$${todayProfit.toFixed(2)}`;
-                    todayProfitEl.className = todayProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
-                }
-            }
-            
-            // Update win rate
-            if (profile.stats?.win_rate !== undefined) {
-                const winRateEl = document.getElementById('winRateDisplay');
-                if (winRateEl) {
-                    winRateEl.innerHTML = `Win Rate: ${profile.stats.win_rate}%`;
-                }
-            }
-            
-            logToTerminal(`💰 Auto-refresh balance: $${balanceNum.toFixed(2)}`);
+            if (window.updateLockedBalance) await window.updateLockedBalance();
         }
-        
-        // Also refresh locked balance
-        if (window.updateLockedBalance) {
-            await window.updateLockedBalance();
-        }
-    } catch (error) {
-        // Silent fail - don't spam console
-    }
+    } catch (error) {}
 }
 
 function startAutoBalanceRefresh() {
     if (autoBalanceInterval) clearInterval(autoBalanceInterval);
-    autoBalanceInterval = setInterval(() => {
-        if (currentUser && document.getElementById('dashboardPage')?.classList.contains('hidden') === false) {
-            refreshBalance();
-        }
-    }, 5000); // Refresh every 5 seconds
+    autoBalanceInterval = setInterval(refreshBalance, 5000);
 }
 
 function stopAutoBalanceRefresh() {
@@ -156,6 +118,7 @@ function initMobileDrawer() {
         if (drawerOverlay) drawerOverlay.classList.add('hidden');
         document.body.style.overflow = '';
         if (mobileHeader) mobileHeader.style.display = 'flex';
+        localStorage.setItem('drawer_open', 'false');
     }
 
     function openDrawer() {
@@ -163,6 +126,13 @@ function initMobileDrawer() {
         if (drawerOverlay) drawerOverlay.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
         if (mobileHeader) mobileHeader.style.display = 'none';
+        localStorage.setItem('drawer_open', 'true');
+    }
+
+    // Restore drawer state
+    const drawerState = localStorage.getItem('drawer_open');
+    if (drawerState === 'true' && window.innerWidth < 1024) {
+        openDrawer();
     }
 
     if (mobileMenuBtn) {
@@ -182,10 +152,16 @@ function initMobileDrawer() {
     }
 
     if (drawerOverlay) {
-        drawerOverlay.addEventListener('click', () => {
-            closeDrawer();
-        });
+        drawerOverlay.addEventListener('click', closeDrawer);
     }
+    
+    window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+            if (sidebarDrawer) sidebarDrawer.style.transform = '';
+            if (drawerOverlay) drawerOverlay.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    });
 }
 
 // ============ PAGE CLOSE BUTTONS ============
@@ -210,7 +186,6 @@ function setupPageCloseButtons() {
                     switchPage('dashboard');
                 };
                 headerDiv.appendChild(closeBtn);
-                logToTerminal(`✅ [UI] Added close button to ${pageId}`);
             }
         }
     });
@@ -243,12 +218,10 @@ function setupAuthModal() {
             e.stopPropagation();
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
-            logToTerminal(`🔐 Login attempt for: ${email}`);
 
             try {
                 const result = await window.api.login(email, password);
                 if (result.success) {
-                    logToTerminal(`✅ Login successful for ${email}`);
                     currentUser = result.user;
                     showApp();
                     await loadUserData();
@@ -270,12 +243,10 @@ function setupAuthModal() {
             const email = document.getElementById('regEmail').value;
             const password = document.getElementById('regPassword').value;
             const voucher = document.getElementById('regVoucher').value;
-            logToTerminal(`📝 Registration attempt for: ${email} (${username})`);
 
             try {
                 const result = await window.api.register(username, email, password, voucher);
                 if (result.success) {
-                    logToTerminal(`✅ Registration successful for ${email}`);
                     currentUser = result.user;
                     showApp();
                     await loadUserData();
@@ -445,11 +416,7 @@ function switchPage(page) {
     if (page === 'history') setTimeout(() => loadFullHistory(), 100);
     if (page === 'leaderboard') setTimeout(() => loadLeaderboard(), 100);
     if (page === 'insights') setTimeout(() => loadFullInsights(), 100);
-
-    // Refresh balance when switching to dashboard
-    if (page === 'dashboard') {
-        setTimeout(() => refreshBalance(), 100);
-    }
+    if (page === 'dashboard') setTimeout(() => refreshBalance(), 100);
 
     setTimeout(() => setupPageCloseButtons(), 200);
 }
@@ -490,7 +457,6 @@ async function loadUserData() {
                     balanceEl.innerHTML = `$0.00`;
                     if (connectionText) connectionText.innerHTML = 'Connecting to REAL...';
                     if (marketStatus) marketStatus.innerHTML = 'CONNECTING';
-                    logToTerminal('⚠️ REAL mode but balance is 0 - forcing reconnect');
 
                     try {
                         const reconnectResult = await window.api.reconnectDeriv();
@@ -498,41 +464,13 @@ async function loadUserData() {
                             balanceEl.innerHTML = `$${reconnectResult.balance.toFixed(2)}`;
                             if (connectionText) connectionText.innerHTML = `REAL Connected`;
                             if (marketStatus) marketStatus.innerHTML = `REAL ACTIVE`;
-                            logToTerminal(`💰 REAL balance fetched: $${reconnectResult.balance}`);
                         }
-                    } catch (reconnectError) {
-                        logToTerminal(`❌ Force reconnect failed: ${reconnectError.message}`, 'error');
-                    }
+                    } catch (reconnectError) {}
                 }
                 else if (!hasAnyApiKey) {
                     balanceEl.innerHTML = `$0.00`;
                     if (connectionText) connectionText.innerHTML = 'No API Keys';
                     if (marketStatus) marketStatus.innerHTML = 'READ-ONLY';
-                    logToTerminal('⚠️ No API keys found - showing $0 balance');
-                }
-                else if (hasAnyApiKey && !profile.derivBalance?.authorized && !isReconnecting) {
-                    balanceEl.innerHTML = `$0.00`;
-                    if (connectionText) connectionText.innerHTML = 'Connecting...';
-                    if (marketStatus) marketStatus.innerHTML = 'CONNECTING';
-                    logToTerminal('⚠️ API keys present but Deriv not authorized - attempting reconnect');
-
-                    isReconnecting = true;
-                    try {
-                        const reconnectResult = await window.api.reconnectDeriv();
-                        if (reconnectResult.success && reconnectResult.balance !== undefined) {
-                            const balanceNum = typeof reconnectResult.balance === 'number'
-                                ? reconnectResult.balance
-                                : parseFloat(reconnectResult.balance);
-                            balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
-                            if (connectionText) connectionText.innerHTML = `${reconnectResult.mode || currentMode} Connected`;
-                            if (marketStatus) marketStatus.innerHTML = `${reconnectResult.mode || currentMode} ACTIVE`;
-                            logToTerminal(`💰 Reconnected! Balance: $${balanceNum}`);
-                        }
-                    } catch (reconnectError) {
-                        logToTerminal(`❌ Auto-reconnect failed: ${reconnectError.message}`, 'error');
-                    } finally {
-                        isReconnecting = false;
-                    }
                 }
             }
 
@@ -566,7 +504,6 @@ async function loadUserData() {
             const adminLink = document.getElementById('adminLink');
             if (adminLink && profile.user.is_admin) {
                 adminLink.classList.remove('hidden');
-                logToTerminal('👑 Admin access granted');
             }
 
             if (window.updateLockedBalance) await window.updateLockedBalance();
@@ -659,123 +596,160 @@ async function loadLeaderboard() {
     }
 }
 
+// ============ FIXED: AI INSIGHTS FOR ALL SYMBOLS ============
 async function loadFullInsights() {
     try {
-        logToTerminal('🧠 Loading full insights page...');
-        const insights = await window.api.getAIInsights();
+        logToTerminal('🧠 Loading full insights page for ALL symbols...');
+        
+        // Get ALL trades (no symbol filter)
+        const allTrades = await window.api.getTradeHistory(500);
+        
         const container = document.getElementById('fullInsightsContent');
-
         if (!container) return;
 
-        if (!insights.user_stats || insights.user_stats.total_trades === 0) {
+        if (!allTrades || allTrades.length === 0) {
             container.innerHTML = `
-                <div class="bg-amber-500/20 p-6 rounded-lg text-center border border-amber-500/30">
+                <div class="bg-amber-500/20 p-6 rounded-lg text-center">
                     <i class="fas fa-chart-line text-4xl text-amber-400 mb-3"></i>
                     <h3 class="text-xl font-bold mb-2">No Trades Yet</h3>
-                    <p class="text-slate-400 mb-4">Execute a trade to generate AI insights!</p>
-                    <div class="text-sm text-slate-500 mb-4">Go to Dashboard and click GET SIGNAL to start trading</div>
-                    <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
+                    <p class="text-slate-400">Execute trades to see AI insights across all symbols!</p>
                 </div>
             `;
-            logToTerminal('🧠 No trades yet - showing placeholder');
             return;
         }
 
-        if (insights.user_stats.total_trades < 3) {
-            const tradesNeeded = 3 - insights.user_stats.total_trades;
-            container.innerHTML = `
-                <div class="bg-blue-500/20 p-6 rounded-lg text-center border border-blue-500/30">
-                    <i class="fas fa-spinner fa-pulse text-4xl text-blue-400 mb-3"></i>
-                    <h3 class="text-xl font-bold mb-2">Gathering Trading Data...</h3>
-                    <p class="text-slate-400 mb-4">AI needs more data. Complete ${tradesNeeded} more trade(s) for pattern analysis.</p>
-                    <div class="text-sm text-slate-500 mb-4">Current trades: ${insights.user_stats.total_trades}/3 needed</div>
-                    <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
-                </div>
-            `;
-            logToTerminal(`🧠 Only ${insights.user_stats.total_trades} trades - need ${tradesNeeded} more for insights`);
-            return;
-        }
+        // Group by symbol
+        const tradesBySymbol = {};
+        allTrades.forEach(t => {
+            if (!tradesBySymbol[t.symbol]) tradesBySymbol[t.symbol] = [];
+            tradesBySymbol[t.symbol].push(t);
+        });
 
-        container.innerHTML = `
-            <div class="bg-slate-800/30 p-4 rounded-lg">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-semibold"><i class="fas fa-chart-line text-emerald-400 mr-2"></i>Your Stats</h3>
-                    <span class="text-xs px-2 py-1 rounded-full bg-indigo-600/20 text-indigo-400">${insights.user_stats.total_trades} trades</span>
-                </div>
+        // Calculate stats per symbol
+        const symbols = Object.keys(tradesBySymbol);
+        let allWins = 0, allLosses = 0, allProfit = 0;
+        
+        const symbolStats = symbols.map(symbol => {
+            const trades = tradesBySymbol[symbol];
+            const wins = trades.filter(t => t.status === 'WIN').length;
+            const losses = trades.filter(t => t.status === 'LOSS').length;
+            const profit = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
+            const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+            
+            allWins += wins;
+            allLosses += losses;
+            allProfit += profit;
+            
+            // Group patterns by symbol
+            const patterns = {};
+            trades.forEach(t => {
+                if (t.pattern) {
+                    if (!patterns[t.pattern]) patterns[t.pattern] = { wins: 0, losses: 0, total: 0 };
+                    patterns[t.pattern].total++;
+                    if (t.status === 'WIN') patterns[t.pattern].wins++;
+                    else if (t.status === 'LOSS') patterns[t.pattern].losses++;
+                }
+            });
+            
+            const patternList = Object.entries(patterns)
+                .map(([name, data]) => ({
+                    name,
+                    winRate: data.total > 0 ? Math.round((data.wins / data.total) * 100) : 0,
+                    total: data.total,
+                    profit: data.wins - data.losses
+                }))
+                .sort((a, b) => b.winRate - a.winRate)
+                .slice(0, 5);
+            
+            return { symbol, wins, losses, profit, winRate, total: trades.length, patterns: patternList };
+        });
+
+        const totalTrades = allWins + allLosses;
+        const overallWinRate = totalTrades > 0 ? Math.round((allWins / totalTrades) * 100) : 0;
+
+        // Build HTML
+        let html = `
+            <div class="bg-slate-800/30 p-4 rounded-lg mb-4">
+                <h3 class="font-bold mb-3"><i class="fas fa-chart-line text-emerald-400 mr-2"></i>Overall Performance (All Symbols)</h3>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div class="text-center p-2 bg-slate-700/30 rounded-lg">
-                        <div class="text-2xl font-bold text-emerald-400">${insights.user_stats.win_rate || 0}%</div>
+                        <div class="text-2xl font-bold text-emerald-400">${overallWinRate}%</div>
                         <div class="text-xs text-slate-500">Win Rate</div>
                     </div>
                     <div class="text-center p-2 bg-slate-700/30 rounded-lg">
-                        <div class="text-2xl font-bold">${insights.user_stats.total_trades || 0}</div>
+                        <div class="text-2xl font-bold">${totalTrades}</div>
                         <div class="text-xs text-slate-500">Total Trades</div>
                     </div>
                     <div class="text-center p-2 bg-slate-700/30 rounded-lg">
-                        <div class="text-2xl font-bold ${(insights.user_stats.net_profit || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}">$${(insights.user_stats.net_profit || 0).toFixed(2)}</div>
+                        <div class="text-2xl font-bold ${allProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${allProfit >= 0 ? '+' : ''}$${allProfit.toFixed(2)}</div>
                         <div class="text-xs text-slate-500">Net Profit</div>
                     </div>
                     <div class="text-center p-2 bg-slate-700/30 rounded-lg">
-                        <div class="text-2xl font-bold">${insights.user_stats.avg_win_confidence || 0}%</div>
-                        <div class="text-xs text-slate-500">Avg Confidence</div>
+                        <div class="text-2xl font-bold">${symbols.length}</div>
+                        <div class="text-xs text-slate-500">Symbols Traded</div>
                     </div>
                 </div>
             </div>
-
-            <div class="bg-slate-800/30 p-4 rounded-lg">
-                <h3 class="font-semibold mb-3"><i class="fas fa-trophy text-yellow-500 mr-2"></i>Top Winning Patterns</h3>
-                ${insights.top_patterns?.length > 0 ? insights.top_patterns.map(p => `
-                    <div class="flex justify-between items-center py-2 border-b border-slate-700">
-                        <div>
-                            <span class="font-medium">${p.pattern_name}</span>
-                            <span class="text-xs text-slate-500 ml-2">on ${p.symbol}</span>
-                        </div>
-                        <div class="flex gap-3">
-                            <span class="text-emerald-400 font-bold">${p.win_rate}%</span>
-                            <span class="text-xs text-slate-500">(${p.times_used} trades)</span>
-                        </div>
-                    </div>
-                `).join('') : '<p class="text-slate-500 text-center py-4">No winning patterns identified yet</p>'}
-            </div>
-
-            <div class="bg-slate-800/30 p-4 rounded-lg">
-                <h3 class="font-semibold mb-3"><i class="fas fa-exclamation-triangle text-red-400 mr-2"></i>Patterns to Avoid</h3>
-                ${insights.worst_patterns?.length > 0 ? insights.worst_patterns.map(p => `
-                    <div class="flex justify-between items-center py-2 border-b border-slate-700">
-                        <div>
-                            <span class="font-medium">${p.pattern_name}</span>
-                            <span class="text-xs text-slate-500 ml-2">on ${p.symbol}</span>
-                        </div>
-                        <div class="flex gap-3">
-                            <span class="text-red-400 font-bold">${p.win_rate}%</span>
-                            <span class="text-xs text-slate-500">(${p.times_used} trades)</span>
-                        </div>
-                    </div>
-                `).join('') : '<p class="text-slate-500 text-center py-4">No losing patterns identified yet</p>'}
-            </div>
-
-            <div class="bg-indigo-600/20 p-4 rounded-lg border border-indigo-500/30">
-                <h3 class="font-semibold mb-2"><i class="fas fa-brain text-indigo-400 mr-2"></i>AI Trading Advice</h3>
-                <ul class="space-y-2">
-                    ${insights.advice?.adjustments?.map(a => `<li class="text-sm flex items-start gap-2"><i class="fas fa-lightbulb text-yellow-500 text-xs mt-0.5"></i><span>${a}</span></li>`).join('') || '<li>Complete more trades for AI advice</li>'}
-                </ul>
-                ${insights.advice?.confidence_adjustment ? `<p class="text-xs text-slate-400 mt-3 pt-2 border-t border-indigo-500/30">Suggested confidence adjustment: ${insights.advice.confidence_adjustment > 0 ? '+' : ''}${insights.advice.confidence_adjustment}%</p>` : ''}
-                ${insights.advice?.stake_adjustment ? `<p class="text-xs text-slate-400">Suggested stake adjustment: ${insights.advice.stake_adjustment > 0 ? '+' : ''}$${Math.abs(insights.advice.stake_adjustment).toFixed(2)}</p>` : ''}
-            </div>
         `;
 
-        logToTerminal('✅ Full insights displayed successfully');
+        // Per symbol section
+        for (const stat of symbolStats) {
+            const profitColor = stat.profit >= 0 ? 'text-emerald-400' : 'text-red-400';
+            const winRateColor = stat.winRate >= 50 ? 'text-emerald-400' : 'text-red-400';
+            
+            html += `
+                <div class="bg-slate-800/30 p-4 rounded-lg mb-4">
+                    <div class="flex justify-between items-center mb-3 border-b border-slate-700 pb-2">
+                        <h3 class="font-bold text-lg"><i class="fas fa-chart-simple mr-2"></i>${stat.symbol}</h3>
+                        <span class="text-xs px-2 py-1 rounded-full bg-indigo-600/20 text-indigo-400">${stat.total} trades</span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                        <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                            <div class="text-xl font-bold ${winRateColor}">${stat.winRate}%</div>
+                            <div class="text-xs text-slate-500">Win Rate</div>
+                        </div>
+                        <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                            <div class="text-xl font-bold">${stat.wins}W / ${stat.losses}L</div>
+                            <div class="text-xs text-slate-500">Wins/Losses</div>
+                        </div>
+                        <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                            <div class="text-xl font-bold ${profitColor}">${stat.profit >= 0 ? '+' : ''}$${stat.profit.toFixed(2)}</div>
+                            <div class="text-xs text-slate-500">Net Profit</div>
+                        </div>
+                    </div>
+                    
+                    ${stat.patterns.length > 0 ? `
+                        <div class="mt-3">
+                            <h4 class="font-semibold text-sm mb-2"><i class="fas fa-chart-line text-yellow-500 mr-1"></i>Top Patterns on ${stat.symbol}</h4>
+                            <div class="space-y-1">
+                                ${stat.patterns.map(p => `
+                                    <div class="flex justify-between items-center text-xs py-1 border-b border-slate-700/50">
+                                        <span>${p.name}</span>
+                                        <div class="flex gap-3">
+                                            <span class="${p.winRate >= 50 ? 'text-emerald-400' : 'text-red-400'}">${p.winRate}% WR</span>
+                                            <span class="text-slate-500">(${p.total} trades)</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+        logToTerminal(`✅ Full insights displayed for ${symbols.length} symbols`);
 
     } catch (error) {
         logToTerminal(`❌ Failed to load full insights: ${error.message}`, 'error');
         const container = document.getElementById('fullInsightsContent');
         if (container) {
             container.innerHTML = `
-                <div class="bg-red-500/20 p-6 rounded-lg text-center border border-red-500/30">
+                <div class="bg-red-500/20 p-6 rounded-lg text-center">
                     <i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-3"></i>
                     <h3 class="text-xl font-bold mb-2">Error Loading Insights</h3>
-                    <p class="text-slate-400 mb-4">${error.message}</p>
-                    <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
+                    <p class="text-slate-400">${error.message}</p>
                 </div>
             `;
         }
@@ -803,7 +777,6 @@ function setupTheme() {
                 if (themeIcon) themeIcon.className = 'fas fa-moon';
                 if (themeText) themeText.innerText = 'Dark Mode';
                 if (window.updateChartTheme) window.updateChartTheme(true);
-                logToTerminal('🌙 Theme changed to Dark');
             } else {
                 document.body.classList.remove('dark-theme');
                 document.body.classList.add('light-theme');
@@ -811,7 +784,6 @@ function setupTheme() {
                 if (themeIcon) themeIcon.className = 'fas fa-sun';
                 if (themeText) themeText.innerText = 'Light Mode';
                 if (window.updateChartTheme) window.updateChartTheme(false);
-                logToTerminal('☀️ Theme changed to Light');
             }
         });
     }
@@ -848,7 +820,6 @@ function showApp() {
     updateServerTime();
     setInterval(updateServerTime, 1000);
     
-    // Start auto-balance refresh
     startAutoBalanceRefresh();
 }
 
@@ -859,7 +830,7 @@ function showAuthModal() {
 }
 
 async function initApp() {
-    logToTerminal('🚀 MONIX Trading Platform v3.0 Initializing...');
+    logToTerminal('🚀 MONIX Trading Platform v6.0 Initializing...');
 
     initMobileDrawer();
     setupAuthModal();
@@ -887,7 +858,6 @@ async function initApp() {
     showAuthModal();
 }
 
-// Global functions
 window.switchPageToDashboard = function() { switchPage('dashboard'); };
 window.switchPage = switchPage;
 window.loadFullInsights = loadFullInsights;
