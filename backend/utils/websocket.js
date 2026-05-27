@@ -1,99 +1,93 @@
-let globalWss = null;
-let globalClients = new Set();
+const WebSocket = require('ws');
 
-function setWebSocketServer(wss) {
-    globalWss = wss;
+let wss = null;
+let clients = new Set();
+
+function initWebSocket(server) {
+    wss = new WebSocket.Server({ server });
+    
+    wss.on('connection', (ws) => {
+        clients.add(ws);
+        console.log(`🔌 WebSocket client connected. Total: ${clients.size}`);
+        
+        ws.on('close', () => {
+            clients.delete(ws);
+            console.log(`🔌 WebSocket client disconnected. Total: ${clients.size}`);
+        });
+        
+        ws.on('message', (message) => {
+            try {
+                const data = JSON.parse(message);
+                if (data.type === 'ping') {
+                    ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                }
+            } catch (e) {}
+        });
+    });
+    
+    return wss;
 }
 
-function setClients(clients) {
-    globalClients = clients;
-}
-
-function broadcastToAll(message) {
-    if (!globalWss) return;
-
-    const data = typeof message === 'string' ? message : JSON.stringify(message);
-    globalClients.forEach(client => {
-        if (client.readyState === 1) {
-            client.send(data);
+function broadcastAIUpdate(aiData) {
+    const message = JSON.stringify({ type: 'ai_update', data: aiData, timestamp: Date.now() });
+    clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
         }
     });
 }
 
 function broadcastPrice(tick) {
-    broadcastToAll({
-        type: 'price',
-        symbol: tick.symbol,
-        price: tick.quote,
-        timestamp: tick.epoch
-    });
-}
-
-function broadcastSignal(signal) {
-    broadcastToAll({
-        type: 'signal',
-        signal: signal
-    });
-}
-
-function broadcastNotification(title, message, type = 'info') {
-    broadcastToAll({
-        type: 'notification',
-        title: title,
-        message: message,
-        notificationType: type,
-        timestamp: Date.now()
+    const message = JSON.stringify({ type: 'price', price: tick.quote, symbol: tick.symbol, epoch: tick.epoch });
+    clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
     });
 }
 
 function broadcastTradeResult(trade) {
-    broadcastToAll({
-        type: 'trade_result',
-        trade: trade
+    const message = JSON.stringify({ type: 'trade_result', trade, timestamp: Date.now() });
+    clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
     });
 }
 
-function broadcastBalance(userId, balance) {
-    broadcastToAll({
-        type: 'balance',
-        userId: userId,
-        balance: balance,
-        timestamp: Date.now()
-    });
-}
-
-function broadcastTradeUpdate(trade) {
-    broadcastToAll({
-        type: 'trade_update',
-        trade: trade
-    });
-}
-
-function broadcastAIUpdate(update) {
-    broadcastToAll({
-        type: 'ai_update',
-        data: update
+function broadcastNotification(title, message, notificationType = 'info') {
+    const msg = JSON.stringify({ type: 'notification', title, message, notificationType, timestamp: Date.now() });
+    clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(msg);
+        }
     });
 }
 
 function broadcastNewSetup(setup) {
-    broadcastToAll({
-        type: 'new_setup',
-        setup: setup,
-        timestamp: Date.now()
+    const message = JSON.stringify({ type: 'new_setup', setup, timestamp: Date.now() });
+    clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
+    });
+}
+
+function broadcastBalance(balance, currency = 'USD') {
+    const message = JSON.stringify({ type: 'balance', balance, currency, timestamp: Date.now() });
+    clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+        }
     });
 }
 
 module.exports = {
-    setWebSocketServer,
-    setClients,
-    broadcastToAll,
-    broadcastPrice,
-    broadcastSignal,
-    broadcastNotification,
-    broadcastTradeResult,
-    broadcastBalance,
-    broadcastTradeUpdate,
+    initWebSocket,
     broadcastAIUpdate,
-    broadcastNewSetup
+    broadcastPrice,
+    broadcastTradeResult,
+    broadcastNotification,
+    broadcastNewSetup,
+    broadcastBalance
 };
