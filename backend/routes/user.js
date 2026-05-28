@@ -99,7 +99,7 @@ router.put('/symbol', authMiddleware, async (req, res) => {
         if (!symbol) {
             return res.status(400).json({ error: 'Symbol is required' });
         }
-        
+
         await User.update(req.userId, { default_symbol: symbol });
         console.log(`💾 [API] User ${req.userId} saved symbol: ${symbol}`);
         res.json({ success: true, symbol });

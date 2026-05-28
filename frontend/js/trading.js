@@ -19,7 +19,6 @@ const realBtn = document.getElementById('realBtn');
 const switchModeBtn = document.getElementById('switchModeBtn');
 const symbolSelect = document.getElementById('symbolSelect');
 const refreshTradesBtn = document.getElementById('refreshTradesBtn');
-const refreshBtn = document.getElementById('refreshBtn');
 
 // Debug log helper
 function uiLog(message, type = 'info') {
@@ -651,7 +650,7 @@ function startPendingOrdersPolling() {
 }
 
 // ============================================================
-// COPY FUNCTIONS
+// COPY & DELETE FUNCTIONS
 // ============================================================
 function copyTradeToClipboard(trade) {
     const text = `${trade.action} ${trade.symbol} @ $${trade.entry_price?.toFixed(2)} | Exit: $${trade.exit_price?.toFixed(2) || 'PENDING'} | ${trade.profit >= 0 ? '+' : ''}$${trade.profit?.toFixed(2)} | ${trade.status} | Pattern: ${trade.pattern || 'N/A'} | RSI: ${trade.rsi || 'N/A'} | ${new Date(trade.executed_at).toLocaleString()}`;
@@ -697,6 +696,29 @@ async function copyAllTrades() {
     });
 }
 
+// SOFT DELETE - Hide trades from UI only, keep for AI learning
+async function deleteAllTrades() {
+    if (!confirm('⚠️ This will REMOVE trades from YOUR VIEW only.\n\nYour trading history will still be used by AI for learning and pattern recognition.\n\nAre you sure you want to hide all trades from the UI?')) {
+        return;
+    }
+    try {
+        const result = await window.api.hideTradeHistory();
+        if (result.success) {
+            uiLog(`Hidden ${result.hiddenCount} trades from UI (kept for AI learning)`);
+            if (window.showToast) window.showToast('History Hidden', `Trades hidden from view. AI can still learn from them.`, 'success');
+            await loadRecentTrades();
+            if (typeof loadFullHistory === 'function') await loadFullHistory();
+            if (typeof loadPerformanceStats === 'function') await loadPerformanceStats();
+            if (typeof refreshUserData === 'function') await refreshUserData();
+        } else {
+            throw new Error(result.error || 'Hide failed');
+        }
+    } catch (error) {
+        uiLog(`Hide trades error: ${error.message}`, 'error');
+        if (window.showToast) window.showToast('Hide Failed', error.message, 'error');
+    }
+}
+
 window.copyTradeById = async function(tradeId) {
     const trades = await window.api.getTradeHistory(50);
     const trade = trades.find(t => t._id === tradeId);
@@ -704,7 +726,7 @@ window.copyTradeById = async function(tradeId) {
 };
 
 // ============================================================
-// LOAD RECENT TRADES
+// LOAD RECENT TRADES (with collapsible state preserved)
 // ============================================================
 async function loadRecentTrades() {
     try {
@@ -712,17 +734,17 @@ async function loadRecentTrades() {
         const countBadge = document.getElementById('recentTradesCount');
         if (!tbody) return;
         tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">Loading...</td></tr>';
-        
+
         const trades = await window.api.getTradeHistory(20);
-        
+
         if (!trades || trades.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet</td></tr>';
             if (countBadge) countBadge.innerText = '(0)';
             return;
         }
-        
+
         if (countBadge) countBadge.innerText = `(${trades.length})`;
-        
+
         tbody.innerHTML = trades.map(trade => `
             <tr class="hover:bg-slate-700/20">
                 <td class="p-4 text-xs">${new Date(trade.executed_at).toLocaleTimeString()}</td>
@@ -738,6 +760,9 @@ async function loadRecentTrades() {
             </tr>
         `).join('');
         uiLog(`Recent trades: Loaded ${trades.length} trades`);
+        
+        // Re-apply collapsible state after DOM update
+        if (typeof initCollapsibles === 'function') initCollapsibles();
     } catch (error) {
         uiLog(`Recent trades error: ${error.message}`, 'error');
         const tbody = document.getElementById('recentTradesBody');
@@ -755,37 +780,46 @@ async function refreshUserData() {
             if (welcomeName) welcomeName.innerHTML = profile.user.username;
             if (userName) userName.innerHTML = profile.user.username;
             if (userEmail) userEmail.innerHTML = profile.user.email;
-            
+
             const balanceEl = document.getElementById('balanceAmount');
             if (balanceEl && profile.derivBalance?.authorized) {
                 balanceEl.innerHTML = `$${profile.derivBalance.balance.toFixed(2)}`;
             }
-            
+
             const winRateEl = document.getElementById('winRateDisplay');
             if (winRateEl && profile.stats) winRateEl.innerHTML = `Win Rate: ${profile.stats.win_rate || 0}%`;
-            
+
             const voucherCode = document.getElementById('voucherCode');
             const tradesRemaining = document.getElementById('tradesRemaining');
             if (voucherCode && profile.user.voucher_code) voucherCode.innerHTML = profile.user.voucher_code;
             if (tradesRemaining) tradesRemaining.innerHTML = `Trades Left: ${profile.user.trades_remaining || 0}`;
-            
+
             if (pushSignalsToggle) pushSignalsToggle.checked = profile.user.push_signals === 1;
             if (autoModeToggle) autoModeToggle.checked = profile.user.auto_mode === 1;
             if (jackpotToggle) jackpotToggle.checked = profile.user.jackpot_mode === 1;
             if (stakeSlider && profile.user.base_stake) stakeSlider.value = Math.max(profile.user.base_stake, 0.50);
             if (stakeValue) stakeValue.innerText = `$${Math.max(profile.user.base_stake || 0.50, 0.50).toFixed(2)}`;
-            
+
             const adminLink = document.getElementById('adminLink');
             if (adminLink && profile.user.is_admin) adminLink.classList.remove('hidden');
-            
-            if (profile.user.is_demo === 1) {
+
+            // Fix DEMO/REAL button styling based on actual mode
+            if (profile.user.is_demo === true || profile.user.is_demo === 1) {
                 if (demoBtn) demoBtn.className = 'px-3 py-1 rounded-lg text-xs bg-emerald-500 text-white shadow-lg';
                 if (realBtn) realBtn.className = 'px-3 py-1 rounded-lg text-xs bg-slate-700 text-slate-400';
+                if (window.marketStatus) {
+                    const marketStatus = document.getElementById('marketStatus');
+                    if (marketStatus) marketStatus.innerHTML = 'DEMO ACTIVE';
+                }
             } else {
                 if (realBtn) realBtn.className = 'px-3 py-1 rounded-lg text-xs bg-emerald-500 text-white shadow-lg';
                 if (demoBtn) demoBtn.className = 'px-3 py-1 rounded-lg text-xs bg-slate-700 text-slate-400';
+                if (window.marketStatus) {
+                    const marketStatus = document.getElementById('marketStatus');
+                    if (marketStatus) marketStatus.innerHTML = 'REAL ACTIVE';
+                }
             }
-            
+
             await updateLockedBalance();
         }
     } catch (error) {
@@ -796,7 +830,7 @@ async function refreshUserData() {
 function addTradeToTable(trade) {
     const tbody = document.getElementById('recentTradesBody');
     if (!tbody) return;
-    
+
     const newRow = document.createElement('tr');
     newRow.className = 'hover:bg-slate-700/20';
     newRow.innerHTML = `
@@ -809,12 +843,12 @@ function addTradeToTable(trade) {
         <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-[10px] ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : trade.status === 'LOSS' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}">${trade.status || 'PENDING'}</span></td>
         <td class="p-4 text-center"><button onclick="window.copyTradeById('${trade._id || trade.id}')" class="text-slate-400 hover:text-white transition text-lg" title="Copy trade details">📋</button></td>
     `;
-    
+
     tbody.insertBefore(newRow, tbody.firstChild);
     if (tbody.children.length > 20) tbody.removeChild(tbody.lastChild);
-    
+
     uiLog(`Trade added to table: ${trade.action} ${trade.status}`);
-    
+
     if (trade.status === 'WIN') {
         playSound('win');
         sendNotification('Trade WIN!', `${trade.action} on ${trade.symbol}: +$${trade.profit?.toFixed(2)}`);
@@ -834,15 +868,15 @@ function updateBalanceInUI(balance) {
 // ============================================================
 function updateAIDisplay(aiData) {
     console.log('🖥️ [UI] updateAIDisplay called with:', aiData);
-    
+
     const watchState = aiData.watch_state || aiData;
     if (!watchState) {
         console.warn('⚠️ [UI] No watch_state in aiData');
         return;
     }
-    
+
     console.log(`🖥️ [UI] Updating: action=${watchState.action}, confidence=${watchState.confidence}, rsi=${watchState.market_rsi}, symbol=${watchState.symbol}`);
-    
+
     // Update Signal Action
     const signalAction = document.getElementById('signalAction');
     if (signalAction) {
@@ -857,13 +891,13 @@ function updateAIDisplay(aiData) {
             signalAction.className = 'text-2xl font-bold text-yellow-400';
         }
     }
-    
+
     // Update Confidence
     const signalConfidence = document.getElementById('signalConfidence');
     if (signalConfidence && watchState.confidence !== undefined) {
         signalConfidence.innerHTML = `${watchState.confidence}%`;
     }
-    
+
     // Update Pattern
     const signalPattern = document.getElementById('signalPattern');
     if (signalPattern && watchState.pattern) {
@@ -871,7 +905,7 @@ function updateAIDisplay(aiData) {
     } else if (signalPattern) {
         signalPattern.innerHTML = '—';
     }
-    
+
     // Update Entry Price
     const signalEntry = document.getElementById('signalEntry');
     if (signalEntry && watchState.entry_price) {
@@ -879,37 +913,41 @@ function updateAIDisplay(aiData) {
     } else if (signalEntry && watchState.market_price) {
         signalEntry.innerHTML = `$${watchState.market_price.toFixed(2)}`;
     }
-    
+
     // Update Take Profit
     const signalTP = document.getElementById('signalTP');
     if (signalTP && watchState.take_profit) {
         signalTP.innerHTML = `$${watchState.take_profit.toFixed(2)}`;
     }
-    
+
     // Update Stop Loss
     const signalSL = document.getElementById('signalSL');
     if (signalSL && watchState.stop_loss) {
         signalSL.innerHTML = `$${watchState.stop_loss.toFixed(2)}`;
     }
-    
+
     // Update RSI
     const rsiValue = document.getElementById('rsiValue');
     if (rsiValue && watchState.market_rsi !== undefined) {
         rsiValue.innerHTML = watchState.market_rsi;
     }
-    
+
     // Update Support
     const supportLevel = document.getElementById('supportLevel');
-    if (supportLevel && watchState.market_support) {
+    if (supportLevel && watchState.market_support !== undefined) {
         supportLevel.innerHTML = `$${watchState.market_support.toFixed(2)}`;
+    } else if (supportLevel) {
+        supportLevel.innerHTML = '$0.00';
     }
-    
+
     // Update Resistance
     const resistanceLevel = document.getElementById('resistanceLevel');
-    if (resistanceLevel && watchState.market_resistance) {
+    if (resistanceLevel && watchState.market_resistance !== undefined) {
         resistanceLevel.innerHTML = `$${watchState.market_resistance.toFixed(2)}`;
+    } else if (resistanceLevel) {
+        resistanceLevel.innerHTML = '$0.00';
     }
-    
+
     // Update AI Reason text
     const signalReasoning = document.getElementById('signalReasoning');
     if (signalReasoning && watchState.reason) {
@@ -918,11 +956,27 @@ function updateAIDisplay(aiData) {
         signalReasoning.style.textDecoration = 'underline';
         signalReasoning.onclick = () => {
             if (window.showAIReasonModal) {
-                window.showAIReasonModal(watchState);
+                window.showAIReasonModal({
+                    symbol: watchState.symbol || 'R_75',
+                    action: watchState.action === 'BUY' ? 'BUY' : (watchState.action === 'SELL' ? 'SELL' : 'WAIT'),
+                    confidence: watchState.confidence,
+                    pattern: watchState.pattern,
+                    entry_price: watchState.entry_price || watchState.market_price,
+                    take_profit: watchState.take_profit,
+                    stop_loss: watchState.stop_loss,
+                    reasoning: watchState.reason,
+                    simple_reason: watchState.reason,
+                    rsi: watchState.market_rsi,
+                    support: watchState.market_support,
+                    resistance: watchState.market_resistance,
+                    market_feeling: watchState.market_feeling,
+                    entry_time: watchState.estimated_entry_time === 'Now' ? new Date().toLocaleTimeString() : watchState.estimated_entry_time,
+                    exit_time: '5 min after entry'
+                });
             }
         };
     }
-    
+
     // Update Exit Time
     const signalExit = document.getElementById('signalExit');
     if (signalExit && watchState.estimated_entry_time === 'Now') {
@@ -930,24 +984,25 @@ function updateAIDisplay(aiData) {
     } else if (signalExit && watchState.exit_time) {
         signalExit.innerHTML = watchState.exit_time;
     }
-    
+
     // Store current signal for modal
     window.currentDisplaySignal = watchState;
-    
+
     // Update confidence bars
     if (window.updateConfidenceBars && watchState.confidence) {
         window.updateConfidenceBars(watchState.confidence);
     }
-    
-    // Update pending orders count
+
+    // Update pending orders count and display (from root or watch_state)
     const pendingCount = document.getElementById('pendingOrdersCount');
-    if (pendingCount && watchState.pending_orders) {
-        pendingCount.innerText = `(${watchState.pending_orders.length})`;
+    const pendingOrders = aiData.pending_orders || watchState.pending_orders;
+    if (pendingCount && pendingOrders) {
+        pendingCount.innerText = `(${pendingOrders.length})`;
         if (window.updatePendingOrdersDisplay) {
-            window.updatePendingOrdersDisplay(watchState.pending_orders);
+            window.updatePendingOrdersDisplay(pendingOrders);
         }
     }
-    
+
     console.log(`✅ [UI] Display updated for ${watchState.symbol}`);
 }
 
@@ -957,12 +1012,12 @@ function updateAIDisplay(aiData) {
 function initCollapsibles() {
     const pendingState = localStorage.getItem('pendingOrdersOpen');
     const recentState = localStorage.getItem('recentTradesOpen');
-    
+
     const pendingContent = document.getElementById('pendingOrdersContent');
     const recentContent = document.getElementById('recentTradesContent');
     const pendingIcon = document.getElementById('pendingOrdersIcon');
     const recentIcon = document.getElementById('recentTradesIcon');
-    
+
     if (pendingContent && pendingIcon) {
         if (pendingState === 'closed') {
             pendingContent.style.display = 'none';
@@ -972,7 +1027,7 @@ function initCollapsibles() {
             pendingIcon.style.transform = 'rotate(180deg)';
         }
     }
-    
+
     if (recentContent && recentIcon) {
         if (recentState === 'closed') {
             recentContent.style.display = 'none';
@@ -988,11 +1043,11 @@ window.toggleCollapsible = function(contentId, iconId) {
     const content = document.getElementById(contentId);
     const icon = document.getElementById(iconId);
     if (!content || !icon) return;
-    
+
     const isHidden = content.style.display === 'none' || !content.style.display;
     content.style.display = isHidden ? 'block' : 'none';
     icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-    
+
     if (contentId === 'pendingOrdersContent') {
         localStorage.setItem('pendingOrdersOpen', isHidden ? 'open' : 'closed');
     }
@@ -1006,10 +1061,10 @@ window.toggleCollapsible = function(contentId, iconId) {
 // ============================================================
 function initTrading() {
     uiLog('Initializing trading module v6.0 Professional...');
-    
+
     loadSavedSymbol();
     initCollapsibles();
-    
+
     if (stakeSlider) {
         stakeSlider.min = 0.50;
         stakeSlider.max = 20;
@@ -1021,7 +1076,7 @@ function initTrading() {
             if (stakeValue) stakeValue.innerText = `$${val}`;
         });
     }
-    
+
     if (getSignalBtn) {
         getSignalBtn.innerHTML = '🧠 AI REASONING';
         getSignalBtn.addEventListener('click', (e) => {
@@ -1030,7 +1085,7 @@ function initTrading() {
             fetchAIAnalysis();
         });
     }
-    
+
     if (yesBtn) {
         yesBtn.innerHTML = '💰 BUY';
         yesBtn.addEventListener('click', (e) => {
@@ -1052,7 +1107,7 @@ function initTrading() {
             if (window.showToast) window.showToast('Signal Declined', 'You declined this trade', 'info');
         });
     }
-    
+
     if (demoBtn) demoBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: DEMO'); switchMode('demo'); });
     if (realBtn) realBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REAL'); switchMode('real'); });
     if (switchModeBtn) switchModeBtn.addEventListener('click', (e) => {
@@ -1061,10 +1116,10 @@ function initTrading() {
         const isDemo = demoBtn && demoBtn.classList.contains('bg-emerald-500');
         switchMode(isDemo ? 'real' : 'demo');
     });
-    
-    if (refreshBtn) refreshBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REFRESH'); refreshUserData(); loadRecentTrades(); });
+
+    // Refresh button removed - no event listener needed
     if (refreshTradesBtn) refreshTradesBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REFRESH TRADES'); loadRecentTrades(); });
-    
+
     if (symbolSelect) {
         symbolSelect.addEventListener('change', () => {
             const newSymbol = symbolSelect.value;
@@ -1075,22 +1130,22 @@ function initTrading() {
             changeSymbol(newSymbol);
         });
     }
-    
+
     if (pushSignalsToggle) pushSignalsToggle.addEventListener('change', (e) => { uiLog(`Toggle: push_signals = ${e.target.checked}`); updateSetting('push_signals', e.target.checked); });
     if (autoModeToggle) autoModeToggle.addEventListener('change', (e) => { uiLog(`Toggle: auto_mode = ${e.target.checked}`); updateSetting('auto_mode', e.target.checked); });
     if (jackpotToggle) jackpotToggle.addEventListener('change', (e) => { uiLog(`Toggle: jackpot_mode = ${e.target.checked}`); updateSetting('jackpot_mode', e.target.checked); });
-    
+
     if (Notification.permission === 'default') Notification.requestPermission();
-    
+
     refreshUserData();
     loadRecentTrades();
     startPendingOrdersPolling();
-    
+
     if (recentTradesRefreshInterval) clearInterval(recentTradesRefreshInterval);
     recentTradesRefreshInterval = setInterval(() => {
         loadRecentTrades();
     }, 10000);
-    
+
     setInterval(() => { if (currentActiveTrade) updateLockedBalance(); }, 10000);
     uiLog('Trading module v6.0 Professional initialized');
 }
@@ -1115,3 +1170,4 @@ window.saveSymbolPreference = saveSymbolPreference;
 window.loadSavedSymbol = loadSavedSymbol;
 window.toggleCollapsible = toggleCollapsible;
 window.updateAIDisplay = updateAIDisplay;
+window.deleteAllTrades = deleteAllTrades;

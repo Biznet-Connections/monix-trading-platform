@@ -1,9 +1,7 @@
 /**
  * AI Trader Service - The Professional
- * Pre-loaded trading DNA + AI enhancement + Perfect memory
- * v13.0.0 - FULL DEBUG + WebSocket broadcasting
+ * v10.5.0 - FIXED: Balance sync, loss streak pause, contract result handling
  */
-
 const marketData = require('./marketData');
 const deepseekService = require('./deepseekService');
 const derivService = require('./derivService');
@@ -39,7 +37,7 @@ class AITrader {
         this.pendingManualSetup = null;
         this.pendingLimitOrders = [];
         this._lastPendingLog = {};
-        this.userId = 1;
+        this.userId = null;
         this.symbol = 'R_75';
         this.mode = 'AUTO';
         this.lastSetupNotified = false;
@@ -130,6 +128,7 @@ class AITrader {
         this._lastExhaustionLog = 0;
         this._lastTickCount = 0;
         this.tickHeartbeat = null;
+        this._lastLossPauseLog = 0;
     }
 
     roundStake(amount) {
@@ -182,6 +181,11 @@ class AITrader {
         this.MAX_STAKE = this.roundStake(bal * pctMax);
         this.HIGH_STAKE = this.MAX_STAKE;
 
+        if (this.MIN_STAKE < 0.50) this.MIN_STAKE = 0.50;
+        if (this.BASE_STAKE < 0.50) this.BASE_STAKE = 2.00;
+        if (this.CONFIDENT_STAKE < 0.50) this.CONFIDENT_STAKE = 4.00;
+        if (this.MAX_STAKE < 0.50) this.MAX_STAKE = 10.00;
+
         if (!this._lastBalanceLog || Date.now() - this._lastBalanceLog > 3600000) {
             const provenTag = this.isProven() ? '✅ PROVEN' : '⏳ PROVING';
             console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | Tier: ${tier} | ${provenTag} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
@@ -196,7 +200,7 @@ class AITrader {
         try {
             const symbolSessionStats = await Trade.getSymbolSessionStats(this.userId, this.symbol);
             const londonPerf = symbolSessionStats?.find(s => s.session === 'LONDON');
-            
+
             if (!londonPerf || londonPerf.total < 10) {
                 return false;
             }
@@ -217,9 +221,12 @@ class AITrader {
         try {
             const balanceResult = await derivService.getBalance();
             if (balanceResult && balanceResult.balance > 0) {
-                this.currentBalance = balanceResult.balance;
-                this.recalculateStakes();
-                console.log(`💰 [AI Trader] Live Balance: $${this.currentBalance.toFixed(2)}`);
+                const newBalance = balanceResult.balance;
+                if (Math.abs(newBalance - this.currentBalance) > 0.01) {
+                    console.log(`💰 [AI Trader] Balance updated: $${this.currentBalance.toFixed(2)} → $${newBalance.toFixed(2)}`);
+                    this.currentBalance = newBalance;
+                    this.recalculateStakes();
+                }
             }
         } catch (error) {
             console.error('❌ [AI Trader] Failed to sync balance:', error.message);
@@ -228,8 +235,8 @@ class AITrader {
 
     async seedCandlesFromHistory() {
         try {
-            const result = await derivService.getCandles(this.symbol, 60, 20);
-            if (result?.candles && result.candles.length > 0) {
+            const result = await derivService.getCandles(this.symbol, 60, 30);
+            if (result?.success && result.candles && result.candles.length > 0) {
                 let seeded = 0;
                 result.candles.forEach(c => {
                     if (c.close) {
@@ -361,44 +368,87 @@ class AITrader {
     }
 
     async start(userId, symbol = 'R_75', mode = 'AUTO') {
-        if (this.isRunning) return;
+        if (this.isRunning) {
+            console.log('⚠️ [AI Trader] Already running, stopping first...');
+            this.stop();
+        }
 
         this.userId = userId;
-        
+
         try {
             const user = await User.findById(userId);
             if (!user) {
                 console.error(`❌ [AI Trader] User ${userId} not found`);
+                this.currentWatchState = {
+                    status: 'ERROR',
+                    action: 'WAIT',
+                    symbol: symbol,
+                    confidence: 0,
+                    reason: `User not found. Please log in again.`,
+                    lastUpdate: Date.now()
+                };
+                broadcastAIUpdate({ watch_state: this.currentWatchState });
                 return;
             }
-            
+
             if (user.default_symbol) {
                 this.symbol = user.default_symbol;
                 console.log(`💾 [AI Trader] Loaded saved symbol: ${this.symbol}`);
             } else {
                 this.symbol = symbol || 'R_75';
             }
-            
+
             this.mode = mode;
-            
+
             const token = user.is_demo ? user.demo_token : user.real_token;
-            
-            if (!token) {
-                console.error(`❌ [AI Trader] No Deriv token found`);
+
+            if (!token || token.trim().length < 10) {
+                console.error(`❌ [AI Trader] No valid Deriv token found for user ${userId}`);
+                this.currentWatchState = {
+                    status: 'NO_TOKEN',
+                    action: 'WAIT',
+                    symbol: this.symbol,
+                    confidence: 0,
+                    reason: `No API token configured. Please add your ${user.is_demo ? 'DEMO' : 'REAL'} token in Settings.`,
+                    lastUpdate: Date.now()
+                };
+                broadcastAIUpdate({ watch_state: this.currentWatchState });
                 return;
             }
-            
+
             console.log(`🔑 [AI Trader] Connecting to Deriv with ${user.is_demo ? 'DEMO' : 'REAL'} account...`);
-            
-            await derivService.connect(token, false, user.is_demo);
-            
-            console.log(`✅ [AI Trader] Connected to Deriv successfully!`);
-            
+
+            try {
+                await derivService.connect(token, false, user.is_demo);
+                console.log(`✅ [AI Trader] Connected to Deriv successfully!`);
+            } catch (connError) {
+                console.error(`❌ [AI Trader] Failed to connect:`, connError.message);
+                this.currentWatchState = {
+                    status: 'CONNECTION_ERROR',
+                    action: 'WAIT',
+                    symbol: this.symbol,
+                    confidence: 0,
+                    reason: `Failed to connect to Deriv: ${connError.message}. Please check your API token.`,
+                    lastUpdate: Date.now()
+                };
+                broadcastAIUpdate({ watch_state: this.currentWatchState });
+                return;
+            }
+
         } catch (err) {
-            console.error(`❌ [AI Trader] Failed to connect:`, err.message);
+            console.error(`❌ [AI Trader] Failed to get user:`, err.message);
+            this.currentWatchState = {
+                status: 'ERROR',
+                action: 'WAIT',
+                symbol: this.symbol,
+                confidence: 0,
+                reason: `Error loading user data. Please refresh.`,
+                lastUpdate: Date.now()
+            };
+            broadcastAIUpdate({ watch_state: this.currentWatchState });
             return;
         }
-        
+
         this.isRunning = true;
         this.isExecuting = false;
         this.pendingManualSetup = null;
@@ -421,22 +471,38 @@ class AITrader {
         this.sessionProfit = 0;
         this.sessionLoss = 0;
 
-        setTimeout(async () => {
+        // ✅ FIX: Get the REAL balance from Deriv immediately with retry
+        let balanceRetries = 3;
+        let balanceSynced = false;
+
+        while (balanceRetries > 0 && !balanceSynced) {
             try {
                 const bal = await derivService.getBalance();
-                if (bal?.balance && bal.balance > 10) {
+                if (bal?.balance && bal.balance > 0) {
                     this.currentBalance = bal.balance;
-                    this.recalculateStakes();
-                    console.log(`💰 [Balance] Updated: $${this.currentBalance.toFixed(2)}`);
+                    balanceSynced = true;
+                    console.log(`💰 [AI Trader] Initial balance synced: $${this.currentBalance.toFixed(2)}`);
+                } else {
+                    console.log(`⚠️ [AI Trader] Balance sync attempt ${4 - balanceRetries}/3 returned ${bal?.balance || 'null'}`);
                 }
-            } catch (e) {}
-        }, 5000);
+            } catch (e) {
+                console.log(`⚠️ [AI Trader] Balance sync error: ${e.message}`);
+            }
+            if (!balanceSynced) {
+                balanceRetries--;
+                if (balanceRetries > 0) await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+
+        if (!balanceSynced) {
+            console.log(`⚠️ [AI Trader] Could not get initial balance after retries, using default $${this.currentBalance.toFixed(2)}`);
+        }
 
         this.recalculateStakes();
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v13.0.0`);
+        console.log(`🤖 [AI Trader] Starting v10.5.0`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
 
@@ -444,7 +510,9 @@ class AITrader {
 
         const derivSymbol = derivService.symbolMap?.[this.symbol] || this.symbol;
         if (!derivService.subscriptions?.has(derivSymbol)) {
-            try { await derivService.subscribeToTicks(this.symbol); } catch (err) {}
+            try { await derivService.subscribeToTicks(this.symbol); } catch (err) {
+                console.log(`⚠️ [AI Trader] Subscribe error: ${err.message}`);
+            }
         }
 
         derivService.on('tick', (tick) => {
@@ -474,7 +542,7 @@ class AITrader {
             }
         }, 60000);
 
-        this.balanceSyncInterval = setInterval(() => this.syncBalanceFromDeriv(), 60000);
+        this.balanceSyncInterval = setInterval(() => this.syncBalanceFromDeriv(), 30000);
 
         this.tickHeartbeat = setInterval(() => {
             if (this.tickCount === this._lastTickCount && this.isRunning && this.tickCount > 0) {
@@ -579,6 +647,16 @@ class AITrader {
             const timeSinceLastTrade = Date.now() - this.lastTradeTime;
             if (this.lastTradeTime > 0 && timeSinceLastTrade < this.tradeCooldown) return;
 
+            // ✅ Stop trading after 2 consecutive losses
+            if (this.consecutiveLosses >= 2) {
+                if (!this._lastLossPauseLog || Date.now() - this._lastLossPauseLog > 60000) {
+                    console.log(`🛑 [AI Trader] Pausing for 5 minutes due to ${this.consecutiveLosses} consecutive losses`);
+                    this._lastLossPauseLog = Date.now();
+                }
+                this.pausedUntil = Date.now() + 300000;
+                return;
+            }
+
             const currentHour = new Date().getUTCHours();
             const blockLondon = await this.shouldBlockLondon();
             if (blockLondon) return;
@@ -594,7 +672,7 @@ class AITrader {
 
             const marketState = marketData.getMarketState();
             const currentPrice = marketState.price;
-            
+
             if (this.tickCount === 0) return;
             if (!this.dataReady && this.tickCount > 0) {
                 this.dataReady = true;
@@ -639,7 +717,7 @@ class AITrader {
                 if (recentWinRate >= 0.7) dynamicThreshold = Math.max(55, this.confidenceThreshold - 10);
                 else if (recentWinRate <= 0.3) dynamicThreshold = Math.min(80, this.confidenceThreshold + 15);
             }
-            if (this.consecutiveLosses >= 2) dynamicThreshold = Math.max(dynamicThreshold, 70);
+            if (this.consecutiveLosses >= 1) dynamicThreshold = Math.max(dynamicThreshold, 70);
             if (this.GOLDEN_HOURS.includes(currentHour)) dynamicThreshold = Math.max(55, dynamicThreshold - 5);
             const sessionRules = knowledgeBase.getSessionRules();
             dynamicThreshold += sessionRules.confidenceModifier;
@@ -709,47 +787,17 @@ class AITrader {
             }
 
             this.currentWatchState = {
-                status: 'WATCHING', 
-                action: action === 'BUY' ? 'BUY' : (action === 'SELL' ? 'SELL' : 'WAIT'),
-                action_display: action === 'BUY' ? '📈 BUY (UP)' : (action === 'SELL' ? '📉 SELL (DOWN)' : '⏳ WAITING'),
-                symbol: this.symbol,
+                status: 'WATCHING', action: 'WAIT', symbol: this.symbol,
                 confidence: effectiveConfidence || combinedConfidence,
-                reason: analysis.simple_reason || 'Waiting for validated setup',
-                pattern: analysis.pattern, 
-                market_price: currentPrice,
-                market_rsi: marketState.rsi, 
-                market_support: marketState.support,
-                market_resistance: marketState.resistance,
-                market_feeling: marketState.condition === 'oversold' ? 'Price is low' : (marketState.condition === 'overbought' ? 'Price is high' : 'Market is stable'),
-                entry_price: currentPrice,
-                take_profit: currentPrice * (action === 'BUY' ? 1.005 : 0.995),
-                stop_loss: currentPrice * (action === 'BUY' ? 0.998 : 1.002),
-                entry_condition: action !== 'WAIT' ? `${action} at market price` : null,
-                estimated_entry_time: action !== 'WAIT' ? 'Now' : null,
-                trend: confirmedTrend,
-                lastUpdate: Date.now(), 
-                is_auto_mode: this.mode === 'AUTO',
+                reason: analysis.simple_reason || 'Waiting for setup',
+                pattern: analysis.pattern, market_price: currentPrice,
+                market_rsi: marketState.rsi, trend: confirmedTrend,
+                lastUpdate: Date.now(), is_auto_mode: this.mode === 'AUTO',
                 confidence_threshold: dynamicThreshold,
-                pending_orders: this.pendingLimitOrders.map(o => ({
-                    action: o.action,
-                    entryPrice: o.entryPrice,
-                    stake: o.stake,
-                    confidence: o.confidence,
-                    pattern: o.pattern,
-                    reason: o.reason,
-                    expires: o.expiresAt
-                })),
-                total_trades: this.totalTrades, 
-                total_wins: this.totalWins, 
-                total_losses: this.totalLosses,
-                session_profit: this.sessionProfit, 
-                session_loss: this.sessionLoss
+                pending_orders: this.pendingLimitOrders,
+                total_trades: this.totalTrades, total_wins: this.totalWins, total_losses: this.totalLosses,
+                session_profit: this.sessionProfit, session_loss: this.sessionLoss
             };
-            
-            // BROADCAST AI UPDATE TO FRONTEND
-            console.log(`📡 [AI Trader] Broadcasting AI update: action=${this.currentWatchState.action}, confidence=${this.currentWatchState.confidence}, symbol=${this.currentWatchState.symbol}, rsi=${this.currentWatchState.market_rsi}`);
-            broadcastAIUpdate(this.currentWatchState);
-            
         } catch (error) {
             console.error('❌ Analysis error:', error.message);
         }
@@ -796,11 +844,11 @@ class AITrader {
             const user = await User.findById(this.userId);
             if (!user || user.trades_remaining <= 0) return;
             if (stake < 0.50) return;
-            
+
             console.log(`💸 ${action} ${this.symbol} | $${entryPrice.toFixed(2)} | $${stake} | ${analysis.confidence}%`);
-            
+
             const tradeResult = await derivService.placeTrade(this.symbol, action, stake, 2, 'm');
-            
+
             const tradeId = await Trade.create({
                 user_id: this.userId, contract_id: tradeResult.buy.contract_id,
                 symbol: this.symbol, action, entry_price: entryPrice, stake,
@@ -808,10 +856,10 @@ class AITrader {
                 rsi: this.currentWatchState?.market_rsi || 50,
                 session: this.getCurrentSession(), is_auto: this.mode === 'AUTO' ? 1 : 0
             });
-            
+
             await User.deductTrade(this.userId);
             this.totalTrades++; this.lastTradeTime = Date.now();
-            
+
             this.activeTrade = {
                 id: tradeId, contract_id: tradeResult.buy.contract_id,
                 action, entry_price: entryPrice, stake,
@@ -819,15 +867,15 @@ class AITrader {
                 confidence: analysis.confidence, pattern: analysis.pattern,
                 isSniper: stake >= this.MAX_STAKE * 0.9
             };
-            
+
             broadcastTradeResult({ id: tradeId, contract_id: tradeResult.buy.contract_id, symbol: this.symbol, action, entry_price: entryPrice, exit_price: null, profit: null, stake, status: 'PENDING' });
             console.log(`✅ Trade #${tradeId} OPEN | ${action} | $${stake}`);
-            
+
             setTimeout(() => this.checkTradeResult(tradeId, tradeResult.buy.contract_id, entryPrice, stake), 125000);
-        } catch (error) { 
-            console.error('❌ Execute error:', error.message); 
-        } finally { 
-            this.isExecuting = false; 
+        } catch (error) {
+            console.error('❌ Execute error:', error.message);
+        } finally {
+            this.isExecuting = false;
         }
     }
 
@@ -842,67 +890,66 @@ class AITrader {
     async checkTradeResult(tradeId, contractId, entryPrice, stake) {
         try {
             let contractResult = null;
-            let retries = 15;
-            
+            let retries = 20;
+            let attempt = 0;
+
             while (retries > 0 && !contractResult) {
-                try { 
-                    contractResult = await derivService.getClosedContract(contractId); 
-                    if (contractResult && (contractResult.proposal_open_contract || contractResult.contract)) {
-                        break;
+                attempt++;
+                try {
+                    contractResult = await derivService.getClosedContract(contractId);
+                    if (contractResult && contractResult.proposal_open_contract) {
+                        const contract = contractResult.proposal_open_contract;
+                        if (contract.is_sold === 1 || contract.status === 'sold') {
+                            console.log(`✅ Contract ${contractId} closed (attempt ${attempt})`);
+                            break;
+                        }
                     }
-                } catch (e) {}
-                await new Promise(r => setTimeout(r, 5000)); 
+                    contractResult = null;
+                } catch (e) {
+                    console.log(`⏳ Waiting for contract ${contractId} to close... (attempt ${attempt})`);
+                }
+                await new Promise(r => setTimeout(r, 5000));
                 retries--;
             }
-            
+
             let profit = -stake;
             let exitPrice = entryPrice;
             let status = 'LOSS';
             let actualProfit = 0;
-            
-            if (contractResult) {
-                const contract = contractResult.proposal_open_contract?.contract || contractResult.contract || contractResult;
+
+            if (contractResult && contractResult.proposal_open_contract) {
+                const contract = contractResult.proposal_open_contract;
                 
-                if (contract) {
-                    if (contract.exit_tick?.quote) exitPrice = contract.exit_tick.quote;
-                    else if (contract.sell_price) exitPrice = contract.sell_price;
-                    
-                    const isCall = contract.contract_type === 'CALL';
-                    
-                    if (contract.profit !== undefined && contract.profit !== null) {
-                        actualProfit = parseFloat(contract.profit);
-                        profit = actualProfit;
-                    } else if (contract.sell_price && contract.buy_price) {
-                        actualProfit = contract.sell_price - contract.buy_price;
-                        profit = actualProfit;
-                    } else {
-                        const priceChange = exitPrice - entryPrice;
-                        if (isCall) {
-                            actualProfit = priceChange > 0 ? stake * (priceChange / entryPrice) : -stake;
-                        } else {
-                            actualProfit = priceChange < 0 ? stake * Math.abs(priceChange / entryPrice) : -stake;
-                        }
-                        profit = actualProfit;
-                    }
-                    
-                    if (profit > 0) {
-                        status = 'WIN';
-                    } else if (profit < 0) {
-                        status = 'LOSS';
-                        profit = profit;
-                    } else {
-                        status = 'LOSS';
-                        profit = -stake;
-                    }
-                    
-                    console.log(`📊 Contract ${contractId}: Type=${contract.contract_type}, Entry=$${contract.buy_price || entryPrice}, Exit=$${exitPrice}, Profit=$${profit.toFixed(2)}`);
+                if (contract.exit_tick?.quote) exitPrice = contract.exit_tick.quote;
+                else if (contract.sell_price) exitPrice = contract.sell_price;
+
+                if (contract.profit !== undefined && contract.profit !== null) {
+                    actualProfit = parseFloat(contract.profit);
+                    profit = actualProfit;
+                } else if (contract.sell_price && contract.buy_price) {
+                    actualProfit = contract.sell_price - contract.buy_price;
+                    profit = actualProfit;
                 } else {
-                    console.log(`⚠️ No contract data found for ${contractId}, marking as loss`);
-                    profit = -stake;
-                    status = 'LOSS';
+                    const priceChange = exitPrice - entryPrice;
+                    const isCall = this.activeTrade?.action === 'BUY';
+                    if (isCall) {
+                        actualProfit = priceChange > 0 ? stake * (priceChange / entryPrice) : -stake;
+                    } else {
+                        actualProfit = priceChange < 0 ? stake * Math.abs(priceChange / entryPrice) : -stake;
+                    }
+                    profit = actualProfit;
                 }
+
+                if (profit > 0) {
+                    status = 'WIN';
+                } else {
+                    status = 'LOSS';
+                    if (profit === 0) profit = -stake;
+                }
+
+                console.log(`📊 Contract ${contractId}: Type=${contract.contract_type}, Exit=$${exitPrice}, Profit=$${profit.toFixed(2)}`);
             } else {
-                console.log(`⚠️ No contract result for ${contractId}, marking as loss`);
+                console.log(`⚠️ No contract result for ${contractId} after ${attempt} attempts, marking as loss`);
                 profit = -stake;
                 status = 'LOSS';
             }
@@ -921,7 +968,7 @@ class AITrader {
             await Trade.updateResult(tradeId, exitPrice, profit, status);
             await User.updateStats(this.userId, status, profit, stake);
             await Pattern.recordTradeResult(this.activeTrade?.pattern || 'Unknown', this.symbol, this.activeTrade?.action || 'BUY', this.getCurrentSession(), status === 'WIN');
-            
+
             this.recentResults.push(status);
             if (this.recentResults.length > 30) this.recentResults.shift();
 
@@ -935,32 +982,30 @@ class AITrader {
                 this.consecutiveLosses++;
                 this.sessionLoss += Math.abs(profit);
                 console.log(`❌ LOSS #${this.consecutiveLosses} | -$${Math.abs(profit).toFixed(2)} | ${this.totalWins}W/${this.totalLosses}L`);
-                if (this.consecutiveLosses >= 5) {
-                    this.pausedUntil = Date.now() + 1800000;
-                    this.pendingLimitOrders = [];
-                    console.log('🛑 HARD PAUSE 30min — 5 losses');
-                } else if (this.consecutiveLosses >= 3) {
+                
+                if (this.consecutiveLosses >= 3) {
                     this.pausedUntil = Date.now() + 900000;
                     this.pendingLimitOrders = [];
                     console.log('🛑 HARD PAUSE 15min — 3 losses');
                 }
             }
 
-            try { 
-                const bal = await derivService.getBalance(); 
+            try {
+                const bal = await derivService.getBalance();
                 if (bal?.balance) {
                     this.currentBalance = bal.balance;
+                    this.recalculateStakes();
                     console.log(`💰 New Balance: $${this.currentBalance.toFixed(2)}`);
                 }
             } catch (e) {}
 
             broadcastTradeResult({ id: tradeId, contract_id: contractId, symbol: this.symbol, action: this.activeTrade?.action, entry_price: entryPrice, exit_price: exitPrice, profit, stake, status });
-            
+
             const winRate = this.recentResults.length > 0 ? Math.round((this.recentResults.filter(r => r === 'WIN').length / this.recentResults.length) * 100) : 0;
             console.log(`📊 Trade #${tradeId}: ${status} $${profit.toFixed(2)} | Recent WR: ${winRate}%`);
-            
+
             this.activeTrade = null;
-            
+
             if (derivService.subscriptions?.size === 0) {
                 try { await derivService.subscribeToTicks(this.symbol); this.lastTickTime = Date.now(); } catch (err) {}
             }
@@ -980,20 +1025,16 @@ class AITrader {
 
     getCurrentAnalysis() {
         return {
-            type: 'ai_update', 
-            watch_state: this.currentWatchState,
-            in_trade: !!this.activeTrade, 
-            active_trade: this.activeTrade,
-            pending_orders: this.pendingLimitOrders,
-            data_ready: this.dataReady, 
-            mode: this.mode, 
-            tick_count: this.tickCount,
-            total_trades: this.totalTrades, 
-            total_wins: this.totalWins, 
-            total_losses: this.totalLosses,
-            session_profit: this.sessionProfit, 
-            session_loss: this.sessionLoss, 
-            timestamp: Date.now()
+            type: 'ai_update', watch_state: this.currentWatchState,
+            in_trade: !!this.activeTrade, active_trade: this.activeTrade,
+            pending_orders: this.pendingLimitOrders.map(o => ({
+                id: o.id, action: o.action, entryPrice: o.entryPrice, stake: o.stake,
+                confidence: o.confidence, pattern: o.pattern, reason: o.reason,
+                created: o.createdAt, expires: o.expiresAt
+            })),
+            data_ready: this.dataReady, mode: this.mode, tick_count: this.tickCount,
+            total_trades: this.totalTrades, total_wins: this.totalWins, total_losses: this.totalLosses,
+            session_profit: this.sessionProfit, session_loss: this.sessionLoss, timestamp: Date.now()
         };
     }
 
@@ -1003,7 +1044,7 @@ class AITrader {
         if (this.tickHealthInterval) { clearInterval(this.tickHealthInterval); this.tickHealthInterval = null; }
         if (this.balanceSyncInterval) { clearInterval(this.balanceSyncInterval); this.balanceSyncInterval = null; }
         if (this.tickHeartbeat) { clearInterval(this.tickHeartbeat); this.tickHeartbeat = null; }
-        console.log('🤖 Stopped');
+        console.log('🤖 AI Trader Stopped');
     }
 
     setMode(mode) { this.mode = mode; this.pendingLimitOrders = []; console.log(`Mode: ${mode}`); }
@@ -1015,7 +1056,7 @@ class AITrader {
         }
 
         console.log(`🔄 Switching symbol from ${this.symbol} to ${symbol}`);
-        
+
         this.symbol = symbol;
         this.dataReady = false;
         this.trendStartTime = 0;

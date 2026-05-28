@@ -12,7 +12,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
         if (!analysis || !analysis.watch_state) {
             return res.json({ success: false, message: 'AI Trader is initializing. Please wait...', signal: null });
         }
-        
+
         const watchState = analysis.watch_state;
         const currentSymbol = watchState.symbol || 'R_75';
 
@@ -71,11 +71,23 @@ router.get('/history', authMiddleware, async (req, res) => {
     }
 });
 
-// Get AI insights
+// ✅ FIX: Get AI insights with optional symbol filter
 router.get('/insights', authMiddleware, async (req, res) => {
     try {
-        const topPatterns = await Pattern.getTopPatterns(10);
-        const worstPatterns = await Pattern.getWorstPatterns(5);
+        const { symbol } = req.query;
+        let topPatterns = [];
+        let worstPatterns = [];
+
+        if (symbol && symbol !== '') {
+            // Get patterns for specific symbol
+            topPatterns = await Pattern.getTopPatternsBySymbol(symbol, 10);
+            worstPatterns = await Pattern.getWorstPatternsBySymbol(symbol, 5);
+        } else {
+            // Get patterns across all symbols
+            topPatterns = await Pattern.getTopPatterns(10);
+            worstPatterns = await Pattern.getWorstPatterns(5);
+        }
+
         const userStats = await Trade.getUserStats(req.userId, 30);
 
         res.json({
@@ -84,6 +96,7 @@ router.get('/insights', authMiddleware, async (req, res) => {
             advice: { adjustments: ["AI is watching the market. Let it find the best entry."] },
             user_stats: userStats,
             has_enough_data: userStats.total_trades >= 3,
+            current_symbol: symbol || 'all',
             message: userStats.total_trades === 0
                 ? "No trades yet. AI is watching the market and will trade when conditions are right."
                 : userStats.total_trades < 3
@@ -100,11 +113,11 @@ router.get('/insights', authMiddleware, async (req, res) => {
 router.post('/confirm-manual', authMiddleware, async (req, res) => {
     try {
         const { action, stake } = req.body;
-        
+
         if (!action || !stake) {
             return res.status(400).json({ success: false, error: 'Action and stake are required' });
         }
-        
+
         const result = await aiTrader.executeManualTrade(action, parseFloat(stake));
         res.json(result);
     } catch (error) {

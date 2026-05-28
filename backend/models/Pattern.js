@@ -26,7 +26,7 @@ class Pattern {
             action: patternData.action,
             session: patternData.session
         };
-        
+
         const update = {
             ...patternData,
             $inc: { times_used: 1 }
@@ -52,15 +52,15 @@ class Pattern {
         };
 
         const pattern = await PatternModel.findOneAndUpdate(filter, update, { upsert: true, new: true });
-        
+
         // Update win rate
         if (pattern) {
-            const newWinRate = pattern.times_used > 0 
-                ? (pattern.wins / pattern.times_used) * 100 
+            const newWinRate = pattern.times_used > 0
+                ? (pattern.wins / pattern.times_used) * 100
                 : 0;
             await PatternModel.findByIdAndUpdate(pattern._id, { win_rate: newWinRate });
         }
-        
+
         return true;
     }
 
@@ -77,6 +77,22 @@ class Pattern {
 
     static async getWorstPatterns(limit = 5) {
         return PatternModel.find({ times_used: { $gte: 3 } })
+            .sort({ win_rate: 1 })
+            .limit(limit)
+            .lean();
+    }
+
+    // ✅ NEW: Get top patterns by specific symbol
+    static async getTopPatternsBySymbol(symbol, limit = 10) {
+        return PatternModel.find({ symbol: symbol, times_used: { $gte: 3 } })
+            .sort({ win_rate: -1 })
+            .limit(limit)
+            .lean();
+    }
+
+    // ✅ NEW: Get worst patterns by specific symbol
+    static async getWorstPatternsBySymbol(symbol, limit = 5) {
+        return PatternModel.find({ symbol: symbol, times_used: { $gte: 3 } })
             .sort({ win_rate: 1 })
             .limit(limit)
             .lean();

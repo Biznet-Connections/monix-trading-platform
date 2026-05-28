@@ -53,8 +53,6 @@ userSchema.methods.generateToken = function() {
     );
 };
 
-// ============ STATIC METHODS ============
-
 userSchema.statics.verifyToken = function(token) {
     try {
         return jwt.verify(token, process.env.JWT_SECRET || 'monix_super_secret_key_change_in_production_2025');
@@ -75,23 +73,6 @@ userSchema.statics.findByEmail = async function(email) {
     return this.findOne({ email });
 };
 
-userSchema.statics.findOne_User = async function(filter) {
-    return this.findOne(filter);
-};
-
-// UPDATE method - CRITICAL for switch mode
-userSchema.statics.update = async function(filter, updateData) {
-    return this.updateOne(filter, updateData);
-};
-
-userSchema.statics.updateOne = async function(filter, updateData) {
-    return this.updateOne(filter, updateData);
-};
-
-userSchema.statics.updateMany = async function(filter, updateData) {
-    return this.updateMany(filter, updateData);
-};
-
 userSchema.statics.getLeaderboard = async function(limit = 50) {
     return this.find({ is_blocked: false, total_trades: { $gt: 0 } })
         .sort({ net_profit: -1 })
@@ -102,7 +83,7 @@ userSchema.statics.getLeaderboard = async function(limit = 50) {
 userSchema.statics.updateStats = async function(userId, status, profit, stake) {
     const user = await this.findById(userId);
     if (!user) return null;
-    
+
     user.total_trades++;
     if (status === 'WIN') {
         user.total_wins++;
@@ -114,7 +95,7 @@ userSchema.statics.updateStats = async function(userId, status, profit, stake) {
         user.net_profit -= stake;
         user.current_streak = user.current_streak < 0 ? user.current_streak - 1 : -1;
     }
-    
+
     user.updated_at = Date.now();
     await user.save();
     return user;
@@ -127,6 +108,11 @@ userSchema.statics.deductTrade = async function(userId) {
         await user.save();
     }
     return user;
+};
+
+// ✅ FIX: Add static update method (was missing)
+userSchema.statics.update = async function(userId, updates) {
+    return this.findByIdAndUpdate(userId, updates, { new: true });
 };
 
 module.exports = mongoose.model('User', userSchema);

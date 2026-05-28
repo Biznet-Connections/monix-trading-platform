@@ -159,6 +159,22 @@ router.get('/history', authMiddleware, async (req, res) => {
     }
 });
 
+// ✅ NEW: Soft delete - hide all trades from UI (keep in DB for AI learning)
+router.delete('/history/hide-all', authMiddleware, async (req, res) => {
+    try {
+        const result = await Trade.hideAllUserTrades(req.userId);
+        console.log(`👁️ User ${req.userId} hid ${result.modifiedCount} trades from UI (kept in DB for AI learning)`);
+        res.json({ 
+            success: true, 
+            hiddenCount: result.modifiedCount, 
+            message: 'Trades hidden from view. AI can still learn from them.' 
+        });
+    } catch (error) {
+        console.error('Hide trades error:', error);
+        res.status(500).json({ error: 'Failed to hide trade history' });
+    }
+});
+
 router.get('/stats', authMiddleware, async (req, res) => {
     try {
         const { days = 30 } = req.query;

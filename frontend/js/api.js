@@ -95,7 +95,10 @@ async function generateSignal(symbol) {
     return apiRequest('/api/signals/generate', { method: 'POST', body: JSON.stringify({ symbol }) });
 }
 async function getSignalHistory() { return apiRequest('/api/signals/history'); }
-async function getAIInsights() { return apiRequest('/api/signals/insights'); }
+async function getAIInsights(symbol = null) {
+    const url = symbol ? `/api/signals/insights?symbol=${encodeURIComponent(symbol)}` : '/api/signals/insights';
+    return apiRequest(url);
+}
 async function changeAISymbol(symbol) {
     sendDebugLog(`🔄 AI symbol → ${symbol}`);
     return apiRequest('/api/ai/symbol', { method: 'POST', body: JSON.stringify({ symbol }) });
@@ -118,6 +121,12 @@ async function adminSendBroadcast(subject, message) { return apiRequest('/api/ad
 async function adminGetStats() { return apiRequest('/api/admin/stats'); }
 async function adminRevokeVoucher(code) { return apiRequest(`/api/admin/vouchers/${code}`, { method: 'DELETE' }); }
 
+// ✅ UPDATED: Soft delete - hide trades from UI, keep in DB
+async function hideTradeHistory() {
+    sendDebugLog(`👁️ Hiding all trade history from UI (kept for AI learning)`);
+    return apiRequest('/api/trades/history/hide-all', { method: 'DELETE' });
+}
+
 function logout() {
     sendDebugLog('🚪 Logout');
     localStorage.removeItem('monix_token');
@@ -132,5 +141,6 @@ window.api = {
     changeAISymbol, getAISymbol, getAIAnalysis, setAIMode, setConfidenceThreshold,
     startAITrader, stopAITrader, adminGenerateVoucher, adminGetVouchers, adminGetUsers,
     adminBlockUser, adminUnblockUser, adminResetTrades, adminAddAdmin,
-    adminSendBroadcast, adminGetStats, adminRevokeVoucher, logout
+    adminSendBroadcast, adminGetStats, adminRevokeVoucher, logout,
+    hideTradeHistory  // ✅ updated
 };
