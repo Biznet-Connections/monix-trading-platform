@@ -47,7 +47,7 @@ router.post('/register', validateSignup, async (req, res) => {
         const user = await User.findById(userId);
         await emailService.sendWelcome(email, username);
 
-        const token = User.generateToken(user);
+        const token = user.generateToken();
 
         res.status(201).json({
             success: true, message: 'Account created successfully', token,
@@ -70,8 +70,10 @@ router.post('/login', validateLogin, async (req, res) => {
         const user = await User.findByEmail(email);
         if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-        const isValid = await User.verifyPassword(user, password);
+        // ✅ FIXED: Use instance method comparePassword
+        const isValid = await user.comparePassword(password);
         if (!isValid) return res.status(401).json({ error: 'Invalid credentials' });
+        
         if (!user.is_active) return res.status(401).json({ error: 'Account blocked. Contact admin.' });
         if (user.voucher_expiry && new Date(user.voucher_expiry) < new Date()) {
             return res.status(401).json({ error: 'Voucher expired. Please contact admin for new voucher.' });
@@ -79,7 +81,7 @@ router.post('/login', validateLogin, async (req, res) => {
 
         await User.update(user._id, { last_login: new Date() });
 
-        const token = User.generateToken(user);
+        const token = user.generateToken();
 
         res.json({
             success: true, message: 'Login successful', token,
@@ -129,7 +131,8 @@ router.post('/change-password', async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const user = await User.findByEmail(decoded.email);
 
-    const isValid = await User.verifyPassword(user, currentPassword);
+    // ✅ FIXED: Use instance method comparePassword
+    const isValid = await user.comparePassword(currentPassword);
     if (!isValid) return res.status(401).json({ error: 'Current password incorrect' });
     if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
 
