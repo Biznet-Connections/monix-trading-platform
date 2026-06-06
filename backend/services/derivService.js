@@ -169,7 +169,7 @@ class DerivService extends EventEmitter {
         }
 
         const derivSymbol = this.convertSymbol(symbol);
-        
+
         try {
             const result = await this.sendRequest({
                 ticks_history: derivSymbol,
@@ -193,7 +193,7 @@ class DerivService extends EventEmitter {
                 console.log(`📊 [Deriv] Got ${candles.length} candles for ${derivSymbol}`);
                 return { success: true, candles: candles };
             }
-            
+
             return { success: false, candles: [] };
         } catch (error) {
             console.error(`❌ [Deriv] Get candles failed:`, error.message);
@@ -234,9 +234,9 @@ class DerivService extends EventEmitter {
                 await this.sendRequest({ forget_all: 'ticks' });
             } catch (e) {}
         }
-        
+
         this.subscriptions.clear();
-        
+
         try {
             await this.subscribeToTicks(symbol);
             console.log(`✅ [Deriv] Reconnected and subscribed to ${symbol}`);
@@ -324,8 +324,11 @@ class DerivService extends EventEmitter {
         }
 
         if (type === 'proposal_open_contract') {
-            console.log(`📄 Contract update: ${msg.proposal_open_contract?.contract_id}`);
-            this.emit('contract_update', msg.proposal_open_contract);
+            const contract = msg.proposal_open_contract;
+            if (contract) {
+                console.log(`📄 Contract ${contract.contract_id} update: is_sold=${contract.is_sold}, profit=${contract.profit}`);
+                this.emit('contract_update', contract);
+            }
         }
 
         if (msg.req_id && this.pendingRequests.has(msg.req_id)) {
@@ -400,9 +403,13 @@ class DerivService extends EventEmitter {
             price: stake
         });
 
-        // Subscribe to contract updates
+        // ✅ FIX: Subscribe to contract updates with correct format
         setTimeout(() => {
-            this.sendRequest({ subscribe: 1, proposal_open_contract: trade.buy.contract_id }).catch(() => {});
+            this.sendRequest({ 
+                subscribe: 1, 
+                proposal_open_contract: 1,
+                contract_id: parseInt(trade.buy.contract_id)
+            }).catch(() => {});
         }, 1000);
 
         return trade;
@@ -412,7 +419,7 @@ class DerivService extends EventEmitter {
         if (!this.authorized || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
             return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized };
         }
-        
+
         try {
             const result = await this.sendRequest({ balance: 1, subscribe: 0 });
             if (result && result.balance) {
@@ -424,20 +431,25 @@ class DerivService extends EventEmitter {
         } catch (error) {
             console.error(`❌ [Deriv] Get balance failed:`, error.message);
         }
-        
+
         return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized };
     }
 
+    // ✅ FIXED: Correct contract lookup format
     async getClosedContract(contractId) {
         try {
-            const result = await this.sendRequest({ proposal_open_contract: contractId });
+            const result = await this.sendRequest({ 
+                proposal_open_contract: 1,
+                contract_id: parseInt(contractId)
+            });
+            
             if (result && result.proposal_open_contract) {
                 const contract = result.proposal_open_contract;
                 if (contract.is_sold === 1 || contract.status === 'sold') {
                     console.log(`📊 [Deriv] Contract ${contractId} closed. Profit: ${contract.profit || (contract.sell_price - contract.buy_price)}`);
                     return result;
                 } else {
-                    console.log(`⏳ [Deriv] Contract ${contractId} still open`);
+                    console.log(`⏳ [Deriv] Contract ${contractId} still open (is_sold=${contract.is_sold})`);
                     return null;
                 }
             }
