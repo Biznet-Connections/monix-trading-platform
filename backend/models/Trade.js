@@ -17,7 +17,8 @@ const tradeSchema = new mongoose.Schema({
     exit_price: { type: Number, default: null },
     profit: { type: Number, default: null },
     closed_at: { type: Date, default: null },
-    hidden: { type: Boolean, default: false }  // ✅ NEW: soft delete flag
+    hidden: { type: Boolean, default: false },
+    loss_reason: { type: String, default: null }
 }, { timestamps: { createdAt: 'executed_at', updatedAt: 'updated_at' } });
 
 tradeSchema.index({ user_id: 1, symbol: 1 });
@@ -25,7 +26,8 @@ tradeSchema.index({ user_id: 1, status: 1 });
 tradeSchema.index({ user_id: 1, pattern: 1 });
 tradeSchema.index({ contract_id: 1 });
 tradeSchema.index({ user_id: 1, symbol: 1, session: 1 });
-tradeSchema.index({ user_id: 1, hidden: 1 });  // ✅ NEW: index for filtering hidden trades
+tradeSchema.index({ user_id: 1, hidden: 1 });
+tradeSchema.index({ user_id: 1, loss_reason: 1 });
 
 const TradeModel = mongoose.model('Trade', tradeSchema);
 
@@ -49,7 +51,29 @@ class Trade {
         return trade._id;
     }
 
+    // 🚨 FIXED: Prevent corrupted exit prices
     static async updateResult(tradeId, exit_price, profit, status, closed_at = null) {
+        // Check for suspicious exit price (for R_75 which trades at 30,000+)
+        if (exit_price && exit_price < 1000 && status === 'WIN') {
+            console.log(`⚠️ [Trade] Suspicious exit price: $${exit_price}. This might be a data error. Keeping original.`);
+            // Don't update with corrupted price - just update profit and status
+            return TradeModel.findByIdAndUpdate(tradeId, {
+                profit,
+                status,
+                closed_at: closed_at || new Date()
+            });
+        }
+        
+        // Also check for exit price that's too high (over 1,000,000 for R_75)
+        if (exit_price && exit_price > 1000000) {
+            console.log(`⚠️ [Trade] Suspicious exit price: $${exit_price} (too high). This might be a data error.`);
+            return TradeModel.findByIdAndUpdate(tradeId, {
+                profit,
+                status,
+                closed_at: closed_at || new Date()
+            });
+        }
+        
         return TradeModel.findByIdAndUpdate(tradeId, {
             exit_price,
             profit,
@@ -58,11 +82,14 @@ class Trade {
         });
     }
 
+    static async updateLossReason(tradeId, reason) {
+        return TradeModel.findByIdAndUpdate(tradeId, { loss_reason: reason });
+    }
+
     static async findByContractId(contractId) {
         return TradeModel.findOne({ contract_id: contractId });
     }
 
-    // ✅ MODIFIED: Exclude hidden trades
     static async getUserTrades(userId, limit = 50, offset = 0) {
         return TradeModel.find({ user_id: userId, hidden: false })
             .sort({ executed_at: -1 })
@@ -71,7 +98,6 @@ class Trade {
             .lean();
     }
 
-    // ✅ MODIFIED: Exclude hidden trades from stats
     static async getUserStats(userId, days = 30) {
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - days);
@@ -89,6 +115,11 @@ class Trade {
         const totalProfit = trades.filter(t => t.status === 'WIN').reduce((sum, t) => sum + (t.profit || 0), 0);
         const totalLoss = trades.filter(t => t.status === 'LOSS').reduce((sum, t) => sum + (t.profit || 0), 0);
 
+        const lossReasons = {};
+        trades.filter(t => t.status === 'LOSS' && t.loss_reason).forEach(t => {
+            lossReasons[t.loss_reason] = (lossReasons[t.loss_reason] || 0) + 1;
+        });
+
         return {
             total_trades: total,
             wins,
@@ -101,11 +132,11 @@ class Trade {
                 ? Math.round(trades.filter(t => t.status === 'WIN').reduce((sum, t) => sum + (t.confidence || 0), 0) / wins)
                 : 0,
             max_win: Math.max(...trades.map(t => t.profit || 0), 0),
-            max_loss: Math.min(...trades.map(t => t.profit || 0), 0)
+            max_loss: Math.min(...trades.map(t => t.profit || 0), 0),
+            loss_reasons: lossReasons
         };
     }
 
-    // ✅ MODIFIED: Exclude hidden trades
     static async getSymbolStats(userId) {
         const trades = await TradeModel.find({ user_id: userId, hidden: false, status: { $ne: 'PENDING' } }).lean();
         const symbols = {};
@@ -124,7 +155,6 @@ class Trade {
         }));
     }
 
-    // ✅ MODIFIED: Exclude hidden trades
     static async getSessionStats(userId) {
         const trades = await TradeModel.find({ user_id: userId, hidden: false, session: { $ne: null }, status: { $ne: 'PENDING' } }).lean();
         const sessions = {};
@@ -143,7 +173,6 @@ class Trade {
         }));
     }
 
-    // ✅ MODIFIED: Exclude hidden trades
     static async getSymbolSessionStats(userId, symbol) {
         const trades = await TradeModel.find({
             user_id: userId,
@@ -172,7 +201,6 @@ class Trade {
         }));
     }
 
-    // ✅ MODIFIED: Exclude hidden trades
     static async getTodayStats(userId) {
         const today = new Date().toISOString().split('T')[0];
         const todayStart = new Date(today);
@@ -193,7 +221,6 @@ class Trade {
         };
     }
 
-    // ✅ MODIFIED: Exclude hidden trades, but AI can still see all for learning
     static async getAllTradesForAI(userId, limit = 1000) {
         return TradeModel.find({ user_id: userId })
             .sort({ executed_at: -1 })
@@ -205,7 +232,6 @@ class Trade {
         return TradeModel.find({ hidden: false }).sort({ executed_at: -1 }).limit(limit).populate('user_id', 'username email').lean();
     }
 
-    // ✅ MODIFIED: Exclude hidden trades from pattern performance (but AI can use all)
     static async getPatternPerformance(userId, symbol) {
         const trades = await TradeModel.find({
             user_id: userId,
@@ -238,7 +264,6 @@ class Trade {
             .sort((a, b) => b.winRate - a.winRate);
     }
 
-    // ✅ MODIFIED: Exclude hidden trades
     static async getRSIPerformance(userId, symbol) {
         const trades = await TradeModel.find({
             user_id: userId,
@@ -280,7 +305,6 @@ class Trade {
             .sort((a, b) => b.winRate - a.winRate);
     }
 
-    // ✅ MODIFIED: Exclude hidden trades
     static async getTrendPerformance(userId, symbol) {
         const trades = await TradeModel.find({
             user_id: userId,
@@ -314,7 +338,6 @@ class Trade {
             .sort((a, b) => b.winRate - a.winRate);
     }
 
-    // ✅ MODIFIED: Exclude hidden trades
     static async getSessionPerformance(userId, symbol) {
         const trades = await TradeModel.find({
             user_id: userId,
@@ -345,7 +368,6 @@ class Trade {
             .sort((a, b) => b.winRate - a.winRate);
     }
 
-    // ✅ NEW: Soft delete - hide all trades for a user (UI only, keep for AI learning)
     static async hideAllUserTrades(userId) {
         return TradeModel.updateMany({ user_id: userId }, { hidden: true });
     }

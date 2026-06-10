@@ -22,6 +22,8 @@ class DerivService extends EventEmitter {
         this.heartbeatInterval = null;
         this.lastSubscribedSymbol = null;
         this.activeAccountId = null;
+        this.subscriptionRetryCount = 0;
+        this.subscriptionRetryInterval = null;
 
         this.symbolMap = {
             "R_10": "R_10", "R_25": "R_25", "R_50": "R_50", "R_75": "R_75", "R_100": "R_100",
@@ -60,8 +62,8 @@ class DerivService extends EventEmitter {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'Deriv-App-ID': process.env.DERIV_APP_ID || '1089',
-                'Deriv-Client-ID': process.env.DERIV_CLIENT_ID,
+                'Deriv-App-ID': process.env.DERIV_APP_ID || '33lnQKOehbu49p53dxDCt',
+                'Deriv-Client-ID': process.env.DERIV_CLIENT_ID || '019e4abc-cec8-7c8f-a120-d33a725f1e8a',
                 'Content-Type': 'application/json'
             }
         });
@@ -74,8 +76,8 @@ class DerivService extends EventEmitter {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
-                'Deriv-App-ID': process.env.DERIV_APP_ID || '1089',
-                'Deriv-Client-ID': process.env.DERIV_CLIENT_ID,
+                'Deriv-App-ID': process.env.DERIV_APP_ID || '33lnQKOehbu49p53dxDCt',
+                'Deriv-Client-ID': process.env.DERIV_CLIENT_ID || '019e4abc-cec8-7c8f-a120-d33a725f1e8a',
                 'Content-Type': 'application/json'
             }
         });
@@ -118,8 +120,12 @@ class DerivService extends EventEmitter {
                 }
                 this.startHeartbeat();
 
+                // 🚨 FIX: Subscribe to ticks AFTER connection is confirmed, with retry
                 if (this.lastSubscribedSymbol) {
-                    this.subscribeToTicks(this.lastSubscribedSymbol).catch(() => {});
+                    console.log(`📡 Attempting to subscribe to ${this.lastSubscribedSymbol}...`);
+                    setTimeout(() => {
+                        this.subscribeToTicksWithRetry(this.lastSubscribedSymbol);
+                    }, 2000);
                 }
 
                 this.emit('connected');
@@ -151,6 +157,27 @@ class DerivService extends EventEmitter {
         }
     }
 
+    async subscribeToTicksWithRetry(symbol, retries = 5, delay = 3000) {
+        for (let i = 0; i < retries; i++) {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN && this.authorized) {
+                try {
+                    await this.subscribeToTicks(symbol);
+                    console.log(`✅ Successfully subscribed to ${symbol} after ${i + 1} attempt(s)`);
+                    return true;
+                } catch (err) {
+                    console.log(`⚠️ Subscribe attempt ${i + 1}/${retries} failed: ${err.message}`);
+                }
+            } else {
+                console.log(`⚠️ WebSocket not ready for subscription (attempt ${i + 1}/${retries})`);
+            }
+            if (i < retries - 1) {
+                await new Promise(r => setTimeout(r, delay));
+            }
+        }
+        console.error(`❌ Failed to subscribe to ${symbol} after ${retries} attempts`);
+        return false;
+    }
+
     async reconnectWithToken(token, isDemo = true) {
         console.log('🔄 [Deriv] Reconnecting with new token...');
         this.currentToken = token;
@@ -164,7 +191,6 @@ class DerivService extends EventEmitter {
 
     async getCandles(symbol, granularity = 60, count = 100) {
         if (!this.authorized || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            console.log('⚠️ [Deriv] Cannot get candles: WebSocket not ready');
             return { success: false, candles: [] };
         }
 
@@ -234,11 +260,11 @@ class DerivService extends EventEmitter {
                 await this.sendRequest({ forget_all: 'ticks' });
             } catch (e) {}
         }
-
+        
         this.subscriptions.clear();
-
+        
         try {
-            await this.subscribeToTicks(symbol);
+            await this.subscribeToTicksWithRetry(symbol, 3, 2000);
             console.log(`✅ [Deriv] Reconnected and subscribed to ${symbol}`);
             return true;
         } catch (error) {
@@ -266,6 +292,10 @@ class DerivService extends EventEmitter {
     safeClose() {
         this.isClosing = true;
         this.stopHeartbeat();
+        if (this.subscriptionRetryInterval) {
+            clearInterval(this.subscriptionRetryInterval);
+            this.subscriptionRetryInterval = null;
+        }
         if (this.ws) {
             try {
                 this.ws.removeAllListeners();
@@ -304,6 +334,7 @@ class DerivService extends EventEmitter {
         const type = msg.msg_type;
 
         if (type === 'tick') {
+            console.log(`📈 TICK: ${msg.tick.symbol} @ $${msg.tick.quote}`);
             this.emit('tick', msg.tick);
         }
 
@@ -365,6 +396,8 @@ class DerivService extends EventEmitter {
             await this.sendRequest({ ticks: derivSymbol, subscribe: 1 });
             this.subscriptions.add(derivSymbol);
             console.log(`📡 Subscribed to ${derivSymbol}`);
+            this.subscriptionRetryCount = 0;
+            return true;
         } catch (err) {
             console.error(`❌ Subscribe failed:`, err.message);
             throw err;
@@ -403,7 +436,6 @@ class DerivService extends EventEmitter {
             price: stake
         });
 
-        // ✅ FIX: Subscribe to contract updates with correct format
         setTimeout(() => {
             this.sendRequest({ 
                 subscribe: 1, 
@@ -435,7 +467,6 @@ class DerivService extends EventEmitter {
         return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized };
     }
 
-    // ✅ FIXED: Correct contract lookup format
     async getClosedContract(contractId) {
         try {
             const result = await this.sendRequest({ 
@@ -445,17 +476,30 @@ class DerivService extends EventEmitter {
             
             if (result && result.proposal_open_contract) {
                 const contract = result.proposal_open_contract;
-                if (contract.is_sold === 1 || contract.status === 'sold') {
-                    console.log(`📊 [Deriv] Contract ${contractId} closed. Profit: ${contract.profit || (contract.sell_price - contract.buy_price)}`);
-                    return result;
-                } else {
-                    console.log(`⏳ [Deriv] Contract ${contractId} still open (is_sold=${contract.is_sold})`);
-                    return null;
+                
+                let exitPrice = null;
+                if (contract.exit_tick && contract.exit_tick.quote) {
+                    exitPrice = contract.exit_tick.quote;
+                } else if (contract.sell_price) {
+                    exitPrice = contract.sell_price;
+                } else if (contract.bid_price) {
+                    exitPrice = contract.bid_price;
                 }
+                
+                let profit = null;
+                if (contract.profit !== undefined && contract.profit !== null) {
+                    profit = parseFloat(contract.profit);
+                } else if (contract.sell_price && contract.buy_price) {
+                    profit = contract.sell_price - contract.buy_price;
+                }
+                
+                if (contract.is_sold === 1 || contract.status === 'sold') {
+                    return { proposal_open_contract: { ...contract, exit_price: exitPrice, profit: profit } };
+                }
+                return null;
             }
             return null;
         } catch (error) {
-            console.error(`❌ [Deriv] Get contract failed:`, error.message);
             return null;
         }
     }

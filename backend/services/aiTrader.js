@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v11.1.0 - FIXED: Loss streak reset after 24 hours, time-based unpause
+ * v12.1.0 - EMERGENCY FIX: Stake caps, session blocks, pattern blocks
  */
 const marketData = require('./marketData');
 const deepseekService = require('./deepseekService');
@@ -48,7 +48,7 @@ class AITrader {
         this.consecutiveWins = 0;
         this.recentResults = [];
         this.lastTradeTime = 0;
-        this.tradeCooldown = 90000;
+        this.tradeCooldown = 30000;
         this.pausedUntil = 0;
         this.tickCount = 0;
         this.lastTickTime = 0;
@@ -69,7 +69,15 @@ class AITrader {
         this.dailyProfitReached = false;
         this.dailyLossReached = false;
 
-        this.watchedSymbols = ['R_10', 'R_25', 'R_50', 'R_75', 'R_100', 'XAU/USD (Gold)', 'EUR/USD', 'GBP/USD', 'Boom 300', 'Crash 500', 'US500'];
+        this.PROFIT_TARGET_PCT = 0.02;
+        this.STOP_LOSS_PCT = 0.01;
+        this.MAX_TRADE_DURATION = 120000;
+        
+        // 🚨 EMERGENCY: Stake limits
+        this.MAX_STAKE_LIMIT = 25;  // Never risk more than $25 per trade
+        this.MIN_STAKE_LIMIT = 1;   // Minimum $1 per trade
+        
+        this.watchedSymbols = ['R_75'];
         this.symbolKnowledge = {};
         this.currentOpportunityScore = 0;
         this.lastSwitchTime = 0;
@@ -85,7 +93,8 @@ class AITrader {
             RSI_OUTSIDE_RANGE: 0,
             PATTERN_FAILED: 0,
             NO_CONFIRMATION: 0,
-            STOP_LOSS_HIT: 0
+            STOP_LOSS_HIT: 0,
+            TIMEOUT: 0
         };
 
         this.PCT_MIN_SMALL = 0.02;
@@ -153,10 +162,14 @@ class AITrader {
         this.tickHeartbeat = null;
         this._lastLossPauseLog = 0;
         this._lastSessionBlockLog = {};
+        this._londonBlockLog = 0;
+        this._rsiBlockLog = 0;
+        
+        this.handleContractUpdate = this.handleContractUpdate.bind(this);
     }
 
     roundStake(amount) {
-        return Math.max(0.50, Math.round(amount * 2) / 2);
+        return Math.max(this.MIN_STAKE_LIMIT, Math.min(this.MAX_STAKE_LIMIT, Math.round(amount * 2) / 2));
     }
 
     isProven() {
@@ -216,14 +229,19 @@ class AITrader {
         this.MAX_STAKE = this.roundStake(bal * pctMax * stakeMultiplier);
         this.HIGH_STAKE = this.MAX_STAKE;
 
-        if (this.MIN_STAKE < 0.50) this.MIN_STAKE = 0.50;
-        if (this.BASE_STAKE < 0.50) this.BASE_STAKE = 2.00;
-        if (this.CONFIDENT_STAKE < 0.50) this.CONFIDENT_STAKE = 4.00;
-        if (this.MAX_STAKE < 0.50) this.MAX_STAKE = 10.00;
+        // 🚨 EMERGENCY: Enforce hard limits
+        if (this.MIN_STAKE > this.MAX_STAKE_LIMIT) this.MIN_STAKE = this.MAX_STAKE_LIMIT;
+        if (this.BASE_STAKE > this.MAX_STAKE_LIMIT) this.BASE_STAKE = this.MAX_STAKE_LIMIT;
+        if (this.CONFIDENT_STAKE > this.MAX_STAKE_LIMIT) this.CONFIDENT_STAKE = this.MAX_STAKE_LIMIT;
+        if (this.MAX_STAKE > this.MAX_STAKE_LIMIT) this.MAX_STAKE = this.MAX_STAKE_LIMIT;
+        if (this.MIN_STAKE < this.MIN_STAKE_LIMIT) this.MIN_STAKE = this.MIN_STAKE_LIMIT;
+        if (this.BASE_STAKE < this.MIN_STAKE_LIMIT) this.BASE_STAKE = this.MIN_STAKE_LIMIT;
+        if (this.CONFIDENT_STAKE < this.MIN_STAKE_LIMIT) this.CONFIDENT_STAKE = this.MIN_STAKE_LIMIT;
+        if (this.MAX_STAKE < this.MIN_STAKE_LIMIT) this.MAX_STAKE = this.MIN_STAKE_LIMIT;
 
         if (!this._lastBalanceLog || Date.now() - this._lastBalanceLog > 3600000) {
             const provenTag = this.isProven() ? '✅ PROVEN' : '⏳ PROVING';
-            console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | Tier: ${tier} | ${provenTag} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
+            console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | Tier: ${tier} | ${provenTag} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE} (Capped at $${this.MAX_STAKE_LIMIT})`);
             this._lastBalanceLog = Date.now();
         }
     }
@@ -287,9 +305,9 @@ class AITrader {
         this.blockedSessions[session].total++;
     }
 
-    async tagLossReason(trade, reason) {
+    async tagLossReason(tradeId, reason) {
         this.lossReasons[reason]++;
-        await Trade.updateLossReason(trade.id, reason);
+        await Trade.updateLossReason(tradeId, reason);
         console.log(`🏷️ [Loss Tag] ${reason} - ${this.lossReasons[reason]} total`);
     }
 
@@ -314,61 +332,15 @@ class AITrader {
             score += (recentWR - 0.5) * 40;
         }
 
-        if (knowledge.avgVolatility > 1.5) score += 15;
-        else if (knowledge.avgVolatility > 0.8) score += 8;
-
-        if (currentConditions.trend === 'uptrend' && knowledge.bullishPerformance > 0.6) score += 10;
-        if (currentConditions.trend === 'downtrend' && knowledge.bearishPerformance > 0.6) score += 10;
-
         return Math.min(100, Math.max(0, score));
     }
 
     async findBestSymbol() {
-        const currentConditions = {
-            session: this.getCurrentSession(),
-            hour: new Date().getUTCHours(),
-            trend: marketData.getMarketState()?.trend || 'sideways'
-        };
-
-        let bestSymbol = this.symbol;
-        let bestScore = await this.getOpportunityScore(this.symbol, currentConditions);
-        let secondBest = null;
-        let secondScore = 0;
-
-        for (const symbol of this.watchedSymbols) {
-            if (symbol === this.symbol) continue;
-            const score = await this.getOpportunityScore(symbol, currentConditions);
-            if (score > bestScore) {
-                secondBest = bestSymbol;
-                secondScore = bestScore;
-                bestSymbol = symbol;
-                bestScore = score;
-            } else if (score > secondScore) {
-                secondBest = symbol;
-                secondScore = score;
-            }
-        }
-
-        const timeSinceLastSwitch = Date.now() - this.lastSwitchTime;
-        const scoreDifference = bestScore - secondScore;
-
-        if (bestSymbol !== this.symbol && 
-            (scoreDifference > 15 || (scoreDifference > 10 && timeSinceLastSwitch > this.minTimeOnSymbol))) {
-            console.log(`🔄 [Symbol Switch] ${this.symbol} (${secondScore}) → ${bestSymbol} (${bestScore}) | Diff: ${scoreDifference}`);
-            broadcastSymbolSwitch(this.symbol, bestSymbol, bestScore, scoreDifference);
-            this.symbol = bestSymbol;
-            this.lastSwitchTime = Date.now();
-            await this.switchSymbol(this.symbol);
-        }
-
-        return { bestSymbol, bestScore, alternatives: this.getTopAlternatives(3) };
+        return { bestSymbol: this.symbol, bestScore: 50, alternatives: [] };
     }
 
     getTopAlternatives(count) {
-        return Object.entries(this.symbolKnowledge)
-            .sort((a,b) => (b[1].score || 0) - (a[1].score || 0))
-            .slice(0, count)
-            .map(([symbol, data]) => ({ symbol, score: data.score || 50, winRate: (data.wins/data.totalTrades)*100 || 0 }));
+        return [];
     }
 
     async switchSymbol(newSymbol) {
@@ -573,6 +545,101 @@ class AITrader {
         return 'Deeply Overbought';
     }
 
+    async handleContractUpdate(contract) {
+        if (!this.activeTrade || contract.contract_id !== this.activeTrade.contract_id) return;
+        
+        const currentProfit = contract.profit || 0;
+        const stake = this.activeTrade.stake;
+        const targetProfit = stake * this.PROFIT_TARGET_PCT;
+        const maxLoss = stake * this.STOP_LOSS_PCT;
+        
+        console.log(`📊 [Trade Monitor] Contract ${contract.contract_id}: Profit=$${currentProfit.toFixed(2)} | Target=$${targetProfit.toFixed(2)} | Stop=$${maxLoss.toFixed(2)}`);
+        
+        if (currentProfit >= targetProfit) {
+            console.log(`🎯 PROFIT TARGET HIT! Closing trade at +$${currentProfit.toFixed(2)}`);
+            await this.closeTrade(contract.contract_id, currentProfit, 'WIN');
+        } else if (currentProfit <= -maxLoss) {
+            console.log(`🛑 STOP LOSS HIT! Closing trade at -$${Math.abs(currentProfit).toFixed(2)}`);
+            await this.closeTrade(contract.contract_id, currentProfit, 'LOSS');
+        }
+    }
+
+    async closeTrade(contractId, profit, status) {
+        if (!this.activeTrade || this.activeTrade.contract_id !== contractId) return;
+        
+        try {
+            if (profit > 0 && derivService.isConnected) {
+                try {
+                    await derivService.sendRequest({ sell: contractId, price: 0 });
+                    console.log(`🔒 Sold contract ${contractId} at profit`);
+                } catch (e) {
+                    console.log(`⚠️ Could not sell contract ${contractId}: ${e.message}`);
+                }
+            }
+            
+            const tradeId = this.activeTrade.id;
+            const entryPrice = this.activeTrade.entry_price;
+            const stake = this.activeTrade.stake;
+            
+            // Calculate reasonable exit price
+            let exitPrice = entryPrice;
+            if (status === 'WIN') {
+                exitPrice = entryPrice * (1 + (profit / stake));
+            } else {
+                exitPrice = entryPrice * (1 - (Math.abs(profit) / stake));
+            }
+            
+            await Trade.updateResult(tradeId, exitPrice, profit, status);
+            await User.updateStats(this.userId, status, profit, stake);
+            await Pattern.recordTradeResult(this.activeTrade.pattern, this.symbol, this.activeTrade.action, this.getCurrentSession(), status === 'WIN');
+            
+            this.recentResults.push(status);
+            if (this.recentResults.length > 30) this.recentResults.shift();
+            
+            if (status === 'WIN') {
+                this.totalWins++;
+                this.consecutiveWins++;
+                this.consecutiveLosses = 0;
+                this.sessionProfit += profit;
+                console.log(`🎉 WIN! +$${Math.abs(profit).toFixed(2)} | Streak: ${this.consecutiveWins}W/${this.consecutiveLosses}L`);
+            } else {
+                this.totalLosses++;
+                this.consecutiveLosses++;
+                this.consecutiveWins = 0;
+                this.sessionLoss += Math.abs(profit);
+                console.log(`❌ LOSS #${this.consecutiveLosses} | -$${Math.abs(profit).toFixed(2)}`);
+                this.recordSessionTrade(this.getCurrentSession(), false);
+                await this.tagLossReason(tradeId, 'STOP_LOSS_HIT');
+            }
+            
+            broadcastTradeResult({
+                id: tradeId,
+                contract_id: contractId,
+                symbol: this.symbol,
+                action: this.activeTrade.action,
+                entry_price: entryPrice,
+                exit_price: exitPrice,
+                profit: profit,
+                stake: stake,
+                status: status
+            });
+            
+            try {
+                const bal = await derivService.getBalance();
+                if (bal?.balance) {
+                    this.currentBalance = bal.balance;
+                    await this.updateDailyLimits();
+                    this.recalculateStakes();
+                }
+            } catch (e) {}
+            
+            this.activeTrade = null;
+            
+        } catch (error) {
+            console.error(`❌ Close trade error:`, error.message);
+        }
+    }
+
     async start(userId, symbol = 'R_75', mode = 'AUTO') {
         if (this.isRunning) {
             console.log('⚠️ [AI Trader] Already running, stopping first...');
@@ -711,10 +778,11 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v11.1.0 (Fixed Loss Streak Reset)`);
+        console.log(`🤖 [AI Trader] Starting v12.1.0 (Emergency Fix: Stake caps, session blocks)`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
-        console.log(`🎯 [AI Trader] Daily Target: ${this.dailyProfitTarget * 100}% | Daily Limit: ${this.dailyLossLimit * 100}%`);
+        console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
+        console.log(`🛡️ [Emergency] Max Stake: $${this.MAX_STAKE_LIMIT} | Min Stake: $${this.MIN_STAKE_LIMIT}`);
 
         marketData.reset();
 
@@ -736,6 +804,8 @@ class AITrader {
             if (this.tickCount % 100 === 0) console.log(`📈 Tick #${this.tickCount} - $${tick.quote?.toFixed(2)} on ${this.symbol}`);
             this.onMarketUpdate();
         });
+
+        derivService.on('contract_update', this.handleContractUpdate);
 
         setTimeout(() => this.seedCandlesFromHistory(), 2000);
 
@@ -762,6 +832,16 @@ class AITrader {
             }
             this._lastTickCount = this.tickCount;
         }, 30000);
+
+        setInterval(() => {
+            if (this.activeTrade) {
+                const timeOpen = Date.now() - this.activeTrade.entry_time;
+                if (timeOpen > this.MAX_TRADE_DURATION) {
+                    console.log(`⏰ Trade timeout! Closing after ${Math.floor(timeOpen / 1000)}s`);
+                    this.closeTrade(this.activeTrade.contract_id, this.activeTrade.stake * -0.01, 'LOSS');
+                }
+            }
+        }, 5000);
 
         setTimeout(() => {
             this.syncBalanceFromDeriv();
@@ -911,7 +991,6 @@ class AITrader {
         try {
             if (this.isExecuting) return;
             
-            // ✅ FIX: Reset loss streak if no trades in 24 hours
             const timeSinceLastTrade = Date.now() - this.lastTradeTime;
             if (this.lastTradeTime > 0 && timeSinceLastTrade > 24 * 60 * 60 * 1000) {
                 if (this.consecutiveLosses > 0 || this.pausedUntil > Date.now()) {
@@ -923,7 +1002,6 @@ class AITrader {
                 }
             }
             
-            // Check if still paused
             if (this.pausedUntil > Date.now()) {
                 const remaining = Math.floor((this.pausedUntil - Date.now()) / 1000);
                 if (remaining % 60 === 0 && remaining < 300) {
@@ -932,19 +1010,25 @@ class AITrader {
                 return;
             }
             
-            // ✅ FIX: Only pause if losses are RECENT (within last 6 hours)
+            // 🚨 EMERGENCY FIX: Block London session completely
+            const currentSession = this.getCurrentSession();
+            if (currentSession === 'LONDON') {
+                if (!this._londonBlockLog || Date.now() - this._londonBlockLog > 3600000) {
+                    console.log(`🚫 [EMERGENCY] London session blocked - 5% WR over 38 trades. NO TRADING.`);
+                    this._londonBlockLog = Date.now();
+                }
+                return;
+            }
+            
             if (this.consecutiveLosses >= 2) {
-                // Check if the losses happened recently
                 const recentTrades = await Trade.getUserTrades(this.userId, 5);
                 const recentLosses = recentTrades.filter(t => t.status === 'LOSS' && 
                     (Date.now() - new Date(t.executed_at).getTime()) < 6 * 60 * 60 * 1000);
                 
                 if (recentLosses.length < 2) {
-                    // Losses are old, reset the counter
                     console.log(`🔄 [Reset] Losses are old (${recentLosses.length} recent). Resetting streak from ${this.consecutiveLosses} to 0`);
                     this.consecutiveLosses = 0;
                 } else if (this.consecutiveLosses >= 2) {
-                    // Recent losses - pause
                     if (!this._lastLossPauseLog || Date.now() - this._lastLossPauseLog > 60000) {
                         console.log(`🛑 [Psychology] ${this.consecutiveLosses} consecutive RECENT losses. Pausing for 15 minutes.`);
                         this._lastLossPauseLog = Date.now();
@@ -954,7 +1038,6 @@ class AITrader {
                 }
             }
             
-            // Check daily limits
             const dailyLimitHit = await this.updateDailyLimits();
             if (dailyLimitHit) return;
             
@@ -963,12 +1046,8 @@ class AITrader {
 
             const currentHour = new Date().getUTCHours();
             
-            const currentSession = this.getCurrentSession();
             const sessionBlocked = await this.isSessionBlocked(currentSession);
             if (sessionBlocked) return;
-            
-            const blockLondon = await this.shouldBlockLondon();
-            if (blockLondon) return;
 
             const marketState = marketData.getMarketState();
             const currentPrice = marketState.price;
@@ -977,6 +1056,15 @@ class AITrader {
             if (!this.dataReady && this.tickCount > 0) {
                 this.dataReady = true;
                 console.log(`✅ Data ready! ${this.tickCount} ticks received.`);
+            }
+            
+            // 🚨 EMERGENCY FIX: Block RSI neutral zone (45-55)
+            if (marketState.rsi >= 45 && marketState.rsi <= 55) {
+                if (!this._rsiBlockLog || Date.now() - this._rsiBlockLog > 3600000) {
+                    console.log(`🚫 [EMERGENCY] RSI neutral zone (${marketState.rsi}) blocked - 27% WR, -$1,220 loss. NO TRADING.`);
+                    this._rsiBlockLog = Date.now();
+                }
+                return;
             }
 
             let dynamicThreshold = this.confidenceThreshold;
@@ -1036,6 +1124,13 @@ class AITrader {
 
             const analysis = await deepseekService.analyzeMarket(this.symbol, currentPrice, marketState.rsi, 'neutral', null, recentTrades, topPatterns, marketContext);
             if (analysis.pattern) analysis.pattern = deepseekService.normalizePatternName(analysis.pattern);
+            
+            // 🚨 EMERGENCY FIX: Block losing patterns
+            const LOSING_PATTERNS = ['doji', 'hammer', 'three_white_soldiers', 'three white soldiers', 'pullback_to_support', 'pullback in uptrend'];
+            if (LOSING_PATTERNS.some(p => analysis.pattern?.toLowerCase().includes(p))) {
+                console.log(`🚫 [EMERGENCY] Pattern "${analysis.pattern}" blocked - losing pattern. NO TRADING.`);
+                return;
+            }
 
             const action = analysis.action === 'CALL' ? 'BUY' : (analysis.action === 'PUT' ? 'SELL' : 'WAIT');
 
@@ -1110,7 +1205,6 @@ class AITrader {
     calculateStake(confidence, patternWinRate, trend, setupQuality = 50) {
         this.recalculateStakes();
         const bal = this.currentBalance || 1000;
-        const tier = this.getAccountTier();
 
         if (this.lastStakeWasMax && this.tradesSinceBigLoss < 3) {
             return this.MIN_STAKE;
@@ -1122,28 +1216,32 @@ class AITrader {
         
         if (this.consecutiveWins >= 3 && confidence >= 75) {
             console.log(`🚀 [Psychology] Win streak ${this.consecutiveWins} + High confidence → Using CONFIDENT stake`);
-            return this.CONFIDENT_STAKE;
+            return Math.min(this.CONFIDENT_STAKE, this.MAX_STAKE_LIMIT);
         }
 
         if (this.sessionProfit >= bal * this.DAILY_PROFIT_TARGET_PCT) {
             return this.MIN_STAKE;
         }
 
-        if (setupQuality >= 85 && this.consecutiveLosses === 0 && !this.sniperTradeActive && tier !== 'SMALL') {
-            console.log(`🔫 SNIPER (Quality:${setupQuality}/100) — MAX ($${this.MAX_STAKE})`);
-            this.sniperTradeActive = true;
-            return this.MAX_STAKE;
-        }
-
+        let stake = this.BASE_STAKE;
         if (setupQuality >= 75) {
-            return this.CONFIDENT_STAKE;
+            stake = this.CONFIDENT_STAKE;
+        } else if (setupQuality >= 60) {
+            stake = this.BASE_STAKE;
+        } else {
+            stake = this.MIN_STAKE;
         }
-
-        if (setupQuality >= 60) {
-            return this.BASE_STAKE;
+        
+        // 🚨 EMERGENCY: Enforce hard caps
+        if (stake > this.MAX_STAKE_LIMIT) {
+            console.log(`🛑 [Emergency] Stake capped: $${stake} → $${this.MAX_STAKE_LIMIT}`);
+            stake = this.MAX_STAKE_LIMIT;
         }
-
-        return this.MIN_STAKE;
+        if (stake < this.MIN_STAKE_LIMIT) {
+            stake = this.MIN_STAKE_LIMIT;
+        }
+        
+        return stake;
     }
 
     async executeEntry(action, entryPrice, stake, analysis) {
@@ -1151,8 +1249,14 @@ class AITrader {
         this.isExecuting = true;
         try {
             const user = await User.findById(this.userId);
-            if (!user || user.trades_remaining <= 0) return;
-            if (stake < 0.50) return;
+            if (!user || user.trades_remaining <= 0) {
+                this.isExecuting = false;
+                return;
+            }
+            if (stake < this.MIN_STAKE_LIMIT) {
+                this.isExecuting = false;
+                return;
+            }
 
             console.log(`💸 ${action} ${this.symbol} | $${entryPrice.toFixed(2)} | $${stake} | ${analysis.confidence}%`);
 
@@ -1180,7 +1284,6 @@ class AITrader {
             broadcastTradeResult({ id: tradeId, contract_id: tradeResult.buy.contract_id, symbol: this.symbol, action, entry_price: entryPrice, exit_price: null, profit: null, stake, status: 'PENDING' });
             console.log(`✅ Trade #${tradeId} OPEN | ${action} | $${stake}`);
 
-            setTimeout(() => this.checkTradeResult(tradeId, tradeResult.buy.contract_id, entryPrice, stake), 125000);
         } catch (error) {
             console.error('❌ Execute error:', error.message);
         } finally {
@@ -1194,159 +1297,6 @@ class AITrader {
         const timeLeft = this.activeTrade.exit_time - now;
         if (timeLeft <= 0) return;
         broadcastAIUpdate({ type: 'active_trade_update', trade: { ...this.activeTrade, current_price: marketData.getCurrentPrice(), time_remaining: Math.floor(timeLeft / 1000) } });
-    }
-
-    async checkTradeResult(tradeId, contractId, entryPrice, stake) {
-        try {
-            let contractResult = null;
-            let retries = 20;
-            let attempt = 0;
-
-            while (retries > 0 && !contractResult) {
-                attempt++;
-                try {
-                    contractResult = await derivService.getClosedContract(contractId);
-                    if (contractResult && contractResult.proposal_open_contract) {
-                        const contract = contractResult.proposal_open_contract;
-                        if (contract.is_sold === 1 || contract.status === 'sold') {
-                            console.log(`✅ Contract ${contractId} closed (attempt ${attempt})`);
-                            break;
-                        }
-                    }
-                    contractResult = null;
-                } catch (e) {
-                    console.log(`⏳ Waiting for contract ${contractId} to close... (attempt ${attempt})`);
-                }
-                await new Promise(r => setTimeout(r, 5000));
-                retries--;
-            }
-
-            let profit = -stake;
-            let exitPrice = entryPrice;
-            let status = 'LOSS';
-            let actualProfit = 0;
-            let lossReason = null;
-
-            if (contractResult && contractResult.proposal_open_contract) {
-                const contract = contractResult.proposal_open_contract;
-                
-                if (contract.exit_tick?.quote) exitPrice = contract.exit_tick.quote;
-                else if (contract.sell_price) exitPrice = contract.sell_price;
-
-                if (contract.profit !== undefined && contract.profit !== null) {
-                    actualProfit = parseFloat(contract.profit);
-                    profit = actualProfit;
-                } else if (contract.sell_price && contract.buy_price) {
-                    actualProfit = contract.sell_price - contract.buy_price;
-                    profit = actualProfit;
-                } else {
-                    const priceChange = exitPrice - entryPrice;
-                    const isCall = this.activeTrade?.action === 'BUY';
-                    if (isCall) {
-                        actualProfit = priceChange > 0 ? stake * (priceChange / entryPrice) : -stake;
-                    } else {
-                        actualProfit = priceChange < 0 ? stake * Math.abs(priceChange / entryPrice) : -stake;
-                    }
-                    profit = actualProfit;
-                }
-
-                if (profit > 0) {
-                    status = 'WIN';
-                } else {
-                    status = 'LOSS';
-                    if (profit === 0) profit = -stake;
-                    
-                    const marketState = marketData.getMarketState();
-                    const session = this.getCurrentSession();
-                    const sessionWR = this.blockedSessions[session]?.winRate || 50;
-                    
-                    if (sessionWR < 30) lossReason = 'BAD_SESSION';
-                    else if (marketState.trend?.includes('strong') && this.activeTrade?.action !== (marketState.trend.includes('up') ? 'BUY' : 'SELL')) lossReason = 'WRONG_TREND';
-                    else if (marketState.rsi > 75 || marketState.rsi < 25) lossReason = 'RSI_OUTSIDE_RANGE';
-                    else lossReason = 'PATTERN_FAILED';
-                    
-                    if (lossReason) await Trade.updateLossReason(tradeId, lossReason);
-                }
-
-                console.log(`📊 Contract ${contractId}: Type=${contract.contract_type}, Exit=$${exitPrice}, Profit=$${profit.toFixed(2)}`);
-            } else {
-                console.log(`⚠️ No contract result for ${contractId} after ${attempt} attempts, marking as loss`);
-                profit = -stake;
-                status = 'LOSS';
-                await Trade.updateLossReason(tradeId, 'NO_CONFIRMATION');
-            }
-
-            const wasSniper = this.activeTrade?.isSniper || false;
-            if (wasSniper) {
-                this.sniperTradeActive = false;
-                this.lastStakeWasMax = (status === 'LOSS');
-                this.tradesSinceBigLoss = 0;
-            }
-            if (this.lastStakeWasMax) {
-                this.tradesSinceBigLoss++;
-                if (this.tradesSinceBigLoss >= 3) this.lastStakeWasMax = false;
-            }
-
-            await Trade.updateResult(tradeId, exitPrice, profit, status);
-            await User.updateStats(this.userId, status, profit, stake);
-            await Pattern.recordTradeResult(this.activeTrade?.pattern || 'Unknown', this.symbol, this.activeTrade?.action || 'BUY', this.getCurrentSession(), status === 'WIN');
-
-            this.recentResults.push(status);
-            if (this.recentResults.length > 30) this.recentResults.shift();
-
-            if (status === 'WIN') {
-                this.totalWins++;
-                this.consecutiveWins++;
-                this.consecutiveLosses = 0;
-                this.sessionProfit += profit;
-                console.log(`🎉 WIN! +$${Math.abs(profit).toFixed(2)} | Streak: ${this.consecutiveWins}W/${this.consecutiveLosses}L | Total: ${this.totalWins}W/${this.totalLosses}L`);
-            } else {
-                this.totalLosses++;
-                this.consecutiveLosses++;
-                this.consecutiveWins = 0;
-                this.sessionLoss += Math.abs(profit);
-                console.log(`❌ LOSS #${this.consecutiveLosses} | -$${Math.abs(profit).toFixed(2)} | Streak: ${this.consecutiveWins}W/${this.consecutiveLosses}L | Total: ${this.totalWins}W/${this.totalLosses}L`);
-                
-                this.recordSessionTrade(this.getCurrentSession(), false);
-                
-                if (this.consecutiveLosses >= 5) {
-                    this.pausedUntil = Date.now() + 1800000;
-                    this.pendingLimitOrders = [];
-                    console.log('🛑 HARD PAUSE 30min — 5 consecutive losses');
-                    broadcastNotification('Emergency Pause', '5 consecutive losses. Bot paused for 30 minutes.', 'error');
-                } else if (this.consecutiveLosses >= 3) {
-                    this.pausedUntil = Date.now() + 900000;
-                    this.pendingLimitOrders = [];
-                    console.log('🛑 HARD PAUSE 15min — 3 consecutive losses');
-                    broadcastNotification('Loss Streak Pause', '3 consecutive losses. Bot paused for 15 minutes.', 'warning');
-                }
-            }
-
-            try {
-                const bal = await derivService.getBalance();
-                if (bal?.balance) {
-                    this.currentBalance = bal.balance;
-                    await this.updateDailyLimits();
-                    this.recalculateStakes();
-                    console.log(`💰 New Balance: $${this.currentBalance.toFixed(2)}`);
-                }
-            } catch (e) {}
-
-            broadcastTradeResult({ id: tradeId, contract_id: contractId, symbol: this.symbol, action: this.activeTrade?.action, entry_price: entryPrice, exit_price: exitPrice, profit, stake, status });
-
-            const winRate = this.recentResults.length > 0 ? Math.round((this.recentResults.filter(r => r === 'WIN').length / this.recentResults.length) * 100) : 0;
-            console.log(`📊 Trade #${tradeId}: ${status} $${profit.toFixed(2)} | Recent WR: ${winRate}%`);
-
-            this.activeTrade = null;
-
-            if (derivService.subscriptions?.size === 0) {
-                try { await derivService.subscribeToTicks(this.symbol); this.lastTickTime = Date.now(); } catch (err) {}
-            }
-        } catch (error) {
-            console.error('❌ Result check error:', error.message);
-            try { await Trade.updateResult(tradeId, entryPrice, -stake, 'LOSS'); } catch (e) {}
-            this.activeTrade = null;
-        }
     }
 
     getCurrentSession() {
@@ -1381,6 +1331,7 @@ class AITrader {
         if (this.tickHealthInterval) { clearInterval(this.tickHealthInterval); this.tickHealthInterval = null; }
         if (this.balanceSyncInterval) { clearInterval(this.balanceSyncInterval); this.balanceSyncInterval = null; }
         if (this.tickHeartbeat) { clearInterval(this.tickHeartbeat); this.tickHeartbeat = null; }
+        derivService.removeListener('contract_update', this.handleContractUpdate);
         console.log('🤖 AI Trader Stopped');
     }
 

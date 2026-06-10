@@ -100,6 +100,8 @@ app.get('/health', (req, res) => {
 });
 
 app.use(helmet({ contentSecurityPolicy: false }));
+// 🚨 EMERGENCY FIX: Trust proxy for rate limiting behind Render
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(compression());
 app.use(express.json());
@@ -115,7 +117,11 @@ app.post('/api/log', express.json(), (req, res) => {
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500,
-    message: { error: 'Too many requests, please try again later' }
+    message: { error: 'Too many requests, please try again later' },
+    // 🚨 FIX: Skip rate limiting for trusted proxy
+    skip: (req) => {
+        return req.path === '/health' || req.path === '/api/log';
+    }
 });
 app.use('/api/', limiter);
 
@@ -156,7 +162,6 @@ async function startServer() {
         // Start Deriv connection without token first (will be reconnected when user logs in)
         try {
             console.log('🔌 Initializing Deriv connection (will wait for user token)...');
-            // Don't try to connect without token - just set up the service
             derivService.isConnected = false;
             derivService.authorized = false;
         } catch (error) {
@@ -169,7 +174,7 @@ async function startServer() {
             console.log(`🧬 Trading DNA: ACTIVE | ${session.name} session optimized`);
             startSelfPing();
 
-            // ✅ FIX: Start AI Trader for the first active user found
+            // Start AI Trader for the first active user found
             setTimeout(async () => {
                 try {
                     const users = await User.getAll();
