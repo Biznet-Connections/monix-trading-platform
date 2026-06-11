@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v12.1.0 - EMERGENCY FIX: Stake caps, session blocks, pattern blocks
+ * v13.0.0 - FIXED: Trade result checking, contract monitoring, balance sync
  */
 const marketData = require('./marketData');
 const deepseekService = require('./deepseekService');
@@ -72,10 +72,8 @@ class AITrader {
         this.PROFIT_TARGET_PCT = 0.02;
         this.STOP_LOSS_PCT = 0.01;
         this.MAX_TRADE_DURATION = 120000;
-        
-        // 🚨 EMERGENCY: Stake limits
-        this.MAX_STAKE_LIMIT = 25;  // Never risk more than $25 per trade
-        this.MIN_STAKE_LIMIT = 1;   // Minimum $1 per trade
+        this.MAX_STAKE_LIMIT = 25;
+        this.MIN_STAKE_LIMIT = 1;
         
         this.watchedSymbols = ['R_75'];
         this.symbolKnowledge = {};
@@ -229,7 +227,6 @@ class AITrader {
         this.MAX_STAKE = this.roundStake(bal * pctMax * stakeMultiplier);
         this.HIGH_STAKE = this.MAX_STAKE;
 
-        // 🚨 EMERGENCY: Enforce hard limits
         if (this.MIN_STAKE > this.MAX_STAKE_LIMIT) this.MIN_STAKE = this.MAX_STAKE_LIMIT;
         if (this.BASE_STAKE > this.MAX_STAKE_LIMIT) this.BASE_STAKE = this.MAX_STAKE_LIMIT;
         if (this.CONFIDENT_STAKE > this.MAX_STAKE_LIMIT) this.CONFIDENT_STAKE = this.MAX_STAKE_LIMIT;
@@ -561,6 +558,10 @@ class AITrader {
         } else if (currentProfit <= -maxLoss) {
             console.log(`🛑 STOP LOSS HIT! Closing trade at -$${Math.abs(currentProfit).toFixed(2)}`);
             await this.closeTrade(contract.contract_id, currentProfit, 'LOSS');
+        } else if (contract.is_sold === 1 || contract.status === 'sold') {
+            console.log(`🏁 Contract ${contract.contract_id} sold! Profit: $${currentProfit.toFixed(2)}`);
+            const status = currentProfit > 0 ? 'WIN' : 'LOSS';
+            await this.closeTrade(contract.contract_id, currentProfit, status);
         }
     }
 
@@ -568,26 +569,18 @@ class AITrader {
         if (!this.activeTrade || this.activeTrade.contract_id !== contractId) return;
         
         try {
-            if (profit > 0 && derivService.isConnected) {
-                try {
-                    await derivService.sendRequest({ sell: contractId, price: 0 });
-                    console.log(`🔒 Sold contract ${contractId} at profit`);
-                } catch (e) {
-                    console.log(`⚠️ Could not sell contract ${contractId}: ${e.message}`);
-                }
-            }
-            
             const tradeId = this.activeTrade.id;
             const entryPrice = this.activeTrade.entry_price;
             const stake = this.activeTrade.stake;
             
-            // Calculate reasonable exit price
             let exitPrice = entryPrice;
             if (status === 'WIN') {
                 exitPrice = entryPrice * (1 + (profit / stake));
             } else {
                 exitPrice = entryPrice * (1 - (Math.abs(profit) / stake));
             }
+            
+            console.log(`📝 Closing trade #${tradeId}: ${status} | Profit: $${profit.toFixed(2)} | Exit: $${exitPrice.toFixed(2)}`);
             
             await Trade.updateResult(tradeId, exitPrice, profit, status);
             await User.updateStats(this.userId, status, profit, stake);
@@ -630,6 +623,7 @@ class AITrader {
                     this.currentBalance = bal.balance;
                     await this.updateDailyLimits();
                     this.recalculateStakes();
+                    console.log(`💰 New Balance: $${this.currentBalance.toFixed(2)}`);
                 }
             } catch (e) {}
             
@@ -778,7 +772,7 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v12.1.0 (Emergency Fix: Stake caps, session blocks)`);
+        console.log(`🤖 [AI Trader] Starting v13.0.0 (Fixed Trade Closing)`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
@@ -833,12 +827,26 @@ class AITrader {
             this._lastTickCount = this.tickCount;
         }, 30000);
 
-        setInterval(() => {
+        // Auto-close timeout for trades that don't hit target or stop
+        setInterval(async () => {
             if (this.activeTrade) {
                 const timeOpen = Date.now() - this.activeTrade.entry_time;
                 if (timeOpen > this.MAX_TRADE_DURATION) {
                     console.log(`⏰ Trade timeout! Closing after ${Math.floor(timeOpen / 1000)}s`);
-                    this.closeTrade(this.activeTrade.contract_id, this.activeTrade.stake * -0.01, 'LOSS');
+                    // Try to get final contract result
+                    try {
+                        const contractResult = await derivService.getClosedContract(this.activeTrade.contract_id);
+                        if (contractResult && contractResult.proposal_open_contract) {
+                            const contract = contractResult.proposal_open_contract;
+                            const profit = contract.profit || -this.activeTrade.stake;
+                            const status = profit > 0 ? 'WIN' : 'LOSS';
+                            await this.closeTrade(this.activeTrade.contract_id, profit, status);
+                        } else {
+                            await this.closeTrade(this.activeTrade.contract_id, -this.activeTrade.stake, 'LOSS');
+                        }
+                    } catch (err) {
+                        await this.closeTrade(this.activeTrade.contract_id, -this.activeTrade.stake, 'LOSS');
+                    }
                 }
             }
         }, 5000);
@@ -1010,7 +1018,6 @@ class AITrader {
                 return;
             }
             
-            // 🚨 EMERGENCY FIX: Block London session completely
             const currentSession = this.getCurrentSession();
             if (currentSession === 'LONDON') {
                 if (!this._londonBlockLog || Date.now() - this._londonBlockLog > 3600000) {
@@ -1058,7 +1065,6 @@ class AITrader {
                 console.log(`✅ Data ready! ${this.tickCount} ticks received.`);
             }
             
-            // 🚨 EMERGENCY FIX: Block RSI neutral zone (45-55)
             if (marketState.rsi >= 45 && marketState.rsi <= 55) {
                 if (!this._rsiBlockLog || Date.now() - this._rsiBlockLog > 3600000) {
                     console.log(`🚫 [EMERGENCY] RSI neutral zone (${marketState.rsi}) blocked - 27% WR, -$1,220 loss. NO TRADING.`);
@@ -1125,7 +1131,6 @@ class AITrader {
             const analysis = await deepseekService.analyzeMarket(this.symbol, currentPrice, marketState.rsi, 'neutral', null, recentTrades, topPatterns, marketContext);
             if (analysis.pattern) analysis.pattern = deepseekService.normalizePatternName(analysis.pattern);
             
-            // 🚨 EMERGENCY FIX: Block losing patterns
             const LOSING_PATTERNS = ['doji', 'hammer', 'three_white_soldiers', 'three white soldiers', 'pullback_to_support', 'pullback in uptrend'];
             if (LOSING_PATTERNS.some(p => analysis.pattern?.toLowerCase().includes(p))) {
                 console.log(`🚫 [EMERGENCY] Pattern "${analysis.pattern}" blocked - losing pattern. NO TRADING.`);
@@ -1232,7 +1237,6 @@ class AITrader {
             stake = this.MIN_STAKE;
         }
         
-        // 🚨 EMERGENCY: Enforce hard caps
         if (stake > this.MAX_STAKE_LIMIT) {
             console.log(`🛑 [Emergency] Stake capped: $${stake} → $${this.MAX_STAKE_LIMIT}`);
             stake = this.MAX_STAKE_LIMIT;
