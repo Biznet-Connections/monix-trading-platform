@@ -22,8 +22,8 @@ class DerivService extends EventEmitter {
         this.heartbeatInterval = null;
         this.lastSubscribedSymbol = null;
         this.activeAccountId = null;
-        this.subscriptionRetryCount = 0;
-        this.subscriptionRetryInterval = null;
+        this.activeContractId = null;
+        this.contractMonitorInterval = null;
 
         this.symbolMap = {
             "R_10": "R_10", "R_25": "R_25", "R_50": "R_50", "R_75": "R_75", "R_100": "R_100",
@@ -120,11 +120,9 @@ class DerivService extends EventEmitter {
                 }
                 this.startHeartbeat();
 
-                // 🚨 FIX: Subscribe to ticks AFTER connection is confirmed, with retry
                 if (this.lastSubscribedSymbol) {
-                    console.log(`📡 Attempting to subscribe to ${this.lastSubscribedSymbol}...`);
                     setTimeout(() => {
-                        this.subscribeToTicksWithRetry(this.lastSubscribedSymbol);
+                        this.subscribeToTicks(this.lastSubscribedSymbol).catch(() => {});
                     }, 2000);
                 }
 
@@ -292,9 +290,9 @@ class DerivService extends EventEmitter {
     safeClose() {
         this.isClosing = true;
         this.stopHeartbeat();
-        if (this.subscriptionRetryInterval) {
-            clearInterval(this.subscriptionRetryInterval);
-            this.subscriptionRetryInterval = null;
+        if (this.contractMonitorInterval) {
+            clearInterval(this.contractMonitorInterval);
+            this.contractMonitorInterval = null;
         }
         if (this.ws) {
             try {
@@ -334,7 +332,6 @@ class DerivService extends EventEmitter {
         const type = msg.msg_type;
 
         if (type === 'tick') {
-            console.log(`📈 TICK: ${msg.tick.symbol} @ $${msg.tick.quote}`);
             this.emit('tick', msg.tick);
         }
 
@@ -350,7 +347,11 @@ class DerivService extends EventEmitter {
                 this.emit('trade_error', msg.error);
             } else {
                 console.log(`✅ Trade executed! Contract: ${msg.buy.contract_id}`);
+                this.activeContractId = msg.buy.contract_id;
                 this.emit('trade_executed', msg.buy);
+                
+                // Start monitoring this contract
+                this.startContractMonitoring(msg.buy.contract_id);
             }
         }
 
@@ -368,6 +369,32 @@ class DerivService extends EventEmitter {
             if (msg.error) reject(new Error(msg.error.message));
             else resolve(msg);
         }
+    }
+
+    startContractMonitoring(contractId) {
+        if (this.contractMonitorInterval) {
+            clearInterval(this.contractMonitorInterval);
+        }
+        
+        this.contractMonitorInterval = setInterval(async () => {
+            if (!this.activeContractId) return;
+            
+            try {
+                const result = await this.getClosedContract(this.activeContractId);
+                if (result && result.proposal_open_contract) {
+                    const contract = result.proposal_open_contract;
+                    if (contract.is_sold === 1 || contract.status === 'sold') {
+                        console.log(`🎯 Contract ${contractId} closed! Profit: ${contract.profit}`);
+                        this.emit('contract_update', contract);
+                        clearInterval(this.contractMonitorInterval);
+                        this.contractMonitorInterval = null;
+                        this.activeContractId = null;
+                    }
+                }
+            } catch (err) {
+                // Silent fail
+            }
+        }, 5000);
     }
 
     sendRequest(request) {
@@ -396,7 +423,6 @@ class DerivService extends EventEmitter {
             await this.sendRequest({ ticks: derivSymbol, subscribe: 1 });
             this.subscriptions.add(derivSymbol);
             console.log(`📡 Subscribed to ${derivSymbol}`);
-            this.subscriptionRetryCount = 0;
             return true;
         } catch (err) {
             console.error(`❌ Subscribe failed:`, err.message);
@@ -436,6 +462,7 @@ class DerivService extends EventEmitter {
             price: stake
         });
 
+        // Subscribe to contract updates
         setTimeout(() => {
             this.sendRequest({ 
                 subscribe: 1, 
@@ -476,27 +503,7 @@ class DerivService extends EventEmitter {
             
             if (result && result.proposal_open_contract) {
                 const contract = result.proposal_open_contract;
-                
-                let exitPrice = null;
-                if (contract.exit_tick && contract.exit_tick.quote) {
-                    exitPrice = contract.exit_tick.quote;
-                } else if (contract.sell_price) {
-                    exitPrice = contract.sell_price;
-                } else if (contract.bid_price) {
-                    exitPrice = contract.bid_price;
-                }
-                
-                let profit = null;
-                if (contract.profit !== undefined && contract.profit !== null) {
-                    profit = parseFloat(contract.profit);
-                } else if (contract.sell_price && contract.buy_price) {
-                    profit = contract.sell_price - contract.buy_price;
-                }
-                
-                if (contract.is_sold === 1 || contract.status === 'sold') {
-                    return { proposal_open_contract: { ...contract, exit_price: exitPrice, profit: profit } };
-                }
-                return null;
+                return result;
             }
             return null;
         } catch (error) {
