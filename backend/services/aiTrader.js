@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v13.0.0 - FIXED: Trade result checking, contract monitoring, balance sync
+ * v13.0.2 - FIXED: Force profit to number using Number() in handleContractUpdate
  */
 const marketData = require('./marketData');
 const deepseekService = require('./deepseekService');
@@ -542,10 +542,15 @@ class AITrader {
         return 'Deeply Overbought';
     }
 
+    // 🚨 FIXED: Force profit to number using Number() (handles strings)
     async handleContractUpdate(contract) {
         if (!this.activeTrade || contract.contract_id !== this.activeTrade.contract_id) return;
         
-        const currentProfit = contract.profit || 0;
+        // Force profit to number using Number() (handles strings, null, undefined)
+        const rawProfit = contract.profit !== undefined && contract.profit !== null ? contract.profit : 0;
+        let currentProfit = Number(rawProfit);
+        if (isNaN(currentProfit)) currentProfit = 0;
+        
         const stake = this.activeTrade.stake;
         const targetProfit = stake * this.PROFIT_TARGET_PCT;
         const maxLoss = stake * this.STOP_LOSS_PCT;
@@ -568,6 +573,10 @@ class AITrader {
     async closeTrade(contractId, profit, status) {
         if (!this.activeTrade || this.activeTrade.contract_id !== contractId) return;
         
+        // Ensure profit is a number
+        let finalProfit = Number(profit);
+        if (isNaN(finalProfit)) finalProfit = 0;
+        
         try {
             const tradeId = this.activeTrade.id;
             const entryPrice = this.activeTrade.entry_price;
@@ -575,15 +584,15 @@ class AITrader {
             
             let exitPrice = entryPrice;
             if (status === 'WIN') {
-                exitPrice = entryPrice * (1 + (profit / stake));
+                exitPrice = entryPrice * (1 + (finalProfit / stake));
             } else {
-                exitPrice = entryPrice * (1 - (Math.abs(profit) / stake));
+                exitPrice = entryPrice * (1 - (Math.abs(finalProfit) / stake));
             }
             
-            console.log(`📝 Closing trade #${tradeId}: ${status} | Profit: $${profit.toFixed(2)} | Exit: $${exitPrice.toFixed(2)}`);
+            console.log(`📝 Closing trade #${tradeId}: ${status} | Profit: $${finalProfit.toFixed(2)} | Exit: $${exitPrice.toFixed(2)}`);
             
-            await Trade.updateResult(tradeId, exitPrice, profit, status);
-            await User.updateStats(this.userId, status, profit, stake);
+            await Trade.updateResult(tradeId, exitPrice, finalProfit, status);
+            await User.updateStats(this.userId, status, finalProfit, stake);
             await Pattern.recordTradeResult(this.activeTrade.pattern, this.symbol, this.activeTrade.action, this.getCurrentSession(), status === 'WIN');
             
             this.recentResults.push(status);
@@ -593,14 +602,14 @@ class AITrader {
                 this.totalWins++;
                 this.consecutiveWins++;
                 this.consecutiveLosses = 0;
-                this.sessionProfit += profit;
-                console.log(`🎉 WIN! +$${Math.abs(profit).toFixed(2)} | Streak: ${this.consecutiveWins}W/${this.consecutiveLosses}L`);
+                this.sessionProfit += finalProfit;
+                console.log(`🎉 WIN! +$${Math.abs(finalProfit).toFixed(2)} | Streak: ${this.consecutiveWins}W/${this.consecutiveLosses}L`);
             } else {
                 this.totalLosses++;
                 this.consecutiveLosses++;
                 this.consecutiveWins = 0;
-                this.sessionLoss += Math.abs(profit);
-                console.log(`❌ LOSS #${this.consecutiveLosses} | -$${Math.abs(profit).toFixed(2)}`);
+                this.sessionLoss += Math.abs(finalProfit);
+                console.log(`❌ LOSS #${this.consecutiveLosses} | -$${Math.abs(finalProfit).toFixed(2)}`);
                 this.recordSessionTrade(this.getCurrentSession(), false);
                 await this.tagLossReason(tradeId, 'STOP_LOSS_HIT');
             }
@@ -612,7 +621,7 @@ class AITrader {
                 action: this.activeTrade.action,
                 entry_price: entryPrice,
                 exit_price: exitPrice,
-                profit: profit,
+                profit: finalProfit,
                 stake: stake,
                 status: status
             });
@@ -772,7 +781,7 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v13.0.0 (Fixed Trade Closing)`);
+        console.log(`🤖 [AI Trader] Starting v13.0.2 (Fixed Profit Parsing with Number())`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
@@ -833,12 +842,15 @@ class AITrader {
                 const timeOpen = Date.now() - this.activeTrade.entry_time;
                 if (timeOpen > this.MAX_TRADE_DURATION) {
                     console.log(`⏰ Trade timeout! Closing after ${Math.floor(timeOpen / 1000)}s`);
-                    // Try to get final contract result
                     try {
                         const contractResult = await derivService.getClosedContract(this.activeTrade.contract_id);
                         if (contractResult && contractResult.proposal_open_contract) {
                             const contract = contractResult.proposal_open_contract;
-                            const profit = contract.profit || -this.activeTrade.stake;
+                            let profit = 0;
+                            if (contract.profit !== undefined && contract.profit !== null) {
+                                profit = Number(contract.profit);
+                            }
+                            if (isNaN(profit)) profit = -this.activeTrade.stake;
                             const status = profit > 0 ? 'WIN' : 'LOSS';
                             await this.closeTrade(this.activeTrade.contract_id, profit, status);
                         } else {
