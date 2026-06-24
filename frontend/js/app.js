@@ -1,12 +1,19 @@
-// Main Application
+// ================================================================
+// 🚀 MONIX APP - COMPLETE WITH SLOW PREMIUM LOADING
+// ================================================================
+
 let currentUser = null;
 let currentPage = 'dashboard';
 let isReconnecting = false;
 let autoBalanceInterval = null;
+let loadingComplete = false;
 
 console.log('🔵 MONIX App Initializing...');
 
-// DOM Elements
+// ================================================================
+// DOM ELEMENTS
+// ================================================================
+const loadingScreen = document.getElementById('loadingScreen');
 const authModal = document.getElementById('authModal');
 const appContainer = document.getElementById('appContainer');
 const loginTab = document.getElementById('loginTab');
@@ -21,24 +28,105 @@ const openApiKeys = document.getElementById('openApiKeys');
 const openSettings = document.getElementById('openSettings');
 const viewFullInsights = document.getElementById('viewFullInsights');
 
-// Sidebar navigation
 const navLinks = document.querySelectorAll('.nav-link');
 const pages = document.querySelectorAll('.page-content');
 
-// Mobile Header Elements
 const mobileHeader = document.getElementById('mobileHeader');
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 const sidebarDrawer = document.getElementById('sidebarDrawer');
 const drawerOverlay = document.getElementById('drawerOverlay');
 const closeDrawerBtn = document.getElementById('closeDrawerBtn');
 
-// ============ HELPER FUNCTIONS ============
+// ================================================================
+// LOADING SCREEN LOGIC - SLOW & PREMIUM
+// ================================================================
+
+function showLoadingScreen() {
+    console.log('🎬 Loading screen started...');
+    loadingScreen.classList.remove('hidden');
+    startTypingEffect();
+}
+
+function hideLoadingScreen() {
+    console.log('🎬 Loading screen complete!');
+    loadingScreen.classList.add('hidden');
+    loadingComplete = true;
+}
+
+function startTypingEffect() {
+    const textElement = document.getElementById('typingText');
+    if (!textElement) return;
+
+    const text = 'AUTOMATED TRADES';
+    let index = 0;
+    let isDeleting = false;
+
+    function typeStep() {
+        if (!loadingScreen || loadingScreen.classList.contains('hidden')) {
+            return;
+        }
+
+        if (!isDeleting) {
+            textElement.textContent = text.substring(0, index + 1);
+            index++;
+
+            if (index === text.length) {
+                // Hold for 2.5 seconds to let user appreciate the full text
+                setTimeout(() => {
+                    hideLoadingScreen();
+                    showAuthOrApp();
+                }, 2500);
+                return;
+            }
+
+            // Slower typing: 150-220ms per character (premium feel)
+            const delay = 150 + Math.random() * 70;
+            setTimeout(typeStep, delay);
+        }
+    }
+
+    // Let the M glow build up for 1.5 seconds before typing starts
+    setTimeout(typeStep, 1500);
+}
+
+function showAuthOrApp() {
+    const token = localStorage.getItem('monix_token');
+
+    if (token) {
+        window.api.verifyToken()
+            .then(result => {
+                if (result.valid) {
+                    console.log('✅ Token valid - showing app');
+                    currentUser = result.user;
+                    showApp();
+                } else {
+                    console.log('⚠️ Token invalid - showing login');
+                    showAuthModal();
+                }
+            })
+            .catch(() => {
+                console.log('⚠️ Token verification failed - showing login');
+                showAuthModal();
+            });
+    } else {
+        console.log('🔑 No token - showing login');
+        showAuthModal();
+    }
+}
+
+// ================================================================
+// HELPER FUNCTIONS
+// ================================================================
+
 function logToTerminal(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
     console.log(`[${timestamp}] ${message}`);
 }
 
-// ============ TOAST NOTIFICATION ============
+// ================================================================
+// TOAST NOTIFICATION
+// ================================================================
+
 function showToast(title, message, type = 'info') {
     const container = document.getElementById('toastContainer');
     if (!container) return;
@@ -70,7 +158,10 @@ function showToast(title, message, type = 'info') {
 
 window.showToast = showToast;
 
-// ============ AUTO BALANCE REFRESH ============
+// ================================================================
+// AUTO BALANCE REFRESH
+// ================================================================
+
 async function refreshBalance() {
     try {
         if (!currentUser) return;
@@ -141,7 +232,10 @@ function stopAutoBalanceRefresh() {
     }
 }
 
-// ============ MOBILE DRAWER ============
+// ================================================================
+// MOBILE DRAWER
+// ================================================================
+
 function initMobileDrawer() {
     logToTerminal('📱 Initializing mobile drawer');
 
@@ -182,7 +276,10 @@ function initMobileDrawer() {
     }
 }
 
-// ============ PAGE CLOSE BUTTONS ============
+// ================================================================
+// PAGE CLOSE BUTTONS
+// ================================================================
+
 function setupPageCloseButtons() {
     const pagesWithClose = ['insightsPage', 'performancePage', 'historyPage', 'leaderboardPage'];
 
@@ -210,7 +307,10 @@ function setupPageCloseButtons() {
     });
 }
 
-// ============ AUTH MODAL SETUP ============
+// ================================================================
+// AUTH MODAL SETUP
+// ================================================================
+
 function setupAuthModal() {
     logToTerminal('🔐 Setting up auth modal');
 
@@ -284,7 +384,10 @@ function setupAuthModal() {
     }
 }
 
-// ============ MODAL SETUP ============
+// ================================================================
+// MODAL SETUP
+// ================================================================
+
 function setupModals() {
     logToTerminal('🔧 Setting up modals');
 
@@ -402,7 +505,10 @@ async function loadSettingsToForm() {
     }
 }
 
-// ============ NAVIGATION ============
+// ================================================================
+// NAVIGATION
+// ================================================================
+
 function setupNavigation() {
     logToTerminal('🧭 Setting up navigation');
 
@@ -447,7 +553,10 @@ function switchPage(page) {
     setTimeout(() => setupPageCloseButtons(), 200);
 }
 
-// ============ DATA LOADING ============
+// ================================================================
+// DATA LOADING
+// ================================================================
+
 async function loadUserData() {
     try {
         logToTerminal('👤 Loading user data...');
@@ -652,14 +761,12 @@ async function loadLeaderboard() {
     }
 }
 
-// ============ FIXED: AI Insights with Symbol Filter ============
 async function loadFullInsights() {
     try {
         logToTerminal('🧠 Loading full insights page...');
-        
-        // Get current symbol from dashboard dropdown
+
         const currentSymbol = document.getElementById('symbolSelect')?.value || null;
-        
+
         const insights = await window.api.getAIInsights(currentSymbol);
         const container = document.getElementById('fullInsightsContent');
 
@@ -694,9 +801,8 @@ async function loadFullInsights() {
             return;
         }
 
-        // Display current symbol info if filter is active
-        const symbolInfo = insights.current_symbol && insights.current_symbol !== 'all' 
-            ? `<div class="text-xs text-indigo-400 mb-2">📊 Showing insights for: ${insights.current_symbol}</div>` 
+        const symbolInfo = insights.current_symbol && insights.current_symbol !== 'all'
+            ? `<div class="text-xs text-indigo-400 mb-2">📊 Showing insights for: ${insights.current_symbol}</div>`
             : '';
 
         container.innerHTML = `
@@ -786,7 +892,10 @@ async function loadFullInsights() {
     }
 }
 
-// ============ THEME ============
+// ================================================================
+// THEME
+// ================================================================
+
 function setupTheme() {
     const savedTheme = localStorage.getItem('monix_theme');
     const isDark = savedTheme !== 'light';
@@ -828,7 +937,10 @@ function updateServerTime() {
     }
 }
 
-// ============ MAIN INIT ============
+// ================================================================
+// MAIN APP FUNCTIONS
+// ================================================================
+
 function showApp() {
     logToTerminal('🚀 Showing main application');
     if (authModal) authModal.classList.add('hidden');
@@ -856,41 +968,31 @@ function showApp() {
 }
 
 function showAuthModal() {
-    logToTerminal('🔐 Showing auth modal (user not logged in)');
+    logToTerminal('🔐 Showing auth modal');
     if (authModal) authModal.classList.remove('hidden');
     if (appContainer) appContainer.classList.add('hidden');
 }
 
+// ================================================================
+// INITIALIZATION
+// ================================================================
+
 async function initApp() {
-    logToTerminal('🚀 MONIX Trading Platform v3.0 Initializing...');
+    logToTerminal('🚀 MONIX Trading Platform v6.0 Initializing...');
 
     initMobileDrawer();
     setupAuthModal();
 
-    const token = localStorage.getItem('monix_token');
-    logToTerminal(`🔑 Token present: ${token ? 'Yes' : 'No'}`);
+    // 🎬 SHOW LOADING SCREEN FIRST
+    showLoadingScreen();
 
-    if (token) {
-        try {
-            const result = await window.api.verifyToken();
-            if (result.valid) {
-                logToTerminal(`✅ Token valid - User: ${result.user.email}`);
-                currentUser = result.user;
-                showApp();
-                await loadUserData();
-                return;
-            } else {
-                logToTerminal('⚠️ Token invalid - showing login');
-            }
-        } catch (error) {
-            logToTerminal(`❌ Token verification failed: ${error.message}`, 'error');
-        }
-    }
-
-    showAuthModal();
+    // The rest happens in showAuthOrApp() after typing completes
 }
 
-// Global functions
+// ================================================================
+// GLOBAL FUNCTIONS
+// ================================================================
+
 window.switchPageToDashboard = function() { switchPage('dashboard'); };
 window.switchPage = switchPage;
 window.loadFullInsights = loadFullInsights;
@@ -903,5 +1005,9 @@ if (logoutBtn) {
         window.api.logout();
     });
 }
+
+// ================================================================
+// START APP
+// ================================================================
 
 initApp();
