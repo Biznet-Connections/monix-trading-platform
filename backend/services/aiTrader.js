@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v13.0.2 - FIXED: Force profit to number using Number() in handleContractUpdate
+ * v13.0.3 - SWING TRADER MODE: 8% profit target, 2% stop loss, 5 min max duration
  */
 const marketData = require('./marketData');
 const deepseekService = require('./deepseekService');
@@ -69,9 +69,10 @@ class AITrader {
         this.dailyProfitReached = false;
         this.dailyLossReached = false;
 
-        this.PROFIT_TARGET_PCT = 0.02;
-        this.STOP_LOSS_PCT = 0.01;
-        this.MAX_TRADE_DURATION = 120000;
+        // 🚀 SWING TRADER MODE: Bigger wins, breathing room
+        this.PROFIT_TARGET_PCT = 0.08;   // 8% profit target - BIGGER WINS
+        this.STOP_LOSS_PCT = 0.02;       // 2% stop loss - BREATHING ROOM
+        this.MAX_TRADE_DURATION = 300000; // 5 minutes max (was 2 minutes)
         this.MAX_STAKE_LIMIT = 25;
         this.MIN_STAKE_LIMIT = 1;
         
@@ -542,7 +543,6 @@ class AITrader {
         return 'Deeply Overbought';
     }
 
-    // 🚨 FIXED: Force profit to number using Number() (handles strings)
     async handleContractUpdate(contract) {
         if (!this.activeTrade || contract.contract_id !== this.activeTrade.contract_id) return;
         
@@ -781,7 +781,7 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v13.0.2 (Fixed Profit Parsing with Number())`);
+        console.log(`🤖 [AI Trader] Starting v13.0.3 (SWING TRADER MODE: 8% TP, 2% SL)`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
@@ -1292,7 +1292,7 @@ class AITrader {
             this.activeTrade = {
                 id: tradeId, contract_id: tradeResult.buy.contract_id,
                 action, entry_price: entryPrice, stake,
-                entry_time: Date.now(), exit_time: Date.now() + 120000,
+                entry_time: Date.now(), exit_time: Date.now() + this.MAX_TRADE_DURATION,
                 confidence: analysis.confidence, pattern: analysis.pattern,
                 isSniper: stake >= this.MAX_STAKE * 0.9
             };
