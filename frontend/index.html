@@ -11,8 +11,47 @@
 </head>
 <body class="dark-theme">
 
-<!-- Login/Register Modal -->
-<div id="authModal" class="modal">
+<!-- ============================================================ -->
+<!-- 🚀 LOADING SCREEN - GLOWING "M"                              -->
+<!-- ============================================================ -->
+<div id="loadingScreen">
+    <div class="loading-container">
+        <!-- Glowing "M" -->
+        <div class="m-wrapper">
+            <div class="glowing-m">M</div>
+            <div class="glow-ring"></div>
+            <div class="glow-ring-2"></div>
+            <div class="particles">
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+            </div>
+        </div>
+
+        <!-- Typing Text -->
+        <div class="loading-text-wrapper">
+            <span class="loading-text" id="typingText"></span>
+            <span class="cursor-blink">|</span>
+        </div>
+
+        <!-- Version -->
+        <div class="loading-version">v6.0 PROFESSIONAL</div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- LOGIN / REGISTER MODAL                                       -->
+<!-- ============================================================ -->
+<div id="authModal" class="modal hidden">
     <div class="modal-content glass-card" style="max-width: 450px; width: 90%;">
         <div class="flex border-b border-slate-700 mb-4">
             <button id="loginTab" class="tab-btn active px-6 py-3 text-sm font-semibold">LOGIN</button>
@@ -68,7 +107,9 @@
     </div>
 </div>
 
-<!-- API Keys Modal -->
+<!-- ============================================================ -->
+<!-- API KEYS MODAL                                               -->
+<!-- ============================================================ -->
 <div id="apiKeysModal" class="modal hidden">
     <div class="modal-content glass-card" style="max-width: 500px; width: 90%;">
         <div class="flex justify-between items-center mb-4">
@@ -106,7 +147,9 @@
     </div>
 </div>
 
-<!-- Settings Modal -->
+<!-- ============================================================ -->
+<!-- SETTINGS MODAL                                               -->
+<!-- ============================================================ -->
 <div id="settingsModal" class="modal hidden">
     <div class="modal-content glass-card" style="max-width: 500px; width: 90%;">
         <div class="flex justify-between items-center mb-4">
@@ -140,7 +183,9 @@
     </div>
 </div>
 
-<!-- Admin Modal -->
+<!-- ============================================================ -->
+<!-- ADMIN MODAL                                                  -->
+<!-- ============================================================ -->
 <div id="adminModal" class="modal hidden">
     <div class="modal-content glass-card" style="max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;">
         <div class="flex justify-between items-center mb-4">
@@ -192,7 +237,9 @@
     </div>
 </div>
 
-<!-- Main App Container (hidden until logged in) -->
+<!-- ============================================================ -->
+<!-- MAIN APP CONTAINER                                           -->
+<!-- ============================================================ -->
 <div id="appContainer" class="hidden">
     <!-- Mobile Header -->
     <div id="mobileHeader" class="fixed top-0 left-0 right-0 z-45 lg:hidden flex items-center gap-3 p-4 bg-indigo-900/80 backdrop-blur-md border-b border-indigo-500/20">
@@ -531,10 +578,14 @@
     </div>
 </div>
 
-<!-- Toast Notification Container -->
+<!-- ============================================================ -->
+<!-- TOAST NOTIFICATION CONTAINER                                 -->
+<!-- ============================================================ -->
 <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
-<!-- AI Reason Modal Popup -->
+<!-- ============================================================ -->
+<!-- AI REASON MODAL POPUP                                        -->
+<!-- ============================================================ -->
 <div id="aiReasonModal" class="modal hidden">
     <div class="modal-content glass-card" style="max-width: 550px; width: 90%;">
         <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
@@ -557,6 +608,9 @@
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- JAVASCRIPT FILES                                             -->
+<!-- ============================================================ -->
 <script src="/js/api.js"></script>
 <script src="/js/websocket.js"></script>
 <script src="/js/chart.js"></script>
