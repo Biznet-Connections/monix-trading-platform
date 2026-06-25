@@ -1,6 +1,7 @@
 /**
  * AI Trader Service - The Professional
- * v13.0.3 - SWING TRADER MODE: 8% profit target, 2% stop loss, 5 min max duration
+ * v13.0.4 - LONDON OVERRIDE: Exceptional setups only (quality > 85, pattern WR > 75%)
+ * TARGET: 5+ quality trades per day
  */
 const marketData = require('./marketData');
 const deepseekService = require('./deepseekService');
@@ -72,7 +73,7 @@ class AITrader {
         // 🚀 SWING TRADER MODE: Bigger wins, breathing room
         this.PROFIT_TARGET_PCT = 0.08;   // 8% profit target - BIGGER WINS
         this.STOP_LOSS_PCT = 0.02;       // 2% stop loss - BREATHING ROOM
-        this.MAX_TRADE_DURATION = 300000; // 5 minutes max (was 2 minutes)
+        this.MAX_TRADE_DURATION = 300000; // 5 minutes max
         this.MAX_STAKE_LIMIT = 25;
         this.MIN_STAKE_LIMIT = 1;
         
@@ -85,6 +86,9 @@ class AITrader {
 
         this.blockedSessions = {};
         this.sessionTradeCount = {};
+        this._londonBlocked = false;
+        this._londonWR = 0;
+        this._londonTotal = 0;
 
         this.lossReasons = {
             WRONG_TREND: 0,
@@ -163,6 +167,8 @@ class AITrader {
         this._lastSessionBlockLog = {};
         this._londonBlockLog = 0;
         this._rsiBlockLog = 0;
+        this._dailyTradeCount = 0;
+        this._dailyResetTime = 0;
         
         this.handleContractUpdate = this.handleContractUpdate.bind(this);
     }
@@ -252,6 +258,8 @@ class AITrader {
             this.dailyLossReached = false;
             this.sessionProfit = 0;
             this.sessionLoss = 0;
+            this._dailyTradeCount = 0;
+            this._dailyResetTime = Date.now();
             this._lastDailyReset = today;
             console.log(`📅 [Daily] Reset. Start balance: $${this.dailyStartBalance.toFixed(2)} | Target: $${(this.dailyStartBalance * this.dailyProfitTarget).toFixed(2)} | Loss limit: $${(this.dailyStartBalance * this.dailyLossLimit).toFixed(2)}`);
         }
@@ -546,7 +554,6 @@ class AITrader {
     async handleContractUpdate(contract) {
         if (!this.activeTrade || contract.contract_id !== this.activeTrade.contract_id) return;
         
-        // Force profit to number using Number() (handles strings, null, undefined)
         const rawProfit = contract.profit !== undefined && contract.profit !== null ? contract.profit : 0;
         let currentProfit = Number(rawProfit);
         if (isNaN(currentProfit)) currentProfit = 0;
@@ -573,7 +580,6 @@ class AITrader {
     async closeTrade(contractId, profit, status) {
         if (!this.activeTrade || this.activeTrade.contract_id !== contractId) return;
         
-        // Ensure profit is a number
         let finalProfit = Number(profit);
         if (isNaN(finalProfit)) finalProfit = 0;
         
@@ -781,7 +787,7 @@ class AITrader {
 
         const session = knowledgeBase.getSessionRules();
         const tier = this.getAccountTier();
-        console.log(`🤖 [AI Trader] Starting v13.0.3 (SWING TRADER MODE: 8% TP, 2% SL)`);
+        console.log(`🤖 [AI Trader] Starting v13.0.4 (London Override for Exceptional Setups)`);
         console.log(`📚 [AI Trader] Symbol: ${this.symbol} | Session: ${session.name}`);
         console.log(`💰 [AI Trader] Account Tier: ${tier} | Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
@@ -835,33 +841,6 @@ class AITrader {
             }
             this._lastTickCount = this.tickCount;
         }, 30000);
-
-        // Auto-close timeout for trades that don't hit target or stop
-        setInterval(async () => {
-            if (this.activeTrade) {
-                const timeOpen = Date.now() - this.activeTrade.entry_time;
-                if (timeOpen > this.MAX_TRADE_DURATION) {
-                    console.log(`⏰ Trade timeout! Closing after ${Math.floor(timeOpen / 1000)}s`);
-                    try {
-                        const contractResult = await derivService.getClosedContract(this.activeTrade.contract_id);
-                        if (contractResult && contractResult.proposal_open_contract) {
-                            const contract = contractResult.proposal_open_contract;
-                            let profit = 0;
-                            if (contract.profit !== undefined && contract.profit !== null) {
-                                profit = Number(contract.profit);
-                            }
-                            if (isNaN(profit)) profit = -this.activeTrade.stake;
-                            const status = profit > 0 ? 'WIN' : 'LOSS';
-                            await this.closeTrade(this.activeTrade.contract_id, profit, status);
-                        } else {
-                            await this.closeTrade(this.activeTrade.contract_id, -this.activeTrade.stake, 'LOSS');
-                        }
-                    } catch (err) {
-                        await this.closeTrade(this.activeTrade.contract_id, -this.activeTrade.stake, 'LOSS');
-                    }
-                }
-            }
-        }, 5000);
 
         setTimeout(() => {
             this.syncBalanceFromDeriv();
@@ -1011,6 +990,13 @@ class AITrader {
         try {
             if (this.isExecuting) return;
             
+            // Reset daily trade counter at midnight
+            const now = Date.now();
+            if (now - this._dailyResetTime > 24 * 60 * 60 * 1000) {
+                this._dailyTradeCount = 0;
+                this._dailyResetTime = now;
+            }
+            
             const timeSinceLastTrade = Date.now() - this.lastTradeTime;
             if (this.lastTradeTime > 0 && timeSinceLastTrade > 24 * 60 * 60 * 1000) {
                 if (this.consecutiveLosses > 0 || this.pausedUntil > Date.now()) {
@@ -1030,13 +1016,42 @@ class AITrader {
                 return;
             }
             
-            const currentSession = this.getCurrentSession();
-            if (currentSession === 'LONDON') {
-                if (!this._londonBlockLog || Date.now() - this._londonBlockLog > 3600000) {
-                    console.log(`🚫 [EMERGENCY] London session blocked - 5% WR over 38 trades. NO TRADING.`);
-                    this._londonBlockLog = Date.now();
+            // Daily trade limit: target 5-8 quality trades per day
+            if (this._dailyTradeCount >= 8) {
+                if (!this._dailyLimitLog || Date.now() - this._dailyLimitLog > 3600000) {
+                    console.log(`📊 [Daily Limit] Reached ${this._dailyTradeCount} trades. Pausing until tomorrow.`);
+                    this._dailyLimitLog = Date.now();
                 }
                 return;
+            }
+            
+            const currentSession = this.getCurrentSession();
+            
+            // 🚀 LONDON OVERRIDE: Check if London is blocked but setup is EXCEPTIONAL
+            // We need to check London stats first
+            let londonWR = 0;
+            let londonTotal = 0;
+            let londonBlocked = false;
+            
+            if (currentSession === 'LONDON') {
+                const recentLondonTrades = await Trade.getSymbolSessionStats(this.userId, this.symbol);
+                const londonStats = recentLondonTrades?.find(s => s.session === 'LONDON');
+                londonWR = londonStats ? parseFloat(londonStats.win_rate) || 0 : 0;
+                londonTotal = londonStats ? londonStats.total || 0 : 0;
+                
+                // If London has improved to 40%+ WR and 20+ trades, unblock it
+                if (londonWR >= 40 && londonTotal >= 20) {
+                    console.log(`🟢 [London] WR improved to ${londonWR}% over ${londonTotal} trades. UNBLOCKED.`);
+                    londonBlocked = false;
+                } else {
+                    londonBlocked = true;
+                    this._londonWR = londonWR;
+                    this._londonTotal = londonTotal;
+                    if (!this._lastLondonLog || Date.now() - this._lastLondonLog > 3600000) {
+                        console.log(`🚫 [London] Blocked - ${londonWR}% WR over ${londonTotal} trades. EXCEPTIONAL setups only.`);
+                        this._lastLondonLog = Date.now();
+                    }
+                }
             }
             
             if (this.consecutiveLosses >= 2) {
@@ -1165,6 +1180,29 @@ class AITrader {
             if (this.consecutiveLosses >= 2) combinedConfidence = Math.max(40, combinedConfidence - 10);
 
             const setupQuality = this.calculateSetupQuality(analysis.pattern, sessionName, marketState.rsi, confirmedTrend, currentHour, nearSR);
+            
+            // 🟢 LONDON OVERRIDE: Check if exceptional setup
+            if (londonBlocked && currentSession === 'LONDON') {
+                // Only override if setup is EXCEPTIONAL
+                // setupQuality > 85 AND patternWinRate > 75%
+                // Get pattern win rate from cached data
+                let patternWinRate = 0;
+                if (analysis.pattern && this._cachedPatternPerformance) {
+                    const patternData = this._cachedPatternPerformance.find(p => 
+                        p.pattern.toLowerCase() === analysis.pattern.toLowerCase()
+                    );
+                    if (patternData) patternWinRate = patternData.winRate || 0;
+                }
+                
+                if (setupQuality > 85 && patternWinRate > 75) {
+                    console.log(`🔓 [London OVERRIDE] EXCEPTIONAL SETUP! Quality: ${setupQuality}, Pattern WR: ${patternWinRate}%`);
+                    console.log(`   Trading London despite ${londonWR}% WR over ${londonTotal} trades.`);
+                    londonBlocked = false; // Allow the trade
+                } else {
+                    console.log(`🚫 [London] Setup quality: ${setupQuality}, Pattern WR: ${patternWinRate}% - Not exceptional enough.`);
+                    return; // Skip
+                }
+            }
 
             const effectiveConfidence = combinedConfidence;
 
@@ -1197,6 +1235,8 @@ class AITrader {
                         pattern: analysis.pattern,
                         simple_reason: `${kbValidation.reason}`
                     });
+                    this._dailyTradeCount++; // Increment daily trade counter
+                    console.log(`📊 Daily trades: ${this._dailyTradeCount}/8`);
                 }
                 return;
             }
@@ -1212,7 +1252,8 @@ class AITrader {
                 pending_orders: this.pendingLimitOrders,
                 total_trades: this.totalTrades, total_wins: this.totalWins, total_losses: this.totalLosses,
                 session_profit: this.sessionProfit, session_loss: this.sessionLoss,
-                consecutive_wins: this.consecutiveWins, consecutive_losses: this.consecutiveLosses
+                consecutive_wins: this.consecutiveWins, consecutive_losses: this.consecutiveLosses,
+                daily_trades: this._dailyTradeCount
             };
         } catch (error) {
             console.error('❌ Analysis error:', error.message);
@@ -1336,7 +1377,8 @@ class AITrader {
             session_profit: this.sessionProfit, session_loss: this.sessionLoss, timestamp: Date.now(),
             consecutive_wins: this.consecutiveWins, consecutive_losses: this.consecutiveLosses,
             opportunity_score: this.currentOpportunityScore,
-            best_alternatives: this.getTopAlternatives(3)
+            best_alternatives: this.getTopAlternatives(3),
+            daily_trades: this._dailyTradeCount
         };
     }
 
