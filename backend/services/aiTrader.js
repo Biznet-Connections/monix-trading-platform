@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.2 - Lowered min trades threshold from 10 to 3 for faster trading
+ * v15.0.3 - Fixed pattern detection, added pattern bonus, lower thresholds for new symbols
  */
 const marketData = require('./marketData');
 const derivService = require('./derivService');
@@ -245,7 +245,6 @@ class AITrader {
                     data.netProfit -= trade.stake || 0;
                 }
                 data.winRate = data.trades > 0 ? (data.wins / data.trades) * 100 : 0;
-                // ✅ CHANGED: Lowered threshold from 10 to 3 trades to start trading faster
                 data.isReady = data.trades >= 3;
                 data.lastTrade = trade.executed_at;
 
@@ -516,38 +515,52 @@ class AITrader {
                 return null;
             }
 
-            // Check 3: Pattern detection
+            // ✅ FIX: Check 3: Pattern detection with default bonus
             const pattern = marketState.lastPattern || 'none';
             let patternWR = 0;
+            let hasPatternData = false;
+            
             if (pattern !== 'none' && data.patternPerformance[pattern]) {
                 const pData = data.patternPerformance[pattern];
                 if (pData.total >= 2) {
                     patternWR = (pData.wins / pData.total) * 100;
+                    hasPatternData = true;
                 }
             }
 
-            // Check 4: Pattern win rate > 50%
-            if (pattern !== 'none' && patternWR > 0 && patternWR < 50) {
+            // ✅ FIX: Check 4: Pattern win rate (less strict for new symbols)
+            // If symbol has less than 3 trades, allow lower pattern WR
+            const minPatternWR = data.trades < 3 ? 30 : 45;
+            if (pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
                 return null;
             }
 
-            // Check 5: Setup Quality
+            // ✅ FIX: Check 5: Setup Quality with pattern bonus
             let setupQuality = 0;
             if (session === 'NEWYORK') setupQuality += 20;
             else if (session === 'ASIAN') setupQuality += 10;
             if (rsi >= 35 && rsi <= 45) setupQuality += 20;
             else if (rsi >= 25 && rsi < 35) setupQuality += 15;
             if (trend && !trend.includes('sideways')) setupQuality += 15;
-            if (pattern && pattern !== 'none') setupQuality += 10;
+            
+            // ✅ FIX: Pattern bonus (even if pattern is 'none')
+            if (pattern !== 'none' && pattern !== 'no_significant_pattern') {
+                setupQuality += 15;  // Bonus for detected pattern
+            } else if (pattern === 'none' || pattern === 'no_significant_pattern') {
+                setupQuality += 8;   // Small bonus for no pattern (still tradeable)
+            }
+            
             if (this.consecutiveLosses === 0) setupQuality += 5;
 
-            if (setupQuality < 60) {
+            // ✅ FIX: Lower setup quality threshold for new symbols
+            const minSetupQuality = data.trades < 3 ? 50 : 60;
+            if (setupQuality < minSetupQuality) {
                 return null;
             }
 
             // Check 6: Confidence
             let confidence = 55;
-            if (patternWR > 0 && patternWR > 50) confidence += (patternWR - 50) * 0.3;
+            if (patternWR > 0 && patternWR > 40) confidence += (patternWR - 40) * 0.25;
             if (session === 'NEWYORK') confidence += 10;
             if (rsi >= 35 && rsi <= 45) confidence += 10;
             if (this.consecutiveWins >= 2) confidence += 5;
@@ -555,7 +568,9 @@ class AITrader {
 
             confidence = Math.min(95, Math.max(40, Math.round(confidence)));
 
-            if (confidence < 55) {
+            // ✅ FIX: Lower confidence threshold for new symbols
+            const minConfidence = data.trades < 3 ? 50 : 55;
+            if (confidence < minConfidence) {
                 return null;
             }
 
@@ -887,7 +902,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.2 (Min trades: 3)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.3 (Fixed pattern detection, lower thresholds)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
