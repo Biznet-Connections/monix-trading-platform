@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.3 - Fixed pattern detection, added pattern bonus, lower thresholds for new symbols
+ * v15.0.6 - Gold and R_100 start after 1 trade (same learning path as R_75)
  */
 const marketData = require('./marketData');
 const derivService = require('./derivService');
@@ -99,6 +99,7 @@ class AITrader {
         this._lastBalanceLog = 0;
         this._dailyLimitLog = 0;
         this._lastLossPauseLog = 0;
+        this._londonBlocked = false;
         
         // Bind handlers
         this.handleContractUpdate = this.handleContractUpdate.bind(this);
@@ -245,7 +246,8 @@ class AITrader {
                     data.netProfit -= trade.stake || 0;
                 }
                 data.winRate = data.trades > 0 ? (data.wins / data.trades) * 100 : 0;
-                data.isReady = data.trades >= 3;
+                // ✅ Gold and R_100 start after 1 trade (same learning path as R_75)
+                data.isReady = data.trades >= 1;
                 data.lastTrade = trade.executed_at;
 
                 if (trade.session) {
@@ -427,7 +429,7 @@ class AITrader {
                     symbolData.netProfit -= stake;
                 }
                 symbolData.winRate = symbolData.trades > 0 ? (symbolData.wins / symbolData.trades) * 100 : 0;
-                symbolData.isReady = symbolData.trades >= 3;
+                symbolData.isReady = symbolData.trades >= 1;
                 symbolData.lastTrade = new Date();
                 if (status === 'WIN') {
                     symbolData.currentStreak = symbolData.currentStreak > 0 ? symbolData.currentStreak + 1 : 1;
@@ -515,27 +517,26 @@ class AITrader {
                 return null;
             }
 
-            // ✅ FIX: Check 3: Pattern detection with default bonus
+            // Check 3: Pattern detection with default bonus
             const pattern = marketState.lastPattern || 'none';
             let patternWR = 0;
             let hasPatternData = false;
             
             if (pattern !== 'none' && data.patternPerformance[pattern]) {
                 const pData = data.patternPerformance[pattern];
-                if (pData.total >= 2) {
+                if (pData.total >= 1) {
                     patternWR = (pData.wins / pData.total) * 100;
                     hasPatternData = true;
                 }
             }
 
-            // ✅ FIX: Check 4: Pattern win rate (less strict for new symbols)
-            // If symbol has less than 3 trades, allow lower pattern WR
+            // Check 4: Pattern win rate (less strict for new symbols)
             const minPatternWR = data.trades < 3 ? 30 : 45;
             if (pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
                 return null;
             }
 
-            // ✅ FIX: Check 5: Setup Quality with pattern bonus
+            // Check 5: Setup Quality with pattern bonus
             let setupQuality = 0;
             if (session === 'NEWYORK') setupQuality += 20;
             else if (session === 'ASIAN') setupQuality += 10;
@@ -543,16 +544,16 @@ class AITrader {
             else if (rsi >= 25 && rsi < 35) setupQuality += 15;
             if (trend && !trend.includes('sideways')) setupQuality += 15;
             
-            // ✅ FIX: Pattern bonus (even if pattern is 'none')
+            // Pattern bonus (even if pattern is 'none')
             if (pattern !== 'none' && pattern !== 'no_significant_pattern') {
-                setupQuality += 15;  // Bonus for detected pattern
+                setupQuality += 15;
             } else if (pattern === 'none' || pattern === 'no_significant_pattern') {
-                setupQuality += 8;   // Small bonus for no pattern (still tradeable)
+                setupQuality += 8;
             }
             
             if (this.consecutiveLosses === 0) setupQuality += 5;
 
-            // ✅ FIX: Lower setup quality threshold for new symbols
+            // Lower setup quality threshold for new symbols
             const minSetupQuality = data.trades < 3 ? 50 : 60;
             if (setupQuality < minSetupQuality) {
                 return null;
@@ -568,7 +569,7 @@ class AITrader {
 
             confidence = Math.min(95, Math.max(40, Math.round(confidence)));
 
-            // ✅ FIX: Lower confidence threshold for new symbols
+            // Lower confidence threshold for new symbols
             const minConfidence = data.trades < 3 ? 50 : 55;
             if (confidence < minConfidence) {
                 return null;
@@ -902,7 +903,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.3 (Fixed pattern detection, lower thresholds)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.6 (Gold/R_100 start after 1 trade)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
