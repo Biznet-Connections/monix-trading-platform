@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.1 - NO AI, Fixed WebSocket subscription, Pure Learning Engine
+ * v15.0.2 - Lowered min trades threshold from 10 to 3 for faster trading
  */
 const marketData = require('./marketData');
 const derivService = require('./derivService');
@@ -245,7 +245,8 @@ class AITrader {
                     data.netProfit -= trade.stake || 0;
                 }
                 data.winRate = data.trades > 0 ? (data.wins / data.trades) * 100 : 0;
-                data.isReady = data.trades >= 10;
+                // ✅ CHANGED: Lowered threshold from 10 to 3 trades to start trading faster
+                data.isReady = data.trades >= 3;
                 data.lastTrade = trade.executed_at;
 
                 if (trade.session) {
@@ -427,7 +428,7 @@ class AITrader {
                     symbolData.netProfit -= stake;
                 }
                 symbolData.winRate = symbolData.trades > 0 ? (symbolData.wins / symbolData.trades) * 100 : 0;
-                symbolData.isReady = symbolData.trades >= 10;
+                symbolData.isReady = symbolData.trades >= 3;
                 symbolData.lastTrade = new Date();
                 if (status === 'WIN') {
                     symbolData.currentStreak = symbolData.currentStreak > 0 ? symbolData.currentStreak + 1 : 1;
@@ -520,7 +521,7 @@ class AITrader {
             let patternWR = 0;
             if (pattern !== 'none' && data.patternPerformance[pattern]) {
                 const pData = data.patternPerformance[pattern];
-                if (pData.total >= 3) {
+                if (pData.total >= 2) {
                     patternWR = (pData.wins / pData.total) * 100;
                 }
             }
@@ -886,7 +887,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.1 (NO AI, Fixed Subscription)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.2 (Min trades: 3)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
