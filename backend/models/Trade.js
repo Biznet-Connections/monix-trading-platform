@@ -51,12 +51,10 @@ class Trade {
         return trade._id;
     }
 
-    // 🚨 FIXED: Prevent corrupted exit prices
     static async updateResult(tradeId, exit_price, profit, status, closed_at = null) {
         // Check for suspicious exit price (for R_75 which trades at 30,000+)
         if (exit_price && exit_price < 1000 && status === 'WIN') {
             console.log(`⚠️ [Trade] Suspicious exit price: $${exit_price}. This might be a data error. Keeping original.`);
-            // Don't update with corrupted price - just update profit and status
             return TradeModel.findByIdAndUpdate(tradeId, {
                 profit,
                 status,
@@ -64,7 +62,6 @@ class Trade {
             });
         }
         
-        // Also check for exit price that's too high (over 1,000,000 for R_75)
         if (exit_price && exit_price > 1000000) {
             console.log(`⚠️ [Trade] Suspicious exit price: $${exit_price} (too high). This might be a data error.`);
             return TradeModel.findByIdAndUpdate(tradeId, {
@@ -201,10 +198,13 @@ class Trade {
         }));
     }
 
+    // ✅ FIXED: Today's profit uses local timezone
     static async getTodayStats(userId) {
-        const today = new Date().toISOString().split('T')[0];
-        const todayStart = new Date(today);
-        const todayEnd = new Date(todayStart.getTime() + 86400000);
+        // Use local timezone
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayEnd = new Date(todayStart);
+        todayEnd.setDate(todayEnd.getDate() + 1);
 
         const todayTrades = await TradeModel.find({
             user_id: userId,
