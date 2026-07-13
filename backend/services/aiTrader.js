@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.6 - Gold and R_100 start after 1 trade (same learning path as R_75)
+ * v15.0.7 - Dynamic stake scaling based on account size, bigger wins
  */
 const marketData = require('./marketData');
 const derivService = require('./derivService');
@@ -62,35 +62,26 @@ class AITrader {
         this.sessionProfit = 0;
         this.sessionLoss = 0;
         
-        // Trade parameters
-        this.PROFIT_TARGET_PCT = 0.08;
-        this.STOP_LOSS_PCT = 0.02;
+        // 🚀 DYNAMIC TRADE PARAMETERS (Scale with account)
+        this.PROFIT_TARGET_PCT = 0.08;   // 8% base
+        this.STOP_LOSS_PCT = 0.02;       // 2% base
         this.MAX_TRADE_DURATION = 300000;
-        this.MAX_STAKE_LIMIT = 25;
-        this.MIN_STAKE_LIMIT = 1;
         
-        // Stake configs
-        this.PCT_MIN_SMALL = 0.02;
-        this.PCT_BASE_SMALL = 0.05;
-        this.PCT_CONFIDENT_SMALL = 0.08;
-        this.PCT_MAX_SMALL = 0.10;
-        this.PCT_MIN_MEDIUM = 0.01;
-        this.PCT_BASE_MEDIUM = 0.025;
-        this.PCT_CONFIDENT_MEDIUM = 0.04;
-        this.PCT_MAX_MEDIUM = 0.06;
-        this.PCT_MIN_LARGE = 0.005;
-        this.PCT_BASE_LARGE = 0.01;
-        this.PCT_CONFIDENT_LARGE = 0.025;
-        this.PCT_MAX_LARGE = 0.05;
-        this.PCT_MIN_XL = 0.005;
-        this.PCT_BASE_XL = 0.01;
-        this.PCT_CONFIDENT_XL = 0.02;
-        this.PCT_MAX_XL = 0.03;
+        // 🚀 STAKE CONFIGURATION (Dynamic based on balance)
+        this.MIN_STAKE_PCT = 0.005;       // 0.5% of balance (minimum)
+        this.BASE_STAKE_PCT = 0.01;       // 1% of balance
+        this.CONFIDENT_STAKE_PCT = 0.02;  // 2% of balance (for high confidence)
+        this.MAX_STAKE_PCT = 0.03;        // 3% of balance (maximum)
         
-        this.MIN_STAKE = 0.50;
-        this.BASE_STAKE = 2.00;
-        this.CONFIDENT_STAKE = 2.00;
-        this.MAX_STAKE = 2.00;
+        // 🚀 FIXED: No hard cap on stakes (scales with account)
+        this.MIN_STAKE_LIMIT = 1;          // Minimum $1
+        this.MAX_STAKE_LIMIT = 999999;    // No practical cap
+        
+        // Current stakes (recalculated on balance change)
+        this.MIN_STAKE = 1;
+        this.BASE_STAKE = 10;
+        this.CONFIDENT_STAKE = 20;
+        this.MAX_STAKE = 30;
         
         // Session blocking
         this.blockedSessions = {};
@@ -143,52 +134,42 @@ class AITrader {
         const bal = this.currentBalance || 1000;
         const tier = this.getAccountTier();
 
-        let pctMin, pctBase, pctConfident, pctMax;
-        switch (tier) {
-            case 'SMALL':
-                pctMin = this.PCT_MIN_SMALL; pctBase = this.PCT_BASE_SMALL;
-                pctConfident = this.PCT_CONFIDENT_SMALL; pctMax = this.PCT_MAX_SMALL;
-                break;
-            case 'MEDIUM':
-                pctMin = this.PCT_MIN_MEDIUM; pctBase = this.PCT_BASE_MEDIUM;
-                pctConfident = this.PCT_CONFIDENT_MEDIUM; pctMax = this.PCT_MAX_MEDIUM;
-                break;
-            case 'LARGE':
-                pctMin = this.PCT_MIN_LARGE; pctBase = this.PCT_BASE_LARGE;
-                pctConfident = this.PCT_CONFIDENT_LARGE; pctMax = this.PCT_MAX_LARGE;
-                break;
-            case 'XL':
-            default:
-                pctMin = this.PCT_MIN_XL; pctBase = this.PCT_BASE_XL;
-                pctConfident = this.PCT_CONFIDENT_XL; pctMax = this.PCT_MAX_XL;
-                break;
-        }
-
+        // 🚀 DYNAMIC STAKE CALCULATION (Scale with account)
         let stakeMultiplier = 1.0;
         if (this.consecutiveWins >= 3) {
-            stakeMultiplier = 1.25;
+            stakeMultiplier = 1.5;  // Win streak: 50% bigger stakes
+            console.log(`📈 [Psychology] Win streak: ${this.consecutiveWins} → Stake +50%`);
         } else if (this.consecutiveLosses >= 3) {
-            stakeMultiplier = 0.5;
+            stakeMultiplier = 0.5;  // Loss streak: 50% smaller stakes
+            console.log(`📉 [Psychology] Loss streak: ${this.consecutiveLosses} → Stake -50%`);
         } else if (this.consecutiveLosses >= 2) {
-            stakeMultiplier = 0.75;
+            stakeMultiplier = 0.75;  // 2 losses: 25% smaller
         }
 
-        this.MIN_STAKE = this.roundStake(bal * pctMin * stakeMultiplier);
-        this.BASE_STAKE = this.roundStake(bal * pctBase * stakeMultiplier);
-        this.CONFIDENT_STAKE = this.roundStake(bal * pctConfident * stakeMultiplier);
-        this.MAX_STAKE = this.roundStake(bal * pctMax * stakeMultiplier);
+        // Calculate stakes based on balance percentages
+        let minStake = bal * this.MIN_STAKE_PCT * stakeMultiplier;
+        let baseStake = bal * this.BASE_STAKE_PCT * stakeMultiplier;
+        let confidentStake = bal * this.CONFIDENT_STAKE_PCT * stakeMultiplier;
+        let maxStake = bal * this.MAX_STAKE_PCT * stakeMultiplier;
 
-        if (this.MIN_STAKE > this.MAX_STAKE_LIMIT) this.MIN_STAKE = this.MAX_STAKE_LIMIT;
-        if (this.BASE_STAKE > this.MAX_STAKE_LIMIT) this.BASE_STAKE = this.MAX_STAKE_LIMIT;
-        if (this.CONFIDENT_STAKE > this.MAX_STAKE_LIMIT) this.CONFIDENT_STAKE = this.MAX_STAKE_LIMIT;
-        if (this.MAX_STAKE > this.MAX_STAKE_LIMIT) this.MAX_STAKE = this.MAX_STAKE_LIMIT;
-        if (this.MIN_STAKE < this.MIN_STAKE_LIMIT) this.MIN_STAKE = this.MIN_STAKE_LIMIT;
-        if (this.BASE_STAKE < this.MIN_STAKE_LIMIT) this.BASE_STAKE = this.MIN_STAKE_LIMIT;
-        if (this.CONFIDENT_STAKE < this.MIN_STAKE_LIMIT) this.CONFIDENT_STAKE = this.MIN_STAKE_LIMIT;
-        if (this.MAX_STAKE < this.MIN_STAKE_LIMIT) this.MAX_STAKE = this.MIN_STAKE_LIMIT;
+        // Round to nearest $0.50
+        this.MIN_STAKE = this.roundStake(minStake);
+        this.BASE_STAKE = this.roundStake(baseStake);
+        this.CONFIDENT_STAKE = this.roundStake(confidentStake);
+        this.MAX_STAKE = this.roundStake(maxStake);
+
+        // Safety: Never risk more than 3% of account
+        if (this.MAX_STAKE > bal * 0.03) this.MAX_STAKE = this.roundStake(bal * 0.03);
+        if (this.CONFIDENT_STAKE > bal * 0.02) this.CONFIDENT_STAKE = this.roundStake(bal * 0.02);
+        
+        // Ensure minimum stake is at least $1
+        if (this.MIN_STAKE < 1) this.MIN_STAKE = 1;
+        if (this.BASE_STAKE < 1) this.BASE_STAKE = 2;
+        if (this.CONFIDENT_STAKE < 1) this.CONFIDENT_STAKE = 5;
+        if (this.MAX_STAKE < 1) this.MAX_STAKE = 10;
 
         if (!this._lastBalanceLog || Date.now() - this._lastBalanceLog > 3600000) {
-            console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | Tier: ${tier} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
+            console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | Tier: ${tier} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE} (${(this.MAX_STAKE/bal*100).toFixed(1)}% of balance)`);
             this._lastBalanceLog = Date.now();
         }
     }
@@ -246,7 +227,6 @@ class AITrader {
                     data.netProfit -= trade.stake || 0;
                 }
                 data.winRate = data.trades > 0 ? (data.wins / data.trades) * 100 : 0;
-                // ✅ Gold and R_100 start after 1 trade (same learning path as R_75)
                 data.isReady = data.trades >= 1;
                 data.lastTrade = trade.executed_at;
 
@@ -445,6 +425,8 @@ class AITrader {
                 this.consecutiveLosses = 0;
                 this.dailyProfit += finalProfit;
                 console.log(`🎉 WIN! +$${Math.abs(finalProfit).toFixed(2)} | Streak: ${this.consecutiveWins}W/${this.consecutiveLosses}L`);
+                // Recalculate stakes after win (may increase)
+                this.recalculateStakes();
             } else {
                 this.totalLosses++;
                 this.consecutiveLosses++;
@@ -452,6 +434,8 @@ class AITrader {
                 this.dailyLoss += Math.abs(finalProfit);
                 console.log(`❌ LOSS #${this.consecutiveLosses} | -$${Math.abs(finalProfit).toFixed(2)}`);
                 this.recordSessionTrade(this.getCurrentSession(), symbol, false);
+                // Recalculate stakes after loss (may decrease)
+                this.recalculateStakes();
 
                 if (this.consecutiveLosses >= 3) {
                     this.pausedUntil = Date.now() + 900000;
@@ -544,7 +528,6 @@ class AITrader {
             else if (rsi >= 25 && rsi < 35) setupQuality += 15;
             if (trend && !trend.includes('sideways')) setupQuality += 15;
             
-            // Pattern bonus (even if pattern is 'none')
             if (pattern !== 'none' && pattern !== 'no_significant_pattern') {
                 setupQuality += 15;
             } else if (pattern === 'none' || pattern === 'no_significant_pattern') {
@@ -553,7 +536,6 @@ class AITrader {
             
             if (this.consecutiveLosses === 0) setupQuality += 5;
 
-            // Lower setup quality threshold for new symbols
             const minSetupQuality = data.trades < 3 ? 50 : 60;
             if (setupQuality < minSetupQuality) {
                 return null;
@@ -569,7 +551,6 @@ class AITrader {
 
             confidence = Math.min(95, Math.max(40, Math.round(confidence)));
 
-            // Lower confidence threshold for new symbols
             const minConfidence = data.trades < 3 ? 50 : 55;
             if (confidence < minConfidence) {
                 return null;
@@ -653,6 +634,7 @@ class AITrader {
                 return;
             }
 
+            // 🚀 Calculate stake with dynamic sizing
             const stake = this.calculateStake(signal.confidence, signal.setupQuality);
 
             console.log(`💸 ${signal.action} ${signal.symbol} | $${signal.entry_price.toFixed(2)} | $${stake} | ${signal.confidence}%`);
@@ -713,31 +695,45 @@ class AITrader {
         }
     }
 
+    // 🚀 DYNAMIC STAKE CALCULATION
     calculateStake(confidence, setupQuality) {
+        // Recalculate stakes based on current balance
         this.recalculateStakes();
 
-        if (this.lastStakeWasMax && this.tradesSinceBigLoss < 3) return this.MIN_STAKE;
-        if (this.consecutiveLosses >= 2) return this.MIN_STAKE;
-
-        if (this.consecutiveWins >= 3 && confidence >= 75) {
-            console.log(`🚀 [Psychology] Win streak ${this.consecutiveWins} + High confidence → Using CONFIDENT stake`);
-            return Math.min(this.CONFIDENT_STAKE, this.MAX_STAKE_LIMIT);
-        }
-
-        if (this.dailyProfit >= this.currentBalance * this.dailyProfitTarget) {
+        // If on a loss streak, use minimum stake
+        if (this.consecutiveLosses >= 2) {
+            console.log(`🛡️ Loss streak (${this.consecutiveLosses}) → Using MIN stake: $${this.MIN_STAKE}`);
             return this.MIN_STAKE;
         }
 
-        let stake = this.BASE_STAKE;
-        if (setupQuality >= 75) stake = this.CONFIDENT_STAKE;
-        else if (setupQuality >= 60) stake = this.BASE_STAKE;
-        else stake = this.MIN_STAKE;
-
-        if (stake > this.MAX_STAKE_LIMIT) {
-            console.log(`🛑 [Emergency] Stake capped: $${stake} → $${this.MAX_STAKE_LIMIT}`);
-            stake = this.MAX_STAKE_LIMIT;
+        // If on a win streak with high confidence, use confident stake
+        if (this.consecutiveWins >= 3 && confidence >= 75) {
+            console.log(`🚀 Win streak ${this.consecutiveWins} + High confidence → Using CONFIDENT stake: $${this.CONFIDENT_STAKE}`);
+            return this.CONFIDENT_STAKE;
         }
-        if (stake < this.MIN_STAKE_LIMIT) stake = this.MIN_STAKE_LIMIT;
+
+        // Use base stake for normal trades
+        let stake = this.BASE_STAKE;
+
+        // Adjust based on setup quality
+        if (setupQuality >= 75) {
+            stake = this.CONFIDENT_STAKE;
+        } else if (setupQuality >= 60) {
+            stake = this.BASE_STAKE;
+        } else {
+            stake = this.MIN_STAKE;
+        }
+
+        // Safety: never exceed max stake
+        if (stake > this.MAX_STAKE) {
+            console.log(`🛑 [Safety] Stake capped: $${stake} → $${this.MAX_STAKE}`);
+            stake = this.MAX_STAKE;
+        }
+
+        // Ensure minimum stake
+        if (stake < this.MIN_STAKE) {
+            stake = this.MIN_STAKE;
+        }
 
         return stake;
     }
@@ -903,10 +899,11 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.6 (Gold/R_100 start after 1 trade)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.7 (Dynamic Stake Scaling)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
+        console.log(`📊 [Stakes] MIN: $${this.MIN_STAKE} | BASE: $${this.BASE_STAKE} | CONFIDENT: $${this.CONFIDENT_STAKE} | MAX: $${this.MAX_STAKE}`);
 
         // Subscribe to all symbols with retry
         for (const sym of this.symbols) {
