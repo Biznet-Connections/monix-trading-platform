@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.7 - Dynamic stake scaling based on account size, bigger wins
+ * v15.0.8 - REMOVED ALL SESSION BLOCKS - Trades anytime on good setups
  */
 const marketData = require('./marketData');
 const derivService = require('./derivService');
@@ -62,35 +62,32 @@ class AITrader {
         this.sessionProfit = 0;
         this.sessionLoss = 0;
         
-        // 🚀 DYNAMIC TRADE PARAMETERS (Scale with account)
-        this.PROFIT_TARGET_PCT = 0.08;   // 8% base
-        this.STOP_LOSS_PCT = 0.02;       // 2% base
+        // Trade parameters
+        this.PROFIT_TARGET_PCT = 0.08;
+        this.STOP_LOSS_PCT = 0.02;
         this.MAX_TRADE_DURATION = 300000;
         
-        // 🚀 STAKE CONFIGURATION (Dynamic based on balance)
-        this.MIN_STAKE_PCT = 0.005;       // 0.5% of balance (minimum)
-        this.BASE_STAKE_PCT = 0.01;       // 1% of balance
-        this.CONFIDENT_STAKE_PCT = 0.02;  // 2% of balance (for high confidence)
-        this.MAX_STAKE_PCT = 0.03;        // 3% of balance (maximum)
+        // 🚀 DYNAMIC STAKE CONFIGURATION
+        this.MIN_STAKE_PCT = 0.005;
+        this.BASE_STAKE_PCT = 0.01;
+        this.CONFIDENT_STAKE_PCT = 0.02;
+        this.MAX_STAKE_PCT = 0.03;
         
-        // 🚀 FIXED: No hard cap on stakes (scales with account)
-        this.MIN_STAKE_LIMIT = 1;          // Minimum $1
-        this.MAX_STAKE_LIMIT = 999999;    // No practical cap
+        this.MIN_STAKE_LIMIT = 1;
+        this.MAX_STAKE_LIMIT = 999999;
         
-        // Current stakes (recalculated on balance change)
         this.MIN_STAKE = 1;
         this.BASE_STAKE = 10;
         this.CONFIDENT_STAKE = 20;
         this.MAX_STAKE = 30;
         
-        // Session blocking
+        // 🚀 REMOVED: No more session blocking
         this.blockedSessions = {};
         this._lastLondonLog = 0;
         this._lastAnalysisLog = 0;
         this._lastBalanceLog = 0;
         this._dailyLimitLog = 0;
         this._lastLossPauseLog = 0;
-        this._londonBlocked = false;
         
         // Bind handlers
         this.handleContractUpdate = this.handleContractUpdate.bind(this);
@@ -134,42 +131,35 @@ class AITrader {
         const bal = this.currentBalance || 1000;
         const tier = this.getAccountTier();
 
-        // 🚀 DYNAMIC STAKE CALCULATION (Scale with account)
         let stakeMultiplier = 1.0;
         if (this.consecutiveWins >= 3) {
-            stakeMultiplier = 1.5;  // Win streak: 50% bigger stakes
-            console.log(`📈 [Psychology] Win streak: ${this.consecutiveWins} → Stake +50%`);
+            stakeMultiplier = 1.5;
         } else if (this.consecutiveLosses >= 3) {
-            stakeMultiplier = 0.5;  // Loss streak: 50% smaller stakes
-            console.log(`📉 [Psychology] Loss streak: ${this.consecutiveLosses} → Stake -50%`);
+            stakeMultiplier = 0.5;
         } else if (this.consecutiveLosses >= 2) {
-            stakeMultiplier = 0.75;  // 2 losses: 25% smaller
+            stakeMultiplier = 0.75;
         }
 
-        // Calculate stakes based on balance percentages
         let minStake = bal * this.MIN_STAKE_PCT * stakeMultiplier;
         let baseStake = bal * this.BASE_STAKE_PCT * stakeMultiplier;
         let confidentStake = bal * this.CONFIDENT_STAKE_PCT * stakeMultiplier;
         let maxStake = bal * this.MAX_STAKE_PCT * stakeMultiplier;
 
-        // Round to nearest $0.50
         this.MIN_STAKE = this.roundStake(minStake);
         this.BASE_STAKE = this.roundStake(baseStake);
         this.CONFIDENT_STAKE = this.roundStake(confidentStake);
         this.MAX_STAKE = this.roundStake(maxStake);
 
-        // Safety: Never risk more than 3% of account
         if (this.MAX_STAKE > bal * 0.03) this.MAX_STAKE = this.roundStake(bal * 0.03);
         if (this.CONFIDENT_STAKE > bal * 0.02) this.CONFIDENT_STAKE = this.roundStake(bal * 0.02);
         
-        // Ensure minimum stake is at least $1
         if (this.MIN_STAKE < 1) this.MIN_STAKE = 1;
         if (this.BASE_STAKE < 1) this.BASE_STAKE = 2;
         if (this.CONFIDENT_STAKE < 1) this.CONFIDENT_STAKE = 5;
         if (this.MAX_STAKE < 1) this.MAX_STAKE = 10;
 
         if (!this._lastBalanceLog || Date.now() - this._lastBalanceLog > 3600000) {
-            console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | Tier: ${tier} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE} (${(this.MAX_STAKE/bal*100).toFixed(1)}% of balance)`);
+            console.log(`💰 [Stakes] Balance: $${bal.toFixed(2)} | Tier: ${tier} | MIN=$${this.MIN_STAKE} | BASE=$${this.BASE_STAKE} | CONFIDENT=$${this.CONFIDENT_STAKE} | MAX=$${this.MAX_STAKE}`);
             this._lastBalanceLog = Date.now();
         }
     }
@@ -278,19 +268,7 @@ class AITrader {
         }
     }
 
-    // ─── Session Blocking ───
-
-    async isSessionBlocked(session, symbol) {
-        const data = this.symbolData[symbol];
-        if (!data || !data.sessionPerformance[session]) return false;
-        const perf = data.sessionPerformance[session];
-        if (perf.total < 10) return false;
-        const winRate = (perf.wins / perf.total) * 100;
-        if (winRate < 30 && perf.total >= 10) {
-            return true;
-        }
-        return false;
-    }
+    // ─── REMOVED: No more session blocking ───
 
     recordSessionTrade(session, symbol, isWin) {
         const data = this.symbolData[symbol];
@@ -397,7 +375,6 @@ class AITrader {
             this.recentResults.push(status);
             if (this.recentResults.length > 30) this.recentResults.shift();
 
-            // Update per-symbol data
             const symbolData = this.symbolData[symbol];
             if (symbolData) {
                 symbolData.trades++;
@@ -425,7 +402,6 @@ class AITrader {
                 this.consecutiveLosses = 0;
                 this.dailyProfit += finalProfit;
                 console.log(`🎉 WIN! +$${Math.abs(finalProfit).toFixed(2)} | Streak: ${this.consecutiveWins}W/${this.consecutiveLosses}L`);
-                // Recalculate stakes after win (may increase)
                 this.recalculateStakes();
             } else {
                 this.totalLosses++;
@@ -434,7 +410,6 @@ class AITrader {
                 this.dailyLoss += Math.abs(finalProfit);
                 console.log(`❌ LOSS #${this.consecutiveLosses} | -$${Math.abs(finalProfit).toFixed(2)}`);
                 this.recordSessionTrade(this.getCurrentSession(), symbol, false);
-                // Recalculate stakes after loss (may decrease)
                 this.recalculateStakes();
 
                 if (this.consecutiveLosses >= 3) {
@@ -486,44 +461,37 @@ class AITrader {
 
             if (!currentPrice || currentPrice <= 0) return null;
             if (rsi === 0 || !rsi) return null;
-            if (!data || !data.isReady) {
-                return null;
-            }
+            if (!data || !data.isReady) return null;
 
-            // Check 1: Session blocking (London is blocked by default)
-            const sessionBlocked = await this.isSessionBlocked(session, symbol);
-            if (sessionBlocked) {
-                return null;
-            }
+            // 🚀 REMOVED: No session blocking check
 
             // Check 2: RSI Zone (only 35-45 or 25-35)
             if (!(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
                 return null;
             }
 
-            // Check 3: Pattern detection with default bonus
+            // Check 3: Pattern detection
             const pattern = marketState.lastPattern || 'none';
             let patternWR = 0;
-            let hasPatternData = false;
             
             if (pattern !== 'none' && data.patternPerformance[pattern]) {
                 const pData = data.patternPerformance[pattern];
                 if (pData.total >= 1) {
                     patternWR = (pData.wins / pData.total) * 100;
-                    hasPatternData = true;
                 }
             }
 
-            // Check 4: Pattern win rate (less strict for new symbols)
+            // Check 4: Pattern win rate
             const minPatternWR = data.trades < 3 ? 30 : 45;
             if (pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
                 return null;
             }
 
-            // Check 5: Setup Quality with pattern bonus
+            // Check 5: Setup Quality
             let setupQuality = 0;
             if (session === 'NEWYORK') setupQuality += 20;
             else if (session === 'ASIAN') setupQuality += 10;
+            else if (session === 'LONDON') setupQuality += 5; // 🚀 ADDED: London gets some points
             if (rsi >= 35 && rsi <= 45) setupQuality += 20;
             else if (rsi >= 25 && rsi < 35) setupQuality += 15;
             if (trend && !trend.includes('sideways')) setupQuality += 15;
@@ -536,7 +504,7 @@ class AITrader {
             
             if (this.consecutiveLosses === 0) setupQuality += 5;
 
-            const minSetupQuality = data.trades < 3 ? 50 : 60;
+            const minSetupQuality = data.trades < 3 ? 45 : 55;
             if (setupQuality < minSetupQuality) {
                 return null;
             }
@@ -545,6 +513,7 @@ class AITrader {
             let confidence = 55;
             if (patternWR > 0 && patternWR > 40) confidence += (patternWR - 40) * 0.25;
             if (session === 'NEWYORK') confidence += 10;
+            else if (session === 'LONDON') confidence += 5; // 🚀 ADDED: London confidence boost
             if (rsi >= 35 && rsi <= 45) confidence += 10;
             if (this.consecutiveWins >= 2) confidence += 5;
             if (this.consecutiveLosses >= 2) confidence -= 10;
@@ -573,7 +542,6 @@ class AITrader {
                 return null;
             }
 
-            // Generate signal
             const takeProfit = action === 'BUY' ? currentPrice * (1 + this.PROFIT_TARGET_PCT) : currentPrice * (1 - this.PROFIT_TARGET_PCT);
             const stopLoss = action === 'BUY' ? currentPrice * (1 - this.STOP_LOSS_PCT) : currentPrice * (1 + this.STOP_LOSS_PCT);
 
@@ -634,7 +602,6 @@ class AITrader {
                 return;
             }
 
-            // 🚀 Calculate stake with dynamic sizing
             const stake = this.calculateStake(signal.confidence, signal.setupQuality);
 
             console.log(`💸 ${signal.action} ${signal.symbol} | $${signal.entry_price.toFixed(2)} | $${stake} | ${signal.confidence}%`);
@@ -695,42 +662,26 @@ class AITrader {
         }
     }
 
-    // 🚀 DYNAMIC STAKE CALCULATION
     calculateStake(confidence, setupQuality) {
-        // Recalculate stakes based on current balance
         this.recalculateStakes();
 
-        // If on a loss streak, use minimum stake
         if (this.consecutiveLosses >= 2) {
-            console.log(`🛡️ Loss streak (${this.consecutiveLosses}) → Using MIN stake: $${this.MIN_STAKE}`);
             return this.MIN_STAKE;
         }
 
-        // If on a win streak with high confidence, use confident stake
         if (this.consecutiveWins >= 3 && confidence >= 75) {
-            console.log(`🚀 Win streak ${this.consecutiveWins} + High confidence → Using CONFIDENT stake: $${this.CONFIDENT_STAKE}`);
+            console.log(`🚀 Win streak ${this.consecutiveWins} + High confidence → Using CONFIDENT stake`);
             return this.CONFIDENT_STAKE;
         }
 
-        // Use base stake for normal trades
         let stake = this.BASE_STAKE;
+        if (setupQuality >= 75) stake = this.CONFIDENT_STAKE;
+        else if (setupQuality >= 60) stake = this.BASE_STAKE;
+        else stake = this.MIN_STAKE;
 
-        // Adjust based on setup quality
-        if (setupQuality >= 75) {
-            stake = this.CONFIDENT_STAKE;
-        } else if (setupQuality >= 60) {
-            stake = this.BASE_STAKE;
-        } else {
-            stake = this.MIN_STAKE;
-        }
-
-        // Safety: never exceed max stake
         if (stake > this.MAX_STAKE) {
-            console.log(`🛑 [Safety] Stake capped: $${stake} → $${this.MAX_STAKE}`);
             stake = this.MAX_STAKE;
         }
-
-        // Ensure minimum stake
         if (stake < this.MIN_STAKE) {
             stake = this.MIN_STAKE;
         }
@@ -752,7 +703,6 @@ class AITrader {
             const timeSinceLastTrade = Date.now() - this.lastTradeTime;
             if (this.lastTradeTime > 0 && timeSinceLastTrade < this.tradeCooldown) return;
 
-            // Reset daily trade count
             const now = Date.now();
             if (now - this.dailyResetTime > 24 * 60 * 60 * 1000) {
                 this.dailyTradeCount = 0;
@@ -767,15 +717,14 @@ class AITrader {
                 return;
             }
 
-            // Find best setup
             const bestSignal = await this.findBestSetup();
 
             if (bestSignal) {
-                console.log(`✅ ${bestSignal.symbol}: ${bestSignal.action} | Conf: ${bestSignal.confidence}% | Quality: ${bestSignal.setupQuality} | ${bestSignal.reason}`);
+                console.log(`✅ ${bestSignal.symbol}: ${bestSignal.action} | Conf: ${bestSignal.confidence}% | Quality: ${bestSignal.setupQuality}`);
                 await this.executeEntry(bestSignal);
             } else {
                 const session = this.getCurrentSession();
-                if (session !== 'LONDON' && !this._lastAnalysisLog || Date.now() - this._lastAnalysisLog > 30000) {
+                if (!this._lastAnalysisLog || Date.now() - this._lastAnalysisLog > 30000) {
                     const status = [];
                     for (const symbol of this.symbols) {
                         const data = this.symbolData[symbol];
@@ -877,10 +826,8 @@ class AITrader {
         this.tickCount = 0;
         this.dailyTradeCount = 0;
 
-        // Load symbol data
         await this.loadSymbolData();
 
-        // Sync balance
         let balanceRetries = 3;
         while (balanceRetries > 0) {
             try {
@@ -899,13 +846,12 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.7 (Dynamic Stake Scaling)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.8 (No Session Blocks)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
         console.log(`📊 [Stakes] MIN: $${this.MIN_STAKE} | BASE: $${this.BASE_STAKE} | CONFIDENT: $${this.CONFIDENT_STAKE} | MAX: $${this.MAX_STAKE}`);
 
-        // Subscribe to all symbols with retry
         for (const sym of this.symbols) {
             let retries = 5;
             let subscribed = false;
@@ -926,7 +872,6 @@ class AITrader {
             }
         }
 
-        // Listen to ticks for all symbols
         derivService.on('tick', (tick) => {
             const symbol = tick.symbol || this.symbols.find(s => s.includes(tick.symbol)) || 'R_75';
             marketData.addTick(tick, symbol);
@@ -944,10 +889,8 @@ class AITrader {
 
         derivService.on('contract_update', this.handleContractUpdate);
 
-        // Analysis interval (every 10 seconds)
         this.analysisInterval = setInterval(() => this.analyzeMarket(), 10000);
 
-        // Tick health check
         this.tickHealthInterval = setInterval(async () => {
             const timeSinceLastTick = Date.now() - this.lastTickTime;
             if (this.tickCount > 0 && timeSinceLastTick > 90000 && !this.forceReconnecting) {
@@ -962,7 +905,6 @@ class AITrader {
 
         this.balanceSyncInterval = setInterval(() => this.syncBalanceFromDeriv(), 30000);
 
-        // Auto-close timeout
         setInterval(async () => {
             if (this.activeTrade) {
                 const timeOpen = Date.now() - this.activeTrade.entry_time;
