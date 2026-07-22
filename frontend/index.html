@@ -323,14 +323,13 @@
                 </div>
             </div>
 
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+            <!-- Stats Cards - 3 Column -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
                 <div class="glass-card p-6 rounded-2xl hover-card transition">
                     <p class="text-slate-400 text-sm font-medium">💰 Balance</p>
                     <h2 id="balanceAmount" class="text-4xl font-bold mt-2">$0.00</h2>
-                    <div class="mt-4 flex justify-between text-sm">
-                        <span id="todayProfit" class="text-emerald-400"><i class="fas fa-arrow-up"></i> Today: +$0.00</span>
-                        <span id="winRateDisplay" class="text-slate-400">Win Rate: 0%</span>
+                    <div class="mt-4">
+                        <span id="todayProfit" class="text-emerald-400 text-sm"><i class="fas fa-arrow-up"></i> Today: +$0.00</span>
                     </div>
                 </div>
                 <div class="glass-card p-6 rounded-2xl hover-card transition border-l-4 border-indigo-500">
@@ -342,6 +341,13 @@
                     </div>
                     <div class="w-full bg-slate-700 h-2 mt-3 rounded-full overflow-hidden">
                         <div id="voucherProgress" class="bg-indigo-500 h-full w-0 rounded-full"></div>
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl hover-card transition">
+                    <p class="text-slate-400 text-sm font-medium">📊 Win Rate</p>
+                    <h2 id="winRateDisplay" class="text-4xl font-bold mt-2">0%</h2>
+                    <div class="mt-4">
+                        <span id="totalTradesDisplay" class="text-slate-400 text-sm">0 trades</span>
                     </div>
                 </div>
             </div>
@@ -369,138 +375,43 @@
                 <div id="marketStatus" class="text-emerald-400">Market: OPEN</div>
             </div>
 
-            <!-- Chart & Signal Panel -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
-                <!-- Chart Column -->
-                <div class="lg:col-span-8">
-                    <div class="glass-card p-5 rounded-2xl">
-                        <div class="flex justify-between items-center mb-5 flex-wrap gap-3">
-                            <div class="flex gap-3 flex-wrap">
-                                <select id="symbolSelect" class="bg-slate-800 rounded-lg px-4 py-2 text-sm border border-slate-700">
-                                    <optgroup label="📊 Volatility Indices (1s)"><option>R_10</option><option>R_25</option><option>R_50</option><option selected>R_75</option><option>R_100</option></optgroup>
-                                    <optgroup label="📈 Volatility Indices (2s)"><option>R_10_2S</option><option>R_25_2S</option><option>R_50_2S</option><option>R_75_2S</option><option>R_100_2S</option></optgroup>
-                                    <optgroup label="💥 Boom & Crash Indices"><option>Boom 300</option><option>Boom 500</option><option>Boom 1000</option><option>Crash 300</option><option>Crash 500</option><option>Crash 1000</option></optgroup>
-                                    <optgroup label="📉 Step Indices"><option>Step 200</option><option>Step 300</option><option>Step 400</option><option>Step 500</option></optgroup>
-                                    <optgroup label="🏆 Derived Indices"><option>1HZ10</option><option>1HZ25</option><option>1HZ50</option><option>1HZ75</option><option>1HZ100</option></optgroup>
-                                    <optgroup label="💱 Major Forex"><option>EUR/USD</option><option>GBP/USD</option><option>USD/JPY</option><option>AUD/USD</option><option>USD/CAD</option><option>NZD/USD</option><option>USD/CHF</option></optgroup>
-                                    <optgroup label="💱 Minor Forex"><option>EUR/GBP</option><option>EUR/JPY</option><option>GBP/JPY</option><option>AUD/JPY</option><option>CAD/JPY</option><option>CHF/JPY</option><option>EUR/AUD</option><option>GBP/AUD</option></optgroup>
-                                    <optgroup label="🥇 Commodities"><option>XAU/USD (Gold)</option><option>XAG/USD (Silver)</option><option>XPT/USD (Platinum)</option><option>XPD/USD (Palladium)</option><option>WTI (Oil)</option><option>Brent (Oil)</option></optgroup>
-                                    <optgroup label="🪙 Cryptocurrencies"><option>BTC/USD (Bitcoin)</option><option>ETH/USD (Ethereum)</option><option>LTC/USD (Litecoin)</option><option>XRP/USD (Ripple)</option><option>ADA/USD (Cardano)</option><option>DOT/USD (Polkadot)</option><option>SOL/USD (Solana)</option><option>DOGE/USD (Dogecoin)</option></optgroup>
-                                    <optgroup label="📊 Stock Indices"><option>US500 (S&P 500)</option><option>USTEC (Nasdaq)</option><option>US30 (Dow Jones)</option><option>GER40 (DAX)</option><option>UK100 (FTSE)</option><option>FRA40 (CAC 40)</option><option>ESP35 (IBEX 35)</option><option>NETH25 (AEX)</option><option>HK50 (Hang Seng)</option><option>JP225 (Nikkei)</option><option>AUS200 (ASX 200)</option></optgroup>
-                                </select>
-                                <div class="flex bg-slate-800 rounded-lg p-1 text-xs gap-1">
-                                    <button data-tf="1m" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">1m</button>
-                                    <button data-tf="5m" class="tf-btn px-3 py-1.5 rounded bg-indigo-600 text-white transition">5m</button>
-                                    <button data-tf="15m" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">15m</button>
-                                    <button data-tf="1h" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">1h</button>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-slate-400 text-xs">Live Price</span>
-                                <p id="livePrice" class="text-2xl font-bold text-emerald-400">$0.00</p>
-                            </div>
+            <!-- Chart - Full Width -->
+            <div class="glass-card p-5 rounded-2xl mb-8">
+                <div class="flex justify-between items-center mb-5 flex-wrap gap-3">
+                    <div class="flex gap-3 flex-wrap">
+                        <select id="symbolSelect" class="bg-slate-800 rounded-lg px-4 py-2 text-sm border border-slate-700">
+                            <optgroup label="📊 Volatility Indices (1s)"><option>R_10</option><option>R_25</option><option>R_50</option><option selected>R_75</option><option>R_100</option></optgroup>
+                            <optgroup label="📈 Volatility Indices (2s)"><option>R_10_2S</option><option>R_25_2S</option><option>R_50_2S</option><option>R_75_2S</option><option>R_100_2S</option></optgroup>
+                            <optgroup label="💥 Boom & Crash Indices"><option>Boom 300</option><option>Boom 500</option><option>Boom 1000</option><option>Crash 300</option><option>Crash 500</option><option>Crash 1000</option></optgroup>
+                            <optgroup label="📉 Step Indices"><option>Step 200</option><option>Step 300</option><option>Step 400</option><option>Step 500</option></optgroup>
+                            <optgroup label="🏆 Derived Indices"><option>1HZ10</option><option>1HZ25</option><option>1HZ50</option><option>1HZ75</option><option>1HZ100</option></optgroup>
+                            <optgroup label="💱 Major Forex"><option>EUR/USD</option><option>GBP/USD</option><option>USD/JPY</option><option>AUD/USD</option><option>USD/CAD</option><option>NZD/USD</option><option>USD/CHF</option></optgroup>
+                            <optgroup label="💱 Minor Forex"><option>EUR/GBP</option><option>EUR/JPY</option><option>GBP/JPY</option><option>AUD/JPY</option><option>CAD/JPY</option><option>CHF/JPY</option><option>EUR/AUD</option><option>GBP/AUD</option></optgroup>
+                            <optgroup label="🥇 Commodities"><option>XAU/USD (Gold)</option><option>XAG/USD (Silver)</option><option>XPT/USD (Platinum)</option><option>XPD/USD (Palladium)</option><option>WTI (Oil)</option><option>Brent (Oil)</option></optgroup>
+                            <optgroup label="🪙 Cryptocurrencies"><option>BTC/USD (Bitcoin)</option><option>ETH/USD (Ethereum)</option><option>LTC/USD (Litecoin)</option><option>XRP/USD (Ripple)</option><option>ADA/USD (Cardano)</option><option>DOT/USD (Polkadot)</option><option>SOL/USD (Solana)</option><option>DOGE/USD (Dogecoin)</option></optgroup>
+                            <optgroup label="📊 Stock Indices"><option>US500 (S&P 500)</option><option>USTEC (Nasdaq)</option><option>US30 (Dow Jones)</option><option>GER40 (DAX)</option><option>UK100 (FTSE)</option><option>FRA40 (CAC 40)</option><option>ESP35 (IBEX 35)</option><option>NETH25 (AEX)</option><option>HK50 (Hang Seng)</option><option>JP225 (Nikkei)</option><option>AUS200 (ASX 200)</option></optgroup>
+                        </select>
+                        <div class="flex bg-slate-800 rounded-lg p-1 text-xs gap-1">
+                            <button data-tf="1m" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">1m</button>
+                            <button data-tf="5m" class="tf-btn px-3 py-1.5 rounded bg-indigo-600 text-white transition">5m</button>
+                            <button data-tf="15m" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">15m</button>
+                            <button data-tf="1h" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">1h</button>
                         </div>
-                        <div id="candlestick-chart" class="w-full" style="height: 400px;"></div>
-                        <div class="mt-5 flex justify-between text-sm text-slate-400">
-                            <span>🟢 Support: <span id="supportLevel">$0.00</span></span>
-                            <span>🔴 Resistance: <span id="resistanceLevel">$0.00</span></span>
-                            <span class="text-amber-400">📊 RSI: <span id="rsiValue">--</span></span>
-                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-slate-400 text-xs">Live Price</span>
+                        <p id="livePrice" class="text-2xl font-bold text-emerald-400">$0.00</p>
                     </div>
                 </div>
-
-                <!-- Signal Panel -->
-                <div class="lg:col-span-4">
-                    <div class="glass-card rounded-2xl overflow-hidden border-2 border-indigo-500/30">
-                        <div class="bg-indigo-600/20 p-4 border-b border-indigo-500/20 flex justify-between">
-                            <span class="text-xs font-bold"><i class="fas fa-brain mr-2"></i> AI SIGNAL</span>
-                            <span class="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full animate-pulse">LIVE</span>
-                        </div>
-                        <div class="p-5">
-                            <div class="flex justify-between items-start mb-5">
-                                <div>
-                                    <h3 id="signalAction" class="text-4xl font-black text-emerald-400">—</h3>
-                                    <p class="text-slate-400 text-xs mt-1">Confidence: <span id="signalConfidence" class="text-emerald-400 font-bold text-xl">0%</span></p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-xs text-slate-500">Pattern</p>
-                                    <p id="signalPattern" class="text-sm font-bold text-indigo-300">—</p>
-                                </div>
-                            </div>
-
-                            <div id="confidenceBars" class="grid grid-cols-10 gap-1 mb-5"></div>
-
-                            <div class="grid grid-cols-2 gap-3 mb-5">
-                                <div class="bg-slate-800/50 p-3 rounded-lg"><p class="text-slate-500 text-[10px]">Entry Price</p><p id="signalEntry" class="font-bold text-base">$0.00</p></div>
-                                <div class="bg-slate-800/50 p-3 rounded-lg"><p class="text-slate-500 text-[10px]">Exit Time</p><p id="signalExit" class="font-bold text-base">5 min</p></div>
-                                <div class="bg-slate-800/50 p-3 rounded-lg"><p class="text-slate-500 text-[10px]">Take Profit</p><p id="signalTP" class="font-bold text-base text-emerald-400">$0.00</p></div>
-                                <div class="bg-slate-800/50 p-3 rounded-lg"><p class="text-slate-500 text-[10px]">Stop Loss</p><p id="signalSL" class="font-bold text-base text-red-400">$0.00</p></div>
-                            </div>
-
-                            <div class="mt-3 text-xs text-slate-300 bg-slate-800/30 p-3 rounded-lg mb-5">
-                                <p class="text-indigo-400 font-semibold mb-2">🧠 AI Reason:</p>
-                                <p id="signalReasoning" class="text-xs">Click GET SIGNAL for AI analysis</p>
-                            </div>
-
-                            <div class="grid grid-cols-3 gap-3">
-                                <button id="getSignalBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all text-sm">🧠 AI REASONING</button>
-                                <button id="yesBtn" disabled class="bg-emerald-500/50 text-white font-bold py-3 rounded-xl transition-all text-sm cursor-not-allowed">✅ YES</button>
-                                <button id="noBtn" disabled class="bg-red-500/10 text-red-400 border border-red-500/30 font-bold py-3 rounded-xl transition-all text-sm cursor-not-allowed">❌ NO</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Quick Settings -->
-                    <div class="grid grid-cols-2 gap-3 mt-5">
-                        <div class="glass-card p-4 rounded-xl flex justify-between items-center">
-                            <div><p class="text-sm font-semibold">📡 SIGNAL PUSH</p><p class="text-[10px] text-slate-500">Auto signals</p></div>
-                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="pushSignalsToggle" class="sr-only peer"><div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div></label>
-                        </div>
-                        <div class="glass-card p-4 rounded-xl flex justify-between items-center">
-                            <div><p class="text-sm font-semibold">🤖 AUTO MODE</p><p class="text-[10px] text-slate-500">Bot trades</p></div>
-                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="autoModeToggle" class="sr-only peer"><div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div></label>
-                        </div>
-                        <div class="glass-card p-4 rounded-xl flex justify-between items-center">
-                            <div><p class="text-sm font-semibold">🎰 JACKPOT</p><p class="text-[10px] text-slate-500">85%+ only</p></div>
-                            <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="jackpotToggle" class="sr-only peer"><div class="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div></label>
-                        </div>
-                        <div class="glass-card p-4 rounded-xl flex justify-between items-center">
-                            <div><p class="text-sm font-semibold">💰 STAKE</p><p id="stakeValue" class="text-[10px] text-slate-500">$2.00</p></div>
-                            <input type="range" min="0.50" max="20" step="0.50" value="2.00" id="stakeSlider" class="w-24 accent-indigo-500">
-                        </div>
-                    </div>
-
-                    <!-- AI Insights Mini -->
-                    <div class="glass-card p-5 rounded-2xl mt-5">
-                        <div class="flex justify-between items-center mb-3">
-                            <h3 class="font-bold text-sm"><i class="fas fa-brain text-indigo-400 mr-2"></i>AI INSIGHTS</h3>
-                            <button id="viewFullInsights" class="text-[10px] text-indigo-400 hover:underline">VIEW FULL</button>
-                        </div>
-                        <div id="insightsContent" class="space-y-2 text-sm">
-                            <div class="flex items-start gap-2"><i class="fas fa-spinner fa-spin text-indigo-500 text-xs mt-0.5"></i><span class="text-xs">Loading insights...</span></div>
-                        </div>
-                    </div>
+                <div id="candlestick-chart" class="w-full" style="height: 500px;"></div>
+                <div class="mt-5 flex justify-between text-sm text-slate-400">
+                    <span>🟢 Support: <span id="supportLevel">$0.00</span></span>
+                    <span>🔴 Resistance: <span id="resistanceLevel">$0.00</span></span>
+                    <span class="text-amber-400">📊 RSI: <span id="rsiValue">--</span></span>
                 </div>
             </div>
 
-            <!-- ============================================================ -->
-            <!-- NEW: Pending Limit Orders Panel (Collapsible) -->
-            <!-- ============================================================ -->
-            <div class="glass-card rounded-2xl overflow-hidden mb-5">
-                <div class="p-5 border-b border-slate-700 flex justify-between items-center cursor-pointer" onclick="toggleCollapsible('pendingOrdersContent', 'pendingOrdersIcon')">
-                    <h3 class="font-bold"><i class="fas fa-clock mr-2 text-yellow-400"></i>⏳ PENDING ORDERS <span id="pendingOrdersCount" class="text-xs text-slate-500 ml-2">(0)</span></h3>
-                    <i id="pendingOrdersIcon" class="fas fa-chevron-down text-slate-400 transition-transform"></i>
-                </div>
-                <div id="pendingOrdersContent" class="p-4">
-                    <div id="pendingOrdersContainer">
-                        <p class="text-xs text-slate-500 text-center py-3">No pending limit orders</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ============================================================ -->
-            <!-- Recent Trades Table (Collapsible) -->
-            <!-- ============================================================ -->
+            <!-- Recent Trades Table - Full Width -->
             <div class="glass-card rounded-2xl overflow-hidden mb-8">
                 <div class="p-5 border-b border-slate-700 flex justify-between items-center cursor-pointer" onclick="toggleCollapsible('recentTradesContent', 'recentTradesIcon')">
                     <h3 class="font-bold"><i class="fas fa-history mr-2 text-indigo-400"></i>📊 RECENT TRADES <span id="recentTradesCount" class="text-xs text-slate-500 ml-2">(0)</span></h3>
@@ -517,7 +428,7 @@
                             <tr><th class="p-4">Time</th><th class="p-4">Symbol</th><th class="p-4">Action</th><th class="p-4">Entry</th><th class="p-4">Exit</th><th class="p-4 text-right">Profit</th><th class="p-4 text-center">Status</th><th class="p-4 text-center">📋</th></tr>
                         </thead>
                         <tbody id="recentTradesBody" class="divide-y divide-slate-700/50">
-                            <tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet. Click GET SIGNAL!</td></tr>
+                            <tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet. Execute a trade to see results!</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -584,29 +495,9 @@
 <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
 <!-- ============================================================ -->
-<!-- AI REASON MODAL POPUP                                        -->
+<!-- AI REASON MODAL POPUP (Hidden - kept for JS compatibility)   -->
 <!-- ============================================================ -->
-<div id="aiReasonModal" class="modal hidden">
-    <div class="modal-content glass-card" style="max-width: 550px; width: 90%;">
-        <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
-            <h2 class="text-xl font-bold"><i class="fas fa-brain text-indigo-400 mr-2"></i>AI TRADE RECOMMENDATION</h2>
-            <button onclick="closeAIReasonModal()" class="text-slate-400 hover:text-white text-2xl">&times;</button>
-        </div>
-        <div class="space-y-4">
-            <div class="text-center"><span id="modalAction" class="text-2xl font-bold text-emerald-400">📈 BUY (Price will go UP)</span><p class="text-xs text-slate-500 mt-1">on <span id="modalSymbol">R_75</span></p></div>
-            <div class="bg-slate-800/30 p-3 rounded-lg"><p class="text-xs text-slate-400 mb-1">📍 CURRENT MARKET</p><div class="flex justify-between"><span>Price right now:</span><span id="modalPrice" class="font-bold">$0.00</span></div><div class="flex justify-between"><span>Market feeling:</span><span id="modalMarketFeeling" class="font-bold">Stable</span></div><div class="flex justify-between"><span>Pattern detected:</span><span id="modalPattern" class="font-bold text-indigo-400">—</span></div></div>
-            <div class="bg-slate-800/30 p-3 rounded-lg"><p class="text-xs text-slate-400 mb-1">⏰ TIMING</p><div class="flex justify-between"><span>Enter trade at:</span><span id="modalEntryTime" class="font-bold">--:-- --</span></div><div class="flex justify-between"><span>Exit trade at:</span><span id="modalExitTime" class="font-bold">--:-- --</span></div></div>
-            <div class="bg-slate-800/30 p-3 rounded-lg"><p class="text-xs text-slate-400 mb-1">🎯 YOUR TARGETS</p><div class="flex justify-between text-emerald-400"><span>Take Profit:</span><span id="modalTakeProfit" class="font-bold">$0.00</span></div><div class="flex justify-between text-red-400"><span>Stop Loss:</span><span id="modalStopLoss" class="font-bold">$0.00</span></div></div>
-            <div class="bg-indigo-600/20 p-3 rounded-lg border border-indigo-500/30"><p class="text-xs text-slate-400 mb-1">💡 WHY</p><p id="modalReason" class="text-sm">Loading...</p></div>
-            <div class="text-center"><p class="text-xs text-slate-400">CONFIDENCE</p><p id="modalConfidence" class="text-2xl font-bold text-emerald-400">0%</p><div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden mt-1"><div id="modalConfidenceBar" class="bg-indigo-500 h-full w-0 rounded-full"></div></div></div>
-            <div id="autoModeNote" class="hidden text-center p-2 bg-yellow-500/20 rounded-lg"><i class="fas fa-robot mr-2"></i> AUTO MODE ACTIVE - Trade will execute automatically</div>
-            <div id="modalButtons" class="flex gap-3">
-                <button onclick="acceptTradeFromModal()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg transition">✅ ACCEPT TRADE</button>
-                <button onclick="closeAIReasonModal()" class="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 font-bold py-3 rounded-lg transition">❌ DECLINE</button>
-            </div>
-        </div>
-    </div>
-</div>
+<div id="aiReasonModal" class="modal hidden" style="display: none !important;"></div>
 
 <!-- ============================================================ -->
 <!-- JAVASCRIPT FILES                                             -->
@@ -632,7 +523,7 @@ function toggleCollapsible(contentId, iconId) {
 
 // Restore collapsible states on load
 document.addEventListener('DOMContentLoaded', () => {
-    ['pendingOrdersContent', 'recentTradesContent'].forEach(id => {
+    ['recentTradesContent'].forEach(id => {
         const state = localStorage.getItem(`collapsible_${id}`);
         const content = document.getElementById(id);
         const icon = document.getElementById(id.replace('Content', 'Icon'));

@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.8 - REMOVED ALL SESSION BLOCKS - Trades anytime on good setups
+ * v15.0.9 - FIXED: closeTrade null error, improved contract handling, no session blocks
  */
 const marketData = require('./marketData');
 const derivService = require('./derivService');
@@ -81,7 +81,7 @@ class AITrader {
         this.CONFIDENT_STAKE = 20;
         this.MAX_STAKE = 30;
         
-        // 🚀 REMOVED: No more session blocking
+        // No session blocking
         this.blockedSessions = {};
         this._lastLondonLog = 0;
         this._lastAnalysisLog = 0;
@@ -268,7 +268,7 @@ class AITrader {
         }
     }
 
-    // ─── REMOVED: No more session blocking ───
+    // ─── No session blocking ───
 
     recordSessionTrade(session, symbol, isWin) {
         const data = this.symbolData[symbol];
@@ -347,17 +347,38 @@ class AITrader {
         }
     }
 
+    // ─── FIXED: closeTrade with null check ───
     async closeTrade(contractId, profit, status) {
-        if (!this.activeTrade || this.activeTrade.contract_id !== contractId) return;
+        // ✅ FIX: Check if activeTrade exists and matches contractId
+        if (!this.activeTrade) {
+            console.log(`⚠️ No active trade to close for contract ${contractId}`);
+            return;
+        }
+        
+        if (this.activeTrade.contract_id !== contractId) {
+            console.log(`⚠️ Active trade contract ${this.activeTrade.contract_id} doesn't match ${contractId}`);
+            return;
+        }
+
+        // Store active trade data before nulling
+        const tradeData = {
+            id: this.activeTrade.id,
+            entry_price: this.activeTrade.entry_price,
+            stake: this.activeTrade.stake,
+            symbol: this.activeTrade.symbol,
+            action: this.activeTrade.action,
+            pattern: this.activeTrade.pattern || 'Unknown',
+            contract_id: this.activeTrade.contract_id
+        };
 
         let finalProfit = Number(profit);
         if (isNaN(finalProfit)) finalProfit = 0;
 
         try {
-            const tradeId = this.activeTrade.id;
-            const entryPrice = this.activeTrade.entry_price;
-            const stake = this.activeTrade.stake;
-            const symbol = this.activeTrade.symbol;
+            const tradeId = tradeData.id;
+            const entryPrice = tradeData.entry_price;
+            const stake = tradeData.stake;
+            const symbol = tradeData.symbol;
 
             let exitPrice = entryPrice;
             if (status === 'WIN') {
@@ -370,11 +391,12 @@ class AITrader {
 
             await Trade.updateResult(tradeId, exitPrice, finalProfit, status);
             await User.updateStats(this.userId, status, finalProfit, stake);
-            await Pattern.recordTradeResult(this.activeTrade.pattern, symbol, this.activeTrade.action, this.getCurrentSession(), status === 'WIN');
+            await Pattern.recordTradeResult(tradeData.pattern, symbol, tradeData.action, this.getCurrentSession(), status === 'WIN');
 
             this.recentResults.push(status);
             if (this.recentResults.length > 30) this.recentResults.shift();
 
+            // Update per-symbol data
             const symbolData = this.symbolData[symbol];
             if (symbolData) {
                 symbolData.trades++;
@@ -422,7 +444,7 @@ class AITrader {
                 id: tradeId,
                 contract_id: contractId,
                 symbol: symbol,
-                action: this.activeTrade.action,
+                action: tradeData.action,
                 entry_price: entryPrice,
                 exit_price: exitPrice,
                 profit: finalProfit,
@@ -440,10 +462,13 @@ class AITrader {
                 }
             } catch (e) {}
 
+            // ✅ Clear active trade AFTER all operations
             this.activeTrade = null;
 
         } catch (error) {
             console.error(`❌ Close trade error:`, error.message);
+            // ✅ Still clear active trade on error to prevent stuck state
+            this.activeTrade = null;
         }
     }
 
@@ -463,14 +488,12 @@ class AITrader {
             if (rsi === 0 || !rsi) return null;
             if (!data || !data.isReady) return null;
 
-            // 🚀 REMOVED: No session blocking check
-
-            // Check 2: RSI Zone (only 35-45 or 25-35)
+            // Check 1: RSI Zone (only 35-45 or 25-35)
             if (!(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
                 return null;
             }
 
-            // Check 3: Pattern detection
+            // Check 2: Pattern detection
             const pattern = marketState.lastPattern || 'none';
             let patternWR = 0;
             
@@ -481,17 +504,17 @@ class AITrader {
                 }
             }
 
-            // Check 4: Pattern win rate
+            // Check 3: Pattern win rate
             const minPatternWR = data.trades < 3 ? 30 : 45;
             if (pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
                 return null;
             }
 
-            // Check 5: Setup Quality
+            // Check 4: Setup Quality
             let setupQuality = 0;
             if (session === 'NEWYORK') setupQuality += 20;
             else if (session === 'ASIAN') setupQuality += 10;
-            else if (session === 'LONDON') setupQuality += 5; // 🚀 ADDED: London gets some points
+            else if (session === 'LONDON') setupQuality += 5;
             if (rsi >= 35 && rsi <= 45) setupQuality += 20;
             else if (rsi >= 25 && rsi < 35) setupQuality += 15;
             if (trend && !trend.includes('sideways')) setupQuality += 15;
@@ -509,11 +532,11 @@ class AITrader {
                 return null;
             }
 
-            // Check 6: Confidence
+            // Check 5: Confidence
             let confidence = 55;
             if (patternWR > 0 && patternWR > 40) confidence += (patternWR - 40) * 0.25;
             if (session === 'NEWYORK') confidence += 10;
-            else if (session === 'LONDON') confidence += 5; // 🚀 ADDED: London confidence boost
+            else if (session === 'LONDON') confidence += 5;
             if (rsi >= 35 && rsi <= 45) confidence += 10;
             if (this.consecutiveWins >= 2) confidence += 5;
             if (this.consecutiveLosses >= 2) confidence -= 10;
@@ -525,7 +548,7 @@ class AITrader {
                 return null;
             }
 
-            // Check 7: Action (BUY or SELL)
+            // Check 6: Action (BUY or SELL)
             let action = 'WAIT';
             if (trend === 'uptrend' || trend === 'strong_uptrend') {
                 if (rsi < 45 && rsi >= 25) action = 'BUY';
@@ -846,7 +869,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.8 (No Session Blocks)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.9 (FIXED closeTrade)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
