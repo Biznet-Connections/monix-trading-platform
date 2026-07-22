@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.9 - FIXED: closeTrade null error, improved contract handling, no session blocks
+ * v15.0.12 - Lowered thresholds for FIRST trade: setup quality 30, confidence 35
  */
 const marketData = require('./marketData');
 const derivService = require('./derivService');
@@ -349,7 +349,6 @@ class AITrader {
 
     // ─── FIXED: closeTrade with null check ───
     async closeTrade(contractId, profit, status) {
-        // ✅ FIX: Check if activeTrade exists and matches contractId
         if (!this.activeTrade) {
             console.log(`⚠️ No active trade to close for contract ${contractId}`);
             return;
@@ -360,7 +359,6 @@ class AITrader {
             return;
         }
 
-        // Store active trade data before nulling
         const tradeData = {
             id: this.activeTrade.id,
             entry_price: this.activeTrade.entry_price,
@@ -396,7 +394,6 @@ class AITrader {
             this.recentResults.push(status);
             if (this.recentResults.length > 30) this.recentResults.shift();
 
-            // Update per-symbol data
             const symbolData = this.symbolData[symbol];
             if (symbolData) {
                 symbolData.trades++;
@@ -462,12 +459,10 @@ class AITrader {
                 }
             } catch (e) {}
 
-            // ✅ Clear active trade AFTER all operations
             this.activeTrade = null;
 
         } catch (error) {
             console.error(`❌ Close trade error:`, error.message);
-            // ✅ Still clear active trade on error to prevent stuck state
             this.activeTrade = null;
         }
     }
@@ -527,6 +522,8 @@ class AITrader {
             
             if (this.consecutiveLosses === 0) setupQuality += 5;
 
+            // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
+            // If 0 trades: setup quality 30, otherwise 40-55
             const minSetupQuality = data.trades === 0 ? 30 : (data.trades < 3 ? 40 : 55);
             if (setupQuality < minSetupQuality) {
                 return null;
@@ -543,6 +540,8 @@ class AITrader {
 
             confidence = Math.min(95, Math.max(40, Math.round(confidence)));
 
+            // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
+            // If 0 trades: confidence 35, otherwise 45-55
             const minConfidence = data.trades === 0 ? 35 : (data.trades < 3 ? 45 : 55);
             if (confidence < minConfidence) {
                 return null;
@@ -869,7 +868,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.9 (FIXED closeTrade)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.12 (Lowered thresholds for first trade)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
