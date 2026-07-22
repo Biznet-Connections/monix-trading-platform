@@ -527,7 +527,7 @@ class AITrader {
             
             if (this.consecutiveLosses === 0) setupQuality += 5;
 
-            const minSetupQuality = data.trades < 3 ? 45 : 55;
+            const minSetupQuality = data.trades < 3 ? 35 : 50;
             if (setupQuality < minSetupQuality) {
                 return null;
             }
@@ -543,7 +543,7 @@ class AITrader {
 
             confidence = Math.min(95, Math.max(40, Math.round(confidence)));
 
-            const minConfidence = data.trades < 3 ? 50 : 55;
+            const minConfidence = data.trades < 3 ? 40 : 50;
             if (confidence < minConfidence) {
                 return null;
             }
