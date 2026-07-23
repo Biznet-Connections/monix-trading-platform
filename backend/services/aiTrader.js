@@ -524,7 +524,7 @@ class AITrader {
 
             // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
             // If 0 trades: setup quality 30, otherwise 40-55
-            const minSetupQuality = data.trades === 0 ? 30 : (data.trades < 3 ? 40 : 55);
+            const minSetupQuality = data.trades === 0 ? 20 : (data.trades < 3 ? 35 : 50);
             if (setupQuality < minSetupQuality) {
                 return null;
             }
@@ -542,7 +542,7 @@ class AITrader {
 
             // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
             // If 0 trades: confidence 35, otherwise 45-55
-            const minConfidence = data.trades === 0 ? 35 : (data.trades < 3 ? 45 : 55);
+            const minConfidence = data.trades === 0 ? 25 : (data.trades < 3 ? 40 : 50);
             if (confidence < minConfidence) {
                 return null;
             }
