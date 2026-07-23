@@ -510,7 +510,8 @@ class AITrader {
 
             // Check 3: Pattern win rate (lower for first trade)
             const minPatternWR = data.trades === 0 ? 5 : (data.trades < 3 ? 20 : 45);
-            if (pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
+            // 🚀 FIRST TRADE: Bypass pattern check if 0 trades
+if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
                 return null;
             }
 
