@@ -1,7 +1,8 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.19 - FIXED Symbol mapping for Deriv tick symbols (frxXAUUSD → XAU/USD (Gold))
+ * v15.0.23 - Removed isReady block to allow first trades
  */
+
 const marketData = require('./marketData');
 const derivService = require('./derivService');
 const Trade = require('../models/Trade');
@@ -34,7 +35,7 @@ class AITrader {
             lastUpdate: Date.now(),
             allSymbols: {}
         };
-        
+
         // Streak tracking
         this.consecutiveLosses = 0;
         this.consecutiveWins = 0;
@@ -42,7 +43,7 @@ class AITrader {
         this.lastTradeTime = 0;
         this.tradeCooldown = 30000;
         this.pausedUntil = 0;
-        
+
         // Daily tracking
         this.dailyStartBalance = 1000;
         this.dailyProfit = 0;
@@ -53,7 +54,7 @@ class AITrader {
         this.dailyLossLimit = 0.05;
         this.dailyProfitReached = false;
         this.dailyLossReached = false;
-        
+
         // Balance
         this.currentBalance = 1000;
         this.totalTrades = 0;
@@ -61,26 +62,26 @@ class AITrader {
         this.totalLosses = 0;
         this.sessionProfit = 0;
         this.sessionLoss = 0;
-        
+
         // Trade parameters
         this.PROFIT_TARGET_PCT = 0.08;
         this.STOP_LOSS_PCT = 0.02;
         this.MAX_TRADE_DURATION = 300000;
-        
+
         // 🚀 DYNAMIC STAKE CONFIGURATION
         this.MIN_STAKE_PCT = 0.005;
         this.BASE_STAKE_PCT = 0.01;
         this.CONFIDENT_STAKE_PCT = 0.02;
         this.MAX_STAKE_PCT = 0.03;
-        
+
         this.MIN_STAKE_LIMIT = 1;
         this.MAX_STAKE_LIMIT = 999999;
-        
+
         this.MIN_STAKE = 1;
         this.BASE_STAKE = 10;
         this.CONFIDENT_STAKE = 20;
         this.MAX_STAKE = 30;
-        
+
         // No session blocking
         this.blockedSessions = {};
         this._lastLondonLog = 0;
@@ -88,10 +89,10 @@ class AITrader {
         this._lastBalanceLog = 0;
         this._dailyLimitLog = 0;
         this._lastLossPauseLog = 0;
-        
+
         // Bind handlers
         this.handleContractUpdate = this.handleContractUpdate.bind(this);
-        
+
         // Initialize symbol data
         for (const symbol of this.symbols) {
             this.symbolData[symbol] = {
@@ -104,7 +105,7 @@ class AITrader {
                 sessionPerformance: {},
                 rsiPerformance: {},
                 hourlyPerformance: {},
-                isReady: false,
+                isReady: true, // 🚀 FORCE READY - Allow first trades
                 lastTrade: null,
                 currentStreak: 0,
                 bestStreak: 0,
@@ -152,7 +153,7 @@ class AITrader {
 
         if (this.MAX_STAKE > bal * 0.03) this.MAX_STAKE = this.roundStake(bal * 0.03);
         if (this.CONFIDENT_STAKE > bal * 0.02) this.CONFIDENT_STAKE = this.roundStake(bal * 0.02);
-        
+
         if (this.MIN_STAKE < 1) this.MIN_STAKE = 1;
         if (this.BASE_STAKE < 1) this.BASE_STAKE = 2;
         if (this.CONFIDENT_STAKE < 1) this.CONFIDENT_STAKE = 5;
@@ -200,7 +201,7 @@ class AITrader {
                     sessionPerformance: {},
                     rsiPerformance: {},
                     hourlyPerformance: {},
-                    isReady: false,
+                    isReady: true, // 🚀 FORCE READY
                     lastTrade: null
                 };
             }
@@ -217,7 +218,7 @@ class AITrader {
                     data.netProfit -= trade.stake || 0;
                 }
                 data.winRate = data.trades > 0 ? (data.wins / data.trades) * 100 : 0;
-                data.isReady = data.trades >= 1;
+                data.isReady = true; // 🚀 ALWAYS READY
                 data.lastTrade = trade.executed_at;
 
                 if (trade.session) {
@@ -353,7 +354,7 @@ class AITrader {
             console.log(`⚠️ No active trade to close for contract ${contractId}`);
             return;
         }
-        
+
         if (this.activeTrade.contract_id !== contractId) {
             console.log(`⚠️ Active trade contract ${this.activeTrade.contract_id} doesn't match ${contractId}`);
             return;
@@ -405,7 +406,7 @@ class AITrader {
                     symbolData.netProfit -= stake;
                 }
                 symbolData.winRate = symbolData.trades > 0 ? (symbolData.wins / symbolData.trades) * 100 : 0;
-                symbolData.isReady = symbolData.trades >= 1;
+                symbolData.isReady = true; // 🚀 ALWAYS READY
                 symbolData.lastTrade = new Date();
                 if (status === 'WIN') {
                     symbolData.currentStreak = symbolData.currentStreak > 0 ? symbolData.currentStreak + 1 : 1;
@@ -470,6 +471,7 @@ class AITrader {
     // ─── Analyze Symbol ───
 
     async analyzeSymbol(symbol) {
+        console.log(`🔍 [DEBUG-ENTRY] analyzeSymbol called for ${symbol}`);
         try {
             const marketState = marketData.getMarketState(symbol);
             const currentPrice = marketState.price;
@@ -479,20 +481,33 @@ class AITrader {
             const hour = new Date().getUTCHours();
             const data = this.symbolData[symbol];
 
-            if (!currentPrice || currentPrice <= 0) return null;
-            if (rsi === 0 || !rsi) return null;
-            if (!data || !data.isReady) return null;
+            console.log(`🔍 [DEBUG] ${symbol}: Price=$${currentPrice?.toFixed(2) || 'N/A'} | RSI=${rsi} | Trend=${trend} | Data=${!!data}`);
+
+            if (!currentPrice || currentPrice <= 0) {
+                console.log(`❌ [DEBUG] ${symbol}: No valid price`);
+                return null;
+            }
+            if (rsi === 0 || !rsi) {
+                console.log(`❌ [DEBUG] ${symbol}: No valid RSI`);
+                return null;
+            }
+            if (!data) {
+                console.log(`❌ [DEBUG] ${symbol}: No symbol data`);
+                return null;
+            }
 
             // Check 1: RSI Zone
             // For FIRST trade (0 trades), allow RSI 45-55 as well
             if (data.trades === 0) {
                 // First trade: allow RSI 45-55 as well
                 if (!(rsi >= 45 && rsi <= 55) && !(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
+                    console.log(`❌ [DEBUG] ${symbol}: RSI ${rsi} outside first-trade zones (25-45 or 45-55)`);
                     return null;
                 }
             } else {
                 // Normal: only 25-45
                 if (!(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
+                    console.log(`❌ [DEBUG] ${symbol}: RSI ${rsi} outside zones (25-45)`);
                     return null;
                 }
             }
@@ -500,7 +515,7 @@ class AITrader {
             // Check 2: Pattern detection
             const pattern = marketState.lastPattern || 'none';
             let patternWR = 0;
-            
+
             if (pattern !== 'none' && data.patternPerformance[pattern]) {
                 const pData = data.patternPerformance[pattern];
                 if (pData.total >= 1) {
@@ -511,7 +526,8 @@ class AITrader {
             // Check 3: Pattern win rate (lower for first trade)
             const minPatternWR = data.trades === 0 ? 5 : (data.trades < 3 ? 20 : 45);
             // 🚀 FIRST TRADE: Bypass pattern check if 0 trades
-if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
+            if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
+                console.log(`❌ [DEBUG] ${symbol}: Pattern ${pattern} WR ${patternWR}% < ${minPatternWR}% minimum`);
                 return null;
             }
 
@@ -523,18 +539,20 @@ if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPat
             if (rsi >= 35 && rsi <= 45) setupQuality += 20;
             else if (rsi >= 25 && rsi < 35) setupQuality += 15;
             if (trend && !trend.includes('sideways')) setupQuality += 15;
-            
+
             if (pattern !== 'none' && pattern !== 'no_significant_pattern') {
                 setupQuality += 15;
             } else if (pattern === 'none' || pattern === 'no_significant_pattern') {
                 setupQuality += 8;
             }
-            
+
             if (this.consecutiveLosses === 0) setupQuality += 5;
 
             // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
             const minSetupQuality = data.trades === 0 ? 10 : (data.trades < 3 ? 30 : 50);
+            console.log(`🔍 [DEBUG] ${symbol}: SetupQuality=${setupQuality} | MinRequired=${minSetupQuality}`);
             if (setupQuality < minSetupQuality) {
+                console.log(`❌ [DEBUG] ${symbol}: Setup quality ${setupQuality} < ${minSetupQuality} minimum`);
                 return null;
             }
 
@@ -551,7 +569,9 @@ if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPat
 
             // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
             const minConfidence = data.trades === 0 ? 20 : (data.trades < 3 ? 35 : 50);
+            console.log(`🔍 [DEBUG] ${symbol}: Confidence=${confidence} | MinRequired=${minConfidence}`);
             if (confidence < minConfidence) {
+                console.log(`❌ [DEBUG] ${symbol}: Confidence ${confidence} < ${minConfidence} minimum`);
                 return null;
             }
 
@@ -569,15 +589,17 @@ if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPat
             }
 
             if (action === 'WAIT') {
+                console.log(`❌ [DEBUG] ${symbol}: Action is WAIT`);
                 return null;
             }
 
             const takeProfit = action === 'BUY' ? currentPrice * (1 + this.PROFIT_TARGET_PCT) : currentPrice * (1 - this.PROFIT_TARGET_PCT);
             const stopLoss = action === 'BUY' ? currentPrice * (1 - this.STOP_LOSS_PCT) : currentPrice * (1 + this.STOP_LOSS_PCT);
 
+            // 🚀 SIGNAL GENERATED!
+            console.log(`✅ [SIGNAL] ${symbol}: ${action} | RSI: ${rsi} | Quality: ${setupQuality} | Confidence: ${confidence} | Pattern: ${pattern} | WR: ${patternWR}`);
+            console.log(`🎯 [SIGNAL] Entry: $${currentPrice.toFixed(2)} | TP: $${takeProfit.toFixed(2)} | SL: $${stopLoss.toFixed(2)}`);
             
-            // 🚀 DEBUG: Log why we're returning signal
-            console.log(`🔍 [SIGNAL] ${symbol}: ${action} | RSI: ${rsi} | Quality: ${setupQuality} | Confidence: ${confidence} | Pattern: ${pattern} | WR: ${patternWR}`);
             return {
                 symbol,
                 action,
@@ -753,7 +775,7 @@ if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPat
             const bestSignal = await this.findBestSetup();
 
             if (bestSignal) {
-                console.log(`✅ ${bestSignal.symbol}: ${bestSignal.action} | Conf: ${bestSignal.confidence}% | Quality: ${bestSignal.setupQuality}`);
+                console.log(`🚀 [TRADE SIGNAL] ${bestSignal.symbol}: ${bestSignal.action} | Conf: ${bestSignal.confidence}% | Quality: ${bestSignal.setupQuality}`);
                 await this.executeEntry(bestSignal);
             } else {
                 const session = this.getCurrentSession();
@@ -881,7 +903,7 @@ if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPat
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.19 (Symbol Mapping Fix)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.23 (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
@@ -939,12 +961,12 @@ if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPat
             if (symbolMap[symbol]) {
                 symbol = symbolMap[symbol];
             }
-            
+
             // Also check if symbol contains XAUUSD
             if (symbol && symbol.includes('XAUUSD')) {
                 symbol = 'XAU/USD (Gold)';
             }
-            
+
             marketData.addTick(tick, symbol);
             this.tickCount++;
             this.lastTickTime = Date.now();
