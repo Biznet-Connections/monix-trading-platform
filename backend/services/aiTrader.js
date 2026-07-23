@@ -505,7 +505,7 @@ class AITrader {
                 return null;
             }
 
-            // Check 4: Setup Quality
+            // 🚀 DEBUG: Log all values\n            console.log(`🔍 [DEBUG] ${symbol} | trades: ${data.trades}, RSI: ${rsi}, setupQuality: ${setupQuality}, minSetupQuality: ${minSetupQuality}, confidence: ${confidence}, minConfidence: ${minConfidence}, pattern: ${pattern}, patternWR: ${patternWR}`);\n\n            // Check 4: Setup Quality
             let setupQuality = 0;
             if (session === 'NEWYORK') setupQuality += 20;
             else if (session === 'ASIAN') setupQuality += 10;
