@@ -575,6 +575,9 @@ if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPat
             const takeProfit = action === 'BUY' ? currentPrice * (1 + this.PROFIT_TARGET_PCT) : currentPrice * (1 - this.PROFIT_TARGET_PCT);
             const stopLoss = action === 'BUY' ? currentPrice * (1 - this.STOP_LOSS_PCT) : currentPrice * (1 + this.STOP_LOSS_PCT);
 
+            
+            // 🚀 DEBUG: Log why we're returning signal
+            console.log(`🔍 [SIGNAL] ${symbol}: ${action} | RSI: ${rsi} | Quality: ${setupQuality} | Confidence: ${confidence} | Pattern: ${pattern} | WR: ${patternWR}`);
             return {
                 symbol,
                 action,
