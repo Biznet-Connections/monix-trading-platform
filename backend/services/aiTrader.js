@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.12 - Lowered thresholds for FIRST trade: setup quality 30, confidence 35
+ * v15.0.19 - FIXED Symbol mapping for Deriv tick symbols (frxXAUUSD → XAU/USD (Gold))
  */
 const marketData = require('./marketData');
 const derivService = require('./derivService');
@@ -483,9 +483,18 @@ class AITrader {
             if (rsi === 0 || !rsi) return null;
             if (!data || !data.isReady) return null;
 
-            // Check 1: RSI Zone (only 35-45 or 25-35)
-            if (!(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
-                return null;
+            // Check 1: RSI Zone
+            // For FIRST trade (0 trades), allow RSI 45-55 as well
+            if (data.trades === 0) {
+                // First trade: allow RSI 45-55 as well
+                if (!(rsi >= 45 && rsi <= 55) && !(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
+                    return null;
+                }
+            } else {
+                // Normal: only 25-45
+                if (!(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
+                    return null;
+                }
             }
 
             // Check 2: Pattern detection
@@ -499,13 +508,13 @@ class AITrader {
                 }
             }
 
-            // Check 3: Pattern win rate
-            const minPatternWR = data.trades < 3 ? 30 : 45;
+            // Check 3: Pattern win rate (lower for first trade)
+            const minPatternWR = data.trades === 0 ? 5 : (data.trades < 3 ? 20 : 45);
             if (pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
                 return null;
             }
 
-            // 🚀 DEBUG: Log all values\n            console.log(`🔍 [DEBUG] ${symbol} | trades: ${data.trades}, RSI: ${rsi}, setupQuality: ${setupQuality}, minSetupQuality: ${minSetupQuality}, confidence: ${confidence}, minConfidence: ${minConfidence}, pattern: ${pattern}, patternWR: ${patternWR}`);\n\n            // Check 4: Setup Quality
+            // Check 4: Setup Quality
             let setupQuality = 0;
             if (session === 'NEWYORK') setupQuality += 20;
             else if (session === 'ASIAN') setupQuality += 10;
@@ -523,8 +532,7 @@ class AITrader {
             if (this.consecutiveLosses === 0) setupQuality += 5;
 
             // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
-            // If 0 trades: setup quality 30, otherwise 40-55
-            const minSetupQuality = data.trades === 0 ? 20 : (data.trades < 3 ? 35 : 50);
+            const minSetupQuality = data.trades === 0 ? 10 : (data.trades < 3 ? 30 : 50);
             if (setupQuality < minSetupQuality) {
                 return null;
             }
@@ -541,8 +549,7 @@ class AITrader {
             confidence = Math.min(95, Math.max(40, Math.round(confidence)));
 
             // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
-            // If 0 trades: confidence 35, otherwise 45-55
-            const minConfidence = data.trades === 0 ? 25 : (data.trades < 3 ? 40 : 50);
+            const minConfidence = data.trades === 0 ? 20 : (data.trades < 3 ? 35 : 50);
             if (confidence < minConfidence) {
                 return null;
             }
@@ -802,6 +809,8 @@ class AITrader {
         }
     }
 
+    // ─── START ───
+
     async start(userId, symbol = 'R_75', mode = 'AUTO') {
         if (this.isRunning) {
             console.log('⚠️ [AI Trader] Already running, stopping first...');
@@ -868,12 +877,37 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.12 (Lowered thresholds for first trade)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.19 (Symbol Mapping Fix)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
         console.log(`📊 [Stakes] MIN: $${this.MIN_STAKE} | BASE: $${this.BASE_STAKE} | CONFIDENT: $${this.CONFIDENT_STAKE} | MAX: $${this.MAX_STAKE}`);
 
+        // 🚀 SYMBOL MAPPING: Map Deriv symbols to display names
+        const symbolMap = {
+            'frxXAUUSD': 'XAU/USD (Gold)',
+            'frxXAGUSD': 'XAG/USD (Silver)',
+            'frxXPTUSD': 'XPT/USD (Platinum)',
+            'frxXPDUSD': 'XPD/USD (Palladium)',
+            'R_10': 'R_10',
+            'R_25': 'R_25',
+            'R_50': 'R_50',
+            'R_75': 'R_75',
+            'R_100': 'R_100',
+            'R_10_2S': 'R_10_2S',
+            'R_25_2S': 'R_25_2S',
+            'R_50_2S': 'R_50_2S',
+            'R_75_2S': 'R_75_2S',
+            'R_100_2S': 'R_100_2S',
+            'BOOM300': 'Boom 300',
+            'BOOM500': 'Boom 500',
+            'BOOM1000': 'Boom 1000',
+            'CRASH300': 'Crash 300',
+            'CRASH500': 'Crash 500',
+            'CRASH1000': 'Crash 1000'
+        };
+
+        // Subscribe to all symbols with retry
         for (const sym of this.symbols) {
             let retries = 5;
             let subscribed = false;
@@ -894,8 +928,19 @@ class AITrader {
             }
         }
 
+        // 🚀 FIXED: Listen to ticks with symbol mapping
         derivService.on('tick', (tick) => {
-            const symbol = tick.symbol || this.symbols.find(s => s.includes(tick.symbol)) || 'R_75';
+            // Map Deriv symbol to display name
+            let symbol = tick.symbol;
+            if (symbolMap[symbol]) {
+                symbol = symbolMap[symbol];
+            }
+            
+            // Also check if symbol contains XAUUSD
+            if (symbol && symbol.includes('XAUUSD')) {
+                symbol = 'XAU/USD (Gold)';
+            }
+            
             marketData.addTick(tick, symbol);
             this.tickCount++;
             this.lastTickTime = Date.now();
