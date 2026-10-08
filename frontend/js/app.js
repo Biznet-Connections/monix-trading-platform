@@ -1,5 +1,5 @@
-﻿// ================================================================
-// ðŸš€ MONIX APP - COMPLETE WITH SLOW PREMIUM LOADING
+// ================================================================
+// Ã°Å¸Å¡â¬ MONIX APP - COMPLETE WITH SLOW PREMIUM LOADING
 // ================================================================
 
 let currentUser = null;
@@ -8,7 +8,7 @@ let isReconnecting = false;
 let autoBalanceInterval = null;
 let loadingComplete = false;
 
-console.log('ðŸ”µ MONIX App Initializing...');
+console.log('Ã°Å¸âÂµ MONIX App Initializing...');
 
 // ================================================================
 // DOM ELEMENTS
@@ -42,13 +42,13 @@ const closeDrawerBtn = document.getElementById('closeDrawerBtn');
 // ================================================================
 
 function showLoadingScreen() {
-    console.log('ðŸŽ¬ Loading screen started...');
+    console.log('Ã°Å¸Å½Â¬ Loading screen started...');
     loadingScreen.classList.remove('hidden');
     startTypingEffect();
 }
 
 function hideLoadingScreen() {
-    console.log('ðŸŽ¬ Loading screen complete!');
+    console.log('Ã°Å¸Å½Â¬ Loading screen complete!');
     loadingScreen.classList.add('hidden');
     loadingComplete = true;
 }
@@ -96,20 +96,20 @@ function showAuthOrApp() {
         window.api.verifyToken()
             .then(result => {
                 if (result.valid) {
-                    console.log('âœ… Token valid - showing app');
+                    console.log('Ã¢Åâ¦ Token valid - showing app');
                     currentUser = result.user;
                     showApp();
                 } else {
-                    console.log('âš ï¸ Token invalid - showing login');
+                    console.log('Ã¢Å¡Â Ã¯Â¸Â Token invalid - showing login');
                     showAuthModal();
                 }
             })
             .catch(() => {
-                console.log('âš ï¸ Token verification failed - showing login');
+                console.log('Ã¢Å¡Â Ã¯Â¸Â Token verification failed - showing login');
                 showAuthModal();
             });
     } else {
-        console.log('ðŸ”‘ No token - showing login');
+        console.log('Ã°Å¸ââ No token - showing login');
         showAuthModal();
     }
 }
@@ -136,9 +136,9 @@ function showToast(title, message, type = 'info') {
 
     let icon = '';
     switch (type) {
-        case 'success': icon = 'âœ…'; break;
-        case 'error': icon = 'âŒ'; break;
-        default: icon = 'â„¹ï¸';
+        case 'success': icon = 'Ã¢Åâ¦'; break;
+        case 'error': icon = 'Ã¢ÂÅ'; break;
+        default: icon = 'Ã¢âÂ¹Ã¯Â¸Â';
     }
 
     toast.innerHTML = `
@@ -148,7 +148,7 @@ function showToast(title, message, type = 'info') {
                 <p class="font-semibold text-sm">${title}</p>
                 <p class="text-xs text-slate-400 mt-1">${message}</p>
             </div>
-            <button class="text-slate-500 hover:text-white" onclick="this.parentElement.parentElement.remove()">âœ•</button>
+            <button class="text-slate-500 hover:text-white" onclick="this.parentElement.parentElement.remove()">Ã¢Åâ¢</button>
         </div>
     `;
 
@@ -205,7 +205,7 @@ async function refreshBalance() {
                 }
             }
 
-            logToTerminal(`ðŸ’° Auto-refresh balance: $${balanceNum.toFixed(2)}`);
+            logToTerminal(`Ã°Å¸âÂ° Auto-refresh balance: $${balanceNum.toFixed(2)}`);
         }
 
         if (window.updateLockedBalance) {
@@ -237,7 +237,7 @@ function stopAutoBalanceRefresh() {
 // ================================================================
 
 function initMobileDrawer() {
-    logToTerminal('ðŸ“± Initializing mobile drawer');
+    logToTerminal('Ã°Å¸âÂ± Initializing mobile drawer');
 
     function closeDrawer() {
         if (sidebarDrawer) sidebarDrawer.style.transform = 'translateX(-100%)';
@@ -263,9 +263,9 @@ function initMobileDrawer() {
             if (__isDesktop) {
                 const __sidebar = document.querySelector('aside, .sidebar, #sidebar, nav[role="navigation"]');
                 if (__sidebar) {
-                    const __hidden = __sidebar.style.display === 'none';
-                    __sidebar.style.display = __hidden ? '' : 'none';
+                    __sidebar.style.display = __sidebar.style.display === 'none' ? '' : 'none';
                 }
+                console.log('Desktop: toggled sidebar');
             } else {
                 openDrawer();
             }
@@ -308,11 +308,11 @@ function setupPageCloseButtons() {
                 closeBtn.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    logToTerminal(`âŒ [UI] Closing ${pageId}, returning to dashboard`);
+                    logToTerminal(`Ã¢ÂÅ [UI] Closing ${pageId}, returning to dashboard`);
                     switchPage('dashboard');
                 };
                 headerDiv.appendChild(closeBtn);
-                logToTerminal(`âœ… [UI] Added close button to ${pageId}`);
+                logToTerminal(`Ã¢Åâ¦ [UI] Added close button to ${pageId}`);
             }
         }
     });
@@ -323,7 +323,7 @@ function setupPageCloseButtons() {
 // ================================================================
 
 function setupAuthModal() {
-    logToTerminal('ðŸ” Setting up auth modal');
+    logToTerminal('Ã°Å¸âÂ Setting up auth modal');
 
     if (loginTab && registerTab) {
         loginTab.addEventListener('click', () => {
@@ -348,12 +348,12 @@ function setupAuthModal() {
             e.stopPropagation();
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
-            logToTerminal(`ðŸ” Login attempt for: ${email}`);
+            logToTerminal(`Ã°Å¸âÂ Login attempt for: ${email}`);
 
             try {
                 const result = await window.api.login(email, password);
                 if (result.success) {
-                    logToTerminal(`âœ… Login successful for ${email}`);
+                    logToTerminal(`Ã¢Åâ¦ Login successful for ${email}`);
                     currentUser = result.user;
                     showApp();
                     await loadUserData();
@@ -375,12 +375,12 @@ function setupAuthModal() {
             const email = document.getElementById('regEmail').value;
             const password = document.getElementById('regPassword').value;
             const voucher = document.getElementById('regVoucher').value;
-            logToTerminal(`ðŸ“ Registration attempt for: ${email} (${username})`);
+            logToTerminal(`Ã°Å¸âÂ Registration attempt for: ${email} (${username})`);
 
             try {
                 const result = await window.api.register(username, email, password, voucher);
                 if (result.success) {
-                    logToTerminal(`âœ… Registration successful for ${email}`);
+                    logToTerminal(`Ã¢Åâ¦ Registration successful for ${email}`);
                     currentUser = result.user;
                     showApp();
                     await loadUserData();
@@ -400,7 +400,7 @@ function setupAuthModal() {
 // ================================================================
 
 function setupModals() {
-    logToTerminal('ðŸ”§ Setting up modals');
+    logToTerminal('Ã°Å¸âÂ§ Setting up modals');
 
     if (openApiKeys) {
         openApiKeys.addEventListener('click', async () => {
@@ -521,7 +521,7 @@ async function loadSettingsToForm() {
 // ================================================================
 
 function setupNavigation() {
-    logToTerminal('ðŸ§­ Setting up navigation');
+    logToTerminal('Ã°Å¸Â§Â­ Setting up navigation');
 
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
@@ -570,7 +570,7 @@ function switchPage(page) {
 
 async function loadUserData() {
     try {
-        logToTerminal('ðŸ‘¤ Loading user data...');
+        logToTerminal('Ã°Å¸âÂ¤ Loading user data...');
         const profile = await window.api.getUserProfile();
 
         if (profile && profile.user) {
@@ -597,13 +597,13 @@ async function loadUserData() {
                     balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
                     if (connectionText) connectionText.innerHTML = `${currentMode} Connected (${profile.derivBalance.currency})`;
                     if (marketStatus) marketStatus.innerHTML = `${currentMode} ACTIVE`;
-                    logToTerminal(`ðŸ’° Balance from Deriv API: $${balanceNum} ${profile.derivBalance.currency} (${currentMode})`);
+                    logToTerminal(`Ã°Å¸âÂ° Balance from Deriv API: $${balanceNum} ${profile.derivBalance.currency} (${currentMode})`);
                 }
                 else if (profile.user.is_demo === 0 && hasRealToken && (!profile.derivBalance || profile.derivBalance.balance === 0)) {
                     balanceEl.innerHTML = `$0.00`;
                     if (connectionText) connectionText.innerHTML = 'Connecting to REAL...';
                     if (marketStatus) marketStatus.innerHTML = 'CONNECTING';
-                    logToTerminal('âš ï¸ REAL mode but balance is 0 - forcing reconnect');
+                    logToTerminal('Ã¢Å¡Â Ã¯Â¸Â REAL mode but balance is 0 - forcing reconnect');
 
                     try {
                         const reconnectResult = await window.api.reconnectDeriv();
@@ -611,23 +611,23 @@ async function loadUserData() {
                             balanceEl.innerHTML = `$${reconnectResult.balance.toFixed(2)}`;
                             if (connectionText) connectionText.innerHTML = `REAL Connected`;
                             if (marketStatus) marketStatus.innerHTML = `REAL ACTIVE`;
-                            logToTerminal(`ðŸ’° REAL balance fetched: $${reconnectResult.balance}`);
+                            logToTerminal(`Ã°Å¸âÂ° REAL balance fetched: $${reconnectResult.balance}`);
                         }
                     } catch (reconnectError) {
-                        logToTerminal(`âŒ Force reconnect failed: ${reconnectError.message}`, 'error');
+                        logToTerminal(`Ã¢ÂÅ Force reconnect failed: ${reconnectError.message}`, 'error');
                     }
                 }
                 else if (!hasAnyApiKey) {
                     balanceEl.innerHTML = `$0.00`;
                     if (connectionText) connectionText.innerHTML = 'No API Keys';
                     if (marketStatus) marketStatus.innerHTML = 'READ-ONLY';
-                    logToTerminal('âš ï¸ No API keys found - showing $0 balance');
+                    logToTerminal('Ã¢Å¡Â Ã¯Â¸Â No API keys found - showing $0 balance');
                 }
                 else if (hasAnyApiKey && !profile.derivBalance?.authorized && !isReconnecting) {
                     balanceEl.innerHTML = `$0.00`;
                     if (connectionText) connectionText.innerHTML = 'Connecting...';
                     if (marketStatus) marketStatus.innerHTML = 'CONNECTING';
-                    logToTerminal('âš ï¸ API keys present but Deriv not authorized - attempting reconnect');
+                    logToTerminal('Ã¢Å¡Â Ã¯Â¸Â API keys present but Deriv not authorized - attempting reconnect');
 
                     isReconnecting = true;
                     try {
@@ -639,10 +639,10 @@ async function loadUserData() {
                             balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
                             if (connectionText) connectionText.innerHTML = `${reconnectResult.mode || currentMode} Connected`;
                             if (marketStatus) marketStatus.innerHTML = `${reconnectResult.mode || currentMode} ACTIVE`;
-                            logToTerminal(`ðŸ’° Reconnected! Balance: $${balanceNum}`);
+                            logToTerminal(`Ã°Å¸âÂ° Reconnected! Balance: $${balanceNum}`);
                         }
                     } catch (reconnectError) {
-                        logToTerminal(`âŒ Auto-reconnect failed: ${reconnectError.message}`, 'error');
+                        logToTerminal(`Ã¢ÂÅ Auto-reconnect failed: ${reconnectError.message}`, 'error');
                     } finally {
                         isReconnecting = false;
                     }
@@ -679,20 +679,20 @@ async function loadUserData() {
             const adminLink = document.getElementById('adminLink');
             if (adminLink && profile.user.is_admin) {
                 adminLink.classList.remove('hidden');
-                logToTerminal('ðŸ‘‘ Admin access granted');
+                logToTerminal('Ã°Å¸ââ Admin access granted');
             }
 
             if (window.updateLockedBalance) await window.updateLockedBalance();
-            logToTerminal('âœ… User data loaded successfully');
+            logToTerminal('Ã¢Åâ¦ User data loaded successfully');
         }
     } catch (error) {
-        logToTerminal(`âŒ Failed to load user data: ${error.message}`, 'error');
+        logToTerminal(`Ã¢ÂÅ Failed to load user data: ${error.message}`, 'error');
     }
 }
 
 async function loadPerformanceStats() {
     try {
-        logToTerminal('ðŸ“ˆ Loading performance stats...');
+        logToTerminal('Ã°Å¸âË Loading performance stats...');
         const stats = await window.api.getTradeStats(30);
         document.getElementById('statWinRate').innerHTML = `${stats.overall?.win_rate || 0}%`;
         document.getElementById('statTotalTrades').innerHTML = stats.overall?.total_trades || 0;
@@ -708,15 +708,15 @@ async function loadPerformanceStats() {
                 symbolContainer.innerHTML = '<p class="text-center text-slate-500">No trades yet</p>';
             }
         }
-        logToTerminal('âœ… Performance stats loaded');
+        logToTerminal('Ã¢Åâ¦ Performance stats loaded');
     } catch (error) {
-        logToTerminal(`âŒ Failed to load performance stats: ${error.message}`, 'error');
+        logToTerminal(`Ã¢ÂÅ Failed to load performance stats: ${error.message}`, 'error');
     }
 }
 
 async function loadFullHistory() {
     try {
-        logToTerminal('ðŸ“œ Loading trade history...');
+        logToTerminal('Ã°Å¸âÅ Loading trade history...');
         const trades = await window.api.getTradeHistory(100);
         const tbody = document.getElementById('historyTradesBody');
         const symbolFilter = document.getElementById('historyFilterSymbol');
@@ -740,15 +740,15 @@ async function loadFullHistory() {
         if (symbolFilter) symbolFilter.addEventListener('change', renderFiltered);
         if (statusFilter) statusFilter.addEventListener('change', renderFiltered);
         renderFiltered();
-        logToTerminal(`âœ… Loaded ${trades.length} trades`);
+        logToTerminal(`Ã¢Åâ¦ Loaded ${trades.length} trades`);
     } catch (error) {
-        logToTerminal(`âŒ Failed to load trade history: ${error.message}`, 'error');
+        logToTerminal(`Ã¢ÂÅ Failed to load trade history: ${error.message}`, 'error');
     }
 }
 
 async function loadLeaderboard() {
     try {
-        logToTerminal('ðŸ† Loading leaderboard...');
+        logToTerminal('Ã°Å¸Ââ  Loading leaderboard...');
         const leaderboard = await window.api.getLeaderboard();
         const container = document.getElementById('leaderboardBody');
 
@@ -765,16 +765,16 @@ async function loadLeaderboard() {
             return username.substring(0, 2) + '***' + username.substring(username.length - 2);
         }
 
-        container.innerHTML = leaderboard.map((user, index) => `<div class="flex items-center justify-between bg-slate-800/30 p-3 rounded-lg"><div class="flex items-center gap-3"><span class="text-2xl ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-slate-400' : index === 2 ? 'text-amber-600' : 'text-slate-500'}">${index === 0 ? 'ðŸ¥‡' : index === 1 ? 'ðŸ¥ˆ' : index === 2 ? 'ðŸ¥‰' : `${index + 1}`}</span><div><p class="font-medium">${maskUsername(user.username)}</p><p class="text-xs text-slate-500">${user.total_trades || 0} trades | ${user.win_rate || 0}% win</p></div></div><div class="text-right"><p class="font-bold text-emerald-400">+$${user.net_profit?.toFixed(2)}</p><p class="text-xs text-slate-500">Best: ${user.best_streak || 0} streak</p></div></div>`).join('');
-        logToTerminal(`âœ… Leaderboard loaded with ${leaderboard.length} traders`);
+        container.innerHTML = leaderboard.map((user, index) => `<div class="flex items-center justify-between bg-slate-800/30 p-3 rounded-lg"><div class="flex items-center gap-3"><span class="text-2xl ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-slate-400' : index === 2 ? 'text-amber-600' : 'text-slate-500'}">${index === 0 ? 'Ã°Å¸Â¥â¡' : index === 1 ? 'Ã°Å¸Â¥Ë' : index === 2 ? 'Ã°Å¸Â¥â°' : `${index + 1}`}</span><div><p class="font-medium">${maskUsername(user.username)}</p><p class="text-xs text-slate-500">${user.total_trades || 0} trades | ${user.win_rate || 0}% win</p></div></div><div class="text-right"><p class="font-bold text-emerald-400">+$${user.net_profit?.toFixed(2)}</p><p class="text-xs text-slate-500">Best: ${user.best_streak || 0} streak</p></div></div>`).join('');
+        logToTerminal(`Ã¢Åâ¦ Leaderboard loaded with ${leaderboard.length} traders`);
     } catch (error) {
-        logToTerminal(`âŒ Failed to load leaderboard: ${error.message}`, 'error');
+        logToTerminal(`Ã¢ÂÅ Failed to load leaderboard: ${error.message}`, 'error');
     }
 }
 
 async function loadFullInsights() {
     try {
-        logToTerminal('ðŸ§  Loading full insights page...');
+        logToTerminal('Ã°Å¸Â§Â  Loading full insights page...');
 
         const currentSymbol = document.getElementById('symbolSelect')?.value || null;
 
@@ -793,7 +793,7 @@ async function loadFullInsights() {
                     <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
                 </div>
             `;
-            logToTerminal('ðŸ§  No trades yet - showing placeholder');
+            logToTerminal('Ã°Å¸Â§Â  No trades yet - showing placeholder');
             return;
         }
 
@@ -808,12 +808,12 @@ async function loadFullInsights() {
                     <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
                 </div>
             `;
-            logToTerminal(`ðŸ§  Only ${insights.user_stats.total_trades} trades - need ${tradesNeeded} more for insights`);
+            logToTerminal(`Ã°Å¸Â§Â  Only ${insights.user_stats.total_trades} trades - need ${tradesNeeded} more for insights`);
             return;
         }
 
         const symbolInfo = insights.current_symbol && insights.current_symbol !== 'all'
-            ? `<div class="text-xs text-indigo-400 mb-2">ðŸ“Š Showing insights for: ${insights.current_symbol}</div>`
+            ? `<div class="text-xs text-indigo-400 mb-2">Ã°Å¸âÅ  Showing insights for: ${insights.current_symbol}</div>`
             : '';
 
         container.innerHTML = `
@@ -885,10 +885,10 @@ async function loadFullInsights() {
             </div>
         `;
 
-        logToTerminal(`âœ… Full insights displayed for symbol: ${currentSymbol || 'all'}`);
+        logToTerminal(`Ã¢Åâ¦ Full insights displayed for symbol: ${currentSymbol || 'all'}`);
 
     } catch (error) {
-        logToTerminal(`âŒ Failed to load full insights: ${error.message}`, 'error');
+        logToTerminal(`Ã¢ÂÅ Failed to load full insights: ${error.message}`, 'error');
         const container = document.getElementById('fullInsightsContent');
         if (container) {
             container.innerHTML = `
@@ -927,7 +927,7 @@ function setupTheme() {
                 if (themeIcon) themeIcon.className = 'fas fa-moon';
                 if (themeText) themeText.innerText = 'Dark Mode';
                 if (window.updateChartTheme) window.updateChartTheme(true);
-                logToTerminal('ðŸŒ™ Theme changed to Dark');
+                logToTerminal('Ã°Å¸Åâ¢ Theme changed to Dark');
             } else {
                 document.body.classList.remove('dark-theme');
                 document.body.classList.add('light-theme');
@@ -935,7 +935,7 @@ function setupTheme() {
                 if (themeIcon) themeIcon.className = 'fas fa-sun';
                 if (themeText) themeText.innerText = 'Light Mode';
                 if (window.updateChartTheme) window.updateChartTheme(false);
-                logToTerminal('â˜€ï¸ Theme changed to Light');
+                logToTerminal('Ã¢Ëâ¬Ã¯Â¸Â Theme changed to Light');
             }
         });
     }
@@ -953,7 +953,7 @@ function updateServerTime() {
 // ================================================================
 
 function showApp() {
-    logToTerminal('ðŸš€ Showing main application');
+    logToTerminal('Ã°Å¸Å¡â¬ Showing main application');
     if (authModal) authModal.classList.add('hidden');
     if (appContainer) appContainer.classList.remove('hidden');
 
@@ -979,7 +979,7 @@ function showApp() {
 }
 
 function showAuthModal() {
-    logToTerminal('ðŸ” Showing auth modal');
+    logToTerminal('Ã°Å¸âÂ Showing auth modal');
     if (authModal) authModal.classList.remove('hidden');
     if (appContainer) appContainer.classList.add('hidden');
 }
@@ -989,12 +989,12 @@ function showAuthModal() {
 // ================================================================
 
 async function initApp() {
-    logToTerminal('ðŸš€ MONIX Trading Platform v6.0 Initializing...');
+    logToTerminal('Ã°Å¸Å¡â¬ MONIX Trading Platform v6.0 Initializing...');
 
     initMobileDrawer();
     setupAuthModal();
 
-    // ðŸŽ¬ SHOW LOADING SCREEN FIRST
+    // Ã°Å¸Å½Â¬ SHOW LOADING SCREEN FIRST
     showLoadingScreen();
 
     // The rest happens in showAuthOrApp() after typing completes
@@ -1011,7 +1011,7 @@ window.refreshBalance = refreshBalance;
 
 if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
-        logToTerminal('ðŸšª User logout');
+        logToTerminal('Ã°Å¸Å¡Âª User logout');
         stopAutoBalanceRefresh();
         window.api.logout();
     });
