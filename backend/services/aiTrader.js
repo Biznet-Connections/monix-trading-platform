@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.32 - Removed isReady block to allow first trades
+ * v15.0.33 - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -482,7 +482,7 @@ class AITrader {
     async analyzeSymbol(symbol) {
         if (symbol === 'XAU/USD (Gold)') return null;
 
-        // 🧠 LEARNING-BASED FILTERS (v15.0.32)
+        // 🧠 LEARNING-BASED FILTERS (v15.0.33)
         const __hour = new Date().getUTCHours();
         
         // Blocked symbols based on historical WR < 20%
@@ -940,7 +940,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.32 (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.33 (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
