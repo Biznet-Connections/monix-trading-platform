@@ -1,0 +1,13 @@
+﻿const isReallyClosed = (contract.is_sold === 1 || contract.status === "sold");
+        if (!isReallyClosed) {
+            if (!this._lastUnrealizedLog || Date.now() - this._lastUnrealizedLog > 5000) {
+                console.log("[Unrealized] " + this.activeTrade.symbol + " #" + contract.contract_id + ": $" + currentProfit.toFixed(2) + " (waiting)");
+                this._lastUnrealizedLog = Date.now();
+            }
+            return;
+        }
+        const finalProfit = currentProfit;
+        const status = finalProfit > 0 ? "WIN" : "LOSS";
+        const pct = ((finalProfit / stake) * 100).toFixed(1);
+        console.log("[REAL CLOSE] " + this.activeTrade.symbol + " #" + contract.contract_id + ": " + status + " $" + finalProfit.toFixed(2) + " (" + pct + "%)");
+        await this.closeTrade(contract.contract_id, finalProfit, status);
