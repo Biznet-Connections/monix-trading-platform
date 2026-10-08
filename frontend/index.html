@@ -242,7 +242,7 @@
 <!-- ============================================================ -->
 <div id="appContainer" class="hidden">
     <!-- Mobile Header -->
-    <div id="mobileHeader" class="fixed top-0 left-0 right-0 z-45 flex items-center gap-3 p-4 bg-indigo-900/80 backdrop-blur-md border-b border-indigo-500/20">
+    <div id="mobileHeader" class="fixed top-0 left-0 right-0 z-30 flex lg:hidden items-center gap-3 p-4 bg-indigo-900/80 backdrop-blur-md border-b border-indigo-500/20">
         <button id="mobileMenuBtn" class="bg-indigo-600 p-3 rounded-xl shadow-lg cursor-pointer">
             <i class="fas fa-bars text-white text-xl"></i>
         </button>
@@ -252,7 +252,7 @@
     </div>
 
     <!-- Sidebar Drawer -->
-    <div id="sidebarDrawer" class="fixed top-0 left-0 z-50 w-64 h-full sidebar-glass flex flex-col shadow-2xl transition-all duration-300 lg:w-48" style="transform: translateX(-100%);">
+    <div id="sidebarDrawer" class="fixed top-0 left-0 z-50 w-64 lg:w-48 h-full sidebar-glass flex flex-col shadow-2xl transition-all duration-300 -translate-x-full lg:translate-x-0">
         <div class="absolute top-4 right-4">
             <button id="closeDrawerBtn" class="text-slate-400 hover:text-white text-2xl">&times;</button>
         </div>
@@ -298,10 +298,13 @@
     <div id="drawerOverlay" class="fixed top-0 left-0 w-full h-full bg-black/50 z-40 hidden"></div>
 
     <!-- Main Content -->
-    <div class="lg:ml-48 main-content transition-all duration-300 p-4 md:p-6 pt-20 lg:pt-6">
+    <div class="lg:ml-48 main-content transition-all duration-300 p-4 md:p-6 pt-20 lg:pt-6" id="mainContent">
         <!-- Dashboard Page -->
         <div id="dashboardPage" class="page-content">
-            <!-- Top Bar -->
+            <!-- Top Bar with Desktop Hamburger -->
+            <button id="desktopHamburger" class="hidden lg:flex items-center justify-center w-10 h-10 mb-4 bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg cursor-pointer text-white transition">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <div>
                     <h2 class="text-2xl font-bold">Dashboard</h2>
