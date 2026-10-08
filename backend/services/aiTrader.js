@@ -489,7 +489,7 @@ class AITrader {
         
         // Blocked hours based on last 100 trades showing 0% WR
         // SESSION FILTER: only ASIAN session trades (34% WR vs 0% others)
-        const __sessionNow = __hour < 8 ? 'ASIAN' : (__hour < 16 ? 'LONDON' : 'NEWYORK');
+        const __sessionNow = __hour < 8 ? 'ASIAN' : (__hour < 14 ? 'LONDON' : 'NEWYORK'); // Extended to 14 UTC
         if (__sessionNow !== 'ASIAN') {
             console.log('[LEARN] ' + __sessionNow + ' session blocked (0% WR - ASIAN only)');
             return null;
