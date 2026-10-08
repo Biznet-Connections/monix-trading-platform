@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.30 - Removed isReady block to allow first trades
+ * v15.0.31 - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -64,8 +64,8 @@ class AITrader {
         this.sessionLoss = 0;
 
         // Trade parameters
-        this.PROFIT_TARGET_PCT = 0.08;
-        this.STOP_LOSS_PCT = 0.02;
+        this.PROFIT_TARGET_PCT = 0.60;
+        this.STOP_LOSS_PCT = 0.30;
         this.MAX_TRADE_DURATION = 300000;
 
         // 🚀 DYNAMIC STAKE CONFIGURATION
@@ -355,6 +355,13 @@ class AITrader {
             return;
         }
 
+        // GUARD: prevent duplicate close on same contract
+        if (this._closingContractId === contractId) {
+            console.log('GUARD: Ignoring duplicate close for ' + contractId);
+            return;
+        }
+        this._closingContractId = contractId;
+
         if (this.activeTrade.contract_id !== contractId) {
             console.log(`⚠️ Active trade contract ${this.activeTrade.contract_id} doesn't match ${contractId}`);
             return;
@@ -461,16 +468,19 @@ class AITrader {
             } catch (e) {}
 
             this.activeTrade = null;
+            this._closingContractId = null;
 
         } catch (error) {
-            console.error(`❌ Close trade error:`, error.message);
+            console.error('Close trade error:', error.message);
             this.activeTrade = null;
+            this._closingContractId = null;
         }
     }
 
     // ─── Analyze Symbol ───
 
     async analyzeSymbol(symbol) {
+        if (symbol === 'XAU/USD (Gold)') return null;
         console.log(`🔍 [DEBUG-ENTRY] analyzeSymbol called for ${symbol}`);
         try {
             const marketState = marketData.getMarketState(symbol);
@@ -903,7 +913,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.30 (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.31 (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
