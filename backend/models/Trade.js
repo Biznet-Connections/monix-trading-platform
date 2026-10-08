@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 
 const tradeSchema = new mongoose.Schema({
     user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -54,7 +54,7 @@ class Trade {
     static async updateResult(tradeId, exit_price, profit, status, closed_at = null) {
         // Check for suspicious exit price (for R_75 which trades at 30,000+)
         if (exit_price && exit_price < 1000 && status === 'WIN') {
-            console.log(`⚠️ [Trade] Suspicious exit price: $${exit_price}. This might be a data error. Keeping original.`);
+            console.log(`âš ï¸ [Trade] Suspicious exit price: $${exit_price}. This might be a data error. Keeping original.`);
             return TradeModel.findByIdAndUpdate(tradeId, {
                 profit,
                 status,
@@ -63,7 +63,7 @@ class Trade {
         }
         
         if (exit_price && exit_price > 1000000) {
-            console.log(`⚠️ [Trade] Suspicious exit price: $${exit_price} (too high). This might be a data error.`);
+            console.log(`âš ï¸ [Trade] Suspicious exit price: $${exit_price} (too high). This might be a data error.`);
             return TradeModel.findByIdAndUpdate(tradeId, {
                 profit,
                 status,
@@ -198,7 +198,7 @@ class Trade {
         }));
     }
 
-    // ✅ FIXED: Today's profit uses local timezone
+    // âœ… FIXED: Today's profit uses local timezone
     static async getTodayStats(userId) {
         // Use local timezone
         const now = new Date();
@@ -210,7 +210,8 @@ class Trade {
             user_id: userId,
             hidden: false,
             executed_at: { $gte: todayStart, $lt: todayEnd },
-            status: { $ne: 'PENDING' }
+            status: { $ne: 'PENDING' },
+            $expr: { $eq: ['$entry_price', '$exit_price'] }
         }).lean();
 
         return {
