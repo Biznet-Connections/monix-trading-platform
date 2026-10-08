@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.31 - Removed isReady block to allow first trades
+ * v15.0.32 - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -481,6 +481,33 @@ class AITrader {
 
     async analyzeSymbol(symbol) {
         if (symbol === 'XAU/USD (Gold)') return null;
+
+        // 🧠 LEARNING-BASED FILTERS (v15.0.32)
+        const __hour = new Date().getUTCHours();
+        
+        // Blocked symbols based on historical WR < 20%
+        const __blockedSymbols = ['R_100']; // 11.8% WR over 407 trades
+        if (__blockedSymbols.includes(symbol)) {
+            console.log('🧠 [LEARN] ' + symbol + ' blocked (historical WR < 20%)');
+            return null;
+        }
+        
+        // Blocked hours based on last 100 trades showing 0% WR
+        const __blockedHours = [0, 21, 22, 23]; // All 0% WR recently
+        if (__blockedHours.includes(__hour)) {
+            console.log('🧠 [LEARN] Hour ' + __hour + ':00 UTC blocked (0% WR last 100 trades)');
+            return null;
+        }
+        
+        // Blocked patterns based on pattern journal WR < 30%
+        const __blockedPatterns = ['oversold_bounce', 'bearish_engulfing', 'FORCE_TRADE', 'doji', 'hammer'];
+        const __mState = marketData.getMarketState(symbol);
+        const __pattern = __mState.lastPattern || 'none';
+        if (__blockedPatterns.includes(__pattern)) {
+            console.log('🧠 [LEARN] Pattern ' + __pattern + ' blocked (journal WR < 30%)');
+            return null;
+        }
+
         console.log(`🔍 [DEBUG-ENTRY] analyzeSymbol called for ${symbol}`);
         try {
             const marketState = marketData.getMarketState(symbol);
@@ -913,7 +940,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.31 (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.32 (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
