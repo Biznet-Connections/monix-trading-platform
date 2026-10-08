@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -12,7 +12,7 @@
 <body class="dark-theme">
 
 <!-- ============================================================ -->
-<!-- 🚀 LOADING SCREEN - GLOWING "M"                              -->
+<!-- ðŸš€ LOADING SCREEN - GLOWING "M"                              -->
 <!-- ============================================================ -->
 <div id="loadingScreen">
     <div class="loading-container">
@@ -120,7 +120,7 @@
             <div class="mb-4">
                 <label class="block text-sm text-slate-400 mb-2">DEMO Account Token</label>
                 <input type="text" id="demoToken" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white font-mono text-sm" placeholder="Enter your Deriv demo token">
-                <p class="text-xs text-slate-500 mt-1">📌 Get from Deriv → Settings → API Token (Demo account)</p>
+                <p class="text-xs text-slate-500 mt-1">ðŸ“Œ Get from Deriv â†’ Settings â†’ API Token (Demo account)</p>
             </div>
             <div class="mb-4">
                 <label class="block text-sm text-slate-400 mb-2">REAL Account Token</label>
@@ -130,16 +130,16 @@
                         <i class="fas fa-eye"></i>
                     </button>
                 </div>
-                <p class="text-xs text-amber-500 mt-1">⚠️ WARNING: This is for REAL money trading! Keep secure!</p>
-                <p class="text-xs text-slate-500 mt-1">📌 Get from Deriv → Settings → API Token (Real account)</p>
+                <p class="text-xs text-amber-500 mt-1">âš ï¸ WARNING: This is for REAL money trading! Keep secure!</p>
+                <p class="text-xs text-slate-500 mt-1">ðŸ“Œ Get from Deriv â†’ Settings â†’ API Token (Real account)</p>
             </div>
-            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">💾 SAVE API KEYS</button>
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">ðŸ’¾ SAVE API KEYS</button>
         </form>
         <div class="mt-4 p-3 bg-slate-800/50 rounded-lg">
-            <p class="text-xs text-slate-400">🔑 How to get API token:</p>
+            <p class="text-xs text-slate-400">ðŸ”‘ How to get API token:</p>
             <ol class="text-xs text-slate-500 list-decimal list-inside mt-1 space-y-1">
                 <li>Login to your Deriv account</li>
-                <li>Go to Settings → API Token</li>
+                <li>Go to Settings â†’ API Token</li>
                 <li>Create new token with "trade" permission</li>
                 <li>Copy and paste here</li>
             </ol>
@@ -160,14 +160,14 @@
             <div class="mb-4">
                 <label class="block text-sm text-slate-400 mb-2">Default Symbol</label>
                 <select id="defaultSymbol" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white">
-                    <optgroup label="📊 Volatility Indices">
+                    <optgroup label="ðŸ“Š Volatility Indices">
                         <option>R_75</option>
                         <option>R_10</option>
                         <option>R_25</option>
                         <option>R_50</option>
                         <option>R_100</option>
                     </optgroup>
-                    <optgroup label="💱 Forex">
+                    <optgroup label="ðŸ’± Forex">
                         <option>EUR/USD</option>
                         <option>GBP/USD</option>
                         <option>USD/JPY</option>
@@ -242,7 +242,7 @@
 <!-- ============================================================ -->
 <div id="appContainer" class="hidden">
     <!-- Mobile Header -->
-    <div id="mobileHeader" class="fixed top-0 left-0 right-0 z-45 lg:hidden flex items-center gap-3 p-4 bg-indigo-900/80 backdrop-blur-md border-b border-indigo-500/20">
+    <div id="mobileHeader" class="fixed top-0 left-0 right-0 z-45 flex items-center gap-3 p-4 bg-indigo-900/80 backdrop-blur-md border-b border-indigo-500/20">
         <button id="mobileMenuBtn" class="bg-indigo-600 p-3 rounded-xl shadow-lg cursor-pointer">
             <i class="fas fa-bars text-white text-xl"></i>
         </button>
@@ -253,7 +253,7 @@
 
     <!-- Sidebar Drawer -->
     <div id="sidebarDrawer" class="fixed top-0 left-0 z-50 w-64 h-full sidebar-glass flex flex-col shadow-2xl transition-all duration-300 lg:w-48" style="transform: translateX(-100%);">
-        <div class="lg:hidden absolute top-4 right-4">
+        <div class="absolute top-4 right-4">
             <button id="closeDrawerBtn" class="text-slate-400 hover:text-white text-2xl">&times;</button>
         </div>
 
@@ -326,14 +326,14 @@
             <!-- Stats Cards - 3 Column -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
                 <div class="glass-card p-6 rounded-2xl hover-card transition">
-                    <p class="text-slate-400 text-sm font-medium">💰 Balance</p>
+                    <p class="text-slate-400 text-sm font-medium">ðŸ’° Balance</p>
                     <h2 id="balanceAmount" class="text-4xl font-bold mt-2">$0.00</h2>
                     <div class="mt-4">
                         <span id="todayProfit" class="text-emerald-400 text-sm"><i class="fas fa-arrow-up"></i> Today: +$0.00</span>
                     </div>
                 </div>
                 <div class="glass-card p-6 rounded-2xl hover-card transition border-l-4 border-indigo-500">
-                    <p class="text-slate-400 text-sm font-medium">🎫 Active Voucher</p>
+                    <p class="text-slate-400 text-sm font-medium">ðŸŽ« Active Voucher</p>
                     <h2 id="voucherCode" class="text-xl font-mono font-bold mt-2 text-indigo-300">MONIX-XXXX</h2>
                     <div class="mt-3 flex justify-between text-xs">
                         <span id="tradesRemaining" class="text-slate-500">Trades Left: 0/0</span>
@@ -344,7 +344,7 @@
                     </div>
                 </div>
                 <div class="glass-card p-6 rounded-2xl hover-card transition">
-                    <p class="text-slate-400 text-sm font-medium">📊 Win Rate</p>
+                    <p class="text-slate-400 text-sm font-medium">ðŸ“Š Win Rate</p>
                     <h2 id="winRateDisplay" class="text-4xl font-bold mt-2">0%</h2>
                     <div class="mt-4">
                         <span id="totalTradesDisplay" class="text-slate-400 text-sm">0 trades</span>
@@ -355,22 +355,22 @@
             <!-- Locked Balance Panel -->
             <div id="lockedBalancePanel" class="glass-card p-4 rounded-xl mt-0 mb-4 hidden">
                 <div class="flex justify-between text-sm mb-2">
-                    <span class="text-slate-400">💰 Total Balance:</span>
+                    <span class="text-slate-400">ðŸ’° Total Balance:</span>
                     <span id="totalBalance" class="font-bold">$0.00</span>
                 </div>
                 <div class="flex justify-between text-sm mb-2">
-                    <span class="text-slate-400">🔒 Locked in Trades:</span>
+                    <span class="text-slate-400">ðŸ”’ Locked in Trades:</span>
                     <span id="lockedBalance" class="font-bold text-yellow-400">$0.00</span>
                 </div>
                 <div class="flex justify-between text-sm pt-2 border-t border-slate-700">
-                    <span class="text-slate-400">✅ Available:</span>
+                    <span class="text-slate-400">âœ… Available:</span>
                     <span id="availableBalance" class="font-bold text-emerald-400">$0.00</span>
                 </div>
             </div>
 
             <!-- Status Bar -->
             <div class="flex justify-between items-center mb-4 text-xs text-slate-400 glass-card px-5 py-3 rounded-xl">
-                <div><span id="connectionStatus" class="text-emerald-400">🟢</span> <span id="connectionText">Connected</span></div>
+                <div><span id="connectionStatus" class="text-emerald-400">ðŸŸ¢</span> <span id="connectionText">Connected</span></div>
                 <div id="serverTime">Server: --:--:--</div>
                 <div id="marketStatus" class="text-emerald-400">Market: OPEN</div>
             </div>
@@ -380,16 +380,16 @@
                 <div class="flex justify-between items-center mb-5 flex-wrap gap-3">
                     <div class="flex gap-3 flex-wrap">
                         <select id="symbolSelect" class="bg-slate-800 rounded-lg px-4 py-2 text-sm border border-slate-700">
-                            <optgroup label="📊 Volatility Indices (1s)"><option>R_10</option><option>R_25</option><option>R_50</option><option selected>R_75</option><option>R_100</option></optgroup>
-                            <optgroup label="📈 Volatility Indices (2s)"><option>R_10_2S</option><option>R_25_2S</option><option>R_50_2S</option><option>R_75_2S</option><option>R_100_2S</option></optgroup>
-                            <optgroup label="💥 Boom & Crash Indices"><option>Boom 300</option><option>Boom 500</option><option>Boom 1000</option><option>Crash 300</option><option>Crash 500</option><option>Crash 1000</option></optgroup>
-                            <optgroup label="📉 Step Indices"><option>Step 200</option><option>Step 300</option><option>Step 400</option><option>Step 500</option></optgroup>
-                            <optgroup label="🏆 Derived Indices"><option>1HZ10</option><option>1HZ25</option><option>1HZ50</option><option>1HZ75</option><option>1HZ100</option></optgroup>
-                            <optgroup label="💱 Major Forex"><option>EUR/USD</option><option>GBP/USD</option><option>USD/JPY</option><option>AUD/USD</option><option>USD/CAD</option><option>NZD/USD</option><option>USD/CHF</option></optgroup>
-                            <optgroup label="💱 Minor Forex"><option>EUR/GBP</option><option>EUR/JPY</option><option>GBP/JPY</option><option>AUD/JPY</option><option>CAD/JPY</option><option>CHF/JPY</option><option>EUR/AUD</option><option>GBP/AUD</option></optgroup>
-                            <optgroup label="🥇 Commodities"><option>XAU/USD (Gold)</option><option>XAG/USD (Silver)</option><option>XPT/USD (Platinum)</option><option>XPD/USD (Palladium)</option><option>WTI (Oil)</option><option>Brent (Oil)</option></optgroup>
-                            <optgroup label="🪙 Cryptocurrencies"><option>BTC/USD (Bitcoin)</option><option>ETH/USD (Ethereum)</option><option>LTC/USD (Litecoin)</option><option>XRP/USD (Ripple)</option><option>ADA/USD (Cardano)</option><option>DOT/USD (Polkadot)</option><option>SOL/USD (Solana)</option><option>DOGE/USD (Dogecoin)</option></optgroup>
-                            <optgroup label="📊 Stock Indices"><option>US500 (S&P 500)</option><option>USTEC (Nasdaq)</option><option>US30 (Dow Jones)</option><option>GER40 (DAX)</option><option>UK100 (FTSE)</option><option>FRA40 (CAC 40)</option><option>ESP35 (IBEX 35)</option><option>NETH25 (AEX)</option><option>HK50 (Hang Seng)</option><option>JP225 (Nikkei)</option><option>AUS200 (ASX 200)</option></optgroup>
+                            <optgroup label="ðŸ“Š Volatility Indices (1s)"><option>R_10</option><option>R_25</option><option>R_50</option><option selected>R_75</option><option>R_100</option></optgroup>
+                            <optgroup label="ðŸ“ˆ Volatility Indices (2s)"><option>R_10_2S</option><option>R_25_2S</option><option>R_50_2S</option><option>R_75_2S</option><option>R_100_2S</option></optgroup>
+                            <optgroup label="ðŸ’¥ Boom & Crash Indices"><option>Boom 300</option><option>Boom 500</option><option>Boom 1000</option><option>Crash 300</option><option>Crash 500</option><option>Crash 1000</option></optgroup>
+                            <optgroup label="ðŸ“‰ Step Indices"><option>Step 200</option><option>Step 300</option><option>Step 400</option><option>Step 500</option></optgroup>
+                            <optgroup label="ðŸ† Derived Indices"><option>1HZ10</option><option>1HZ25</option><option>1HZ50</option><option>1HZ75</option><option>1HZ100</option></optgroup>
+                            <optgroup label="ðŸ’± Major Forex"><option>EUR/USD</option><option>GBP/USD</option><option>USD/JPY</option><option>AUD/USD</option><option>USD/CAD</option><option>NZD/USD</option><option>USD/CHF</option></optgroup>
+                            <optgroup label="ðŸ’± Minor Forex"><option>EUR/GBP</option><option>EUR/JPY</option><option>GBP/JPY</option><option>AUD/JPY</option><option>CAD/JPY</option><option>CHF/JPY</option><option>EUR/AUD</option><option>GBP/AUD</option></optgroup>
+                            <optgroup label="ðŸ¥‡ Commodities"><option>XAU/USD (Gold)</option><option>XAG/USD (Silver)</option><option>XPT/USD (Platinum)</option><option>XPD/USD (Palladium)</option><option>WTI (Oil)</option><option>Brent (Oil)</option></optgroup>
+                            <optgroup label="ðŸª™ Cryptocurrencies"><option>BTC/USD (Bitcoin)</option><option>ETH/USD (Ethereum)</option><option>LTC/USD (Litecoin)</option><option>XRP/USD (Ripple)</option><option>ADA/USD (Cardano)</option><option>DOT/USD (Polkadot)</option><option>SOL/USD (Solana)</option><option>DOGE/USD (Dogecoin)</option></optgroup>
+                            <optgroup label="ðŸ“Š Stock Indices"><option>US500 (S&P 500)</option><option>USTEC (Nasdaq)</option><option>US30 (Dow Jones)</option><option>GER40 (DAX)</option><option>UK100 (FTSE)</option><option>FRA40 (CAC 40)</option><option>ESP35 (IBEX 35)</option><option>NETH25 (AEX)</option><option>HK50 (Hang Seng)</option><option>JP225 (Nikkei)</option><option>AUS200 (ASX 200)</option></optgroup>
                         </select>
                         <div class="flex bg-slate-800 rounded-lg p-1 text-xs gap-1">
                             <button data-tf="1m" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">1m</button>
@@ -405,27 +405,27 @@
                 </div>
                 <div id="candlestick-chart" class="w-full" style="height: 500px;"></div>
                 <div class="mt-5 flex justify-between text-sm text-slate-400">
-                    <span>🟢 Support: <span id="supportLevel">$0.00</span></span>
-                    <span>🔴 Resistance: <span id="resistanceLevel">$0.00</span></span>
-                    <span class="text-amber-400">📊 RSI: <span id="rsiValue">--</span></span>
+                    <span>ðŸŸ¢ Support: <span id="supportLevel">$0.00</span></span>
+                    <span>ðŸ”´ Resistance: <span id="resistanceLevel">$0.00</span></span>
+                    <span class="text-amber-400">ðŸ“Š RSI: <span id="rsiValue">--</span></span>
                 </div>
             </div>
 
             <!-- Recent Trades Table - Full Width -->
             <div class="glass-card rounded-2xl overflow-hidden mb-8">
                 <div class="p-5 border-b border-slate-700 flex justify-between items-center cursor-pointer" onclick="toggleCollapsible('recentTradesContent', 'recentTradesIcon')">
-                    <h3 class="font-bold"><i class="fas fa-history mr-2 text-indigo-400"></i>📊 RECENT TRADES <span id="recentTradesCount" class="text-xs text-slate-500 ml-2">(0)</span></h3>
+                    <h3 class="font-bold"><i class="fas fa-history mr-2 text-indigo-400"></i>ðŸ“Š RECENT TRADES <span id="recentTradesCount" class="text-xs text-slate-500 ml-2">(0)</span></h3>
                     <div class="flex items-center gap-3">
-                        <button id="copyAllTradesBtn" class="text-xs text-indigo-400 hover:text-indigo-300 transition" onclick="event.stopPropagation(); window.copyAllTrades()" title="Copy all trades to clipboard">📋 Copy All</button>
+                        <button id="copyAllTradesBtn" class="text-xs text-indigo-400 hover:text-indigo-300 transition" onclick="event.stopPropagation(); window.copyAllTrades()" title="Copy all trades to clipboard">ðŸ“‹ Copy All</button>
                         <button id="refreshTradesBtn" class="text-xs text-indigo-400 hover:underline" onclick="event.stopPropagation(); window.loadRecentTrades()">REFRESH</button>
-                        <button id="deleteAllTradesBtn" class="text-xs text-red-400 hover:text-red-300 transition" onclick="event.stopPropagation(); window.deleteAllTrades()" title="Hide trades from UI (AI still learns)">🗑️ Clear View</button>
+                        <button id="deleteAllTradesBtn" class="text-xs text-red-400 hover:text-red-300 transition" onclick="event.stopPropagation(); window.deleteAllTrades()" title="Hide trades from UI (AI still learns)">ðŸ—‘ï¸ Clear View</button>
                         <i id="recentTradesIcon" class="fas fa-chevron-down text-slate-400 transition-transform"></i>
                     </div>
                 </div>
                 <div id="recentTradesContent" class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-slate-800/50 text-slate-400 text-xs uppercase">
-                            <tr><th class="p-4">Time</th><th class="p-4">Symbol</th><th class="p-4">Action</th><th class="p-4">Entry</th><th class="p-4">Exit</th><th class="p-4 text-right">Profit</th><th class="p-4 text-center">Status</th><th class="p-4 text-center">📋</th></tr>
+                            <tr><th class="p-4">Time</th><th class="p-4">Symbol</th><th class="p-4">Action</th><th class="p-4">Entry</th><th class="p-4">Exit</th><th class="p-4 text-right">Profit</th><th class="p-4 text-center">Status</th><th class="p-4 text-center">ðŸ“‹</th></tr>
                         </thead>
                         <tbody id="recentTradesBody" class="divide-y divide-slate-700/50">
                             <tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet. Execute a trade to see results!</td></tr>
