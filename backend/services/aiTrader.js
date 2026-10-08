@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.23 - Removed isReady block to allow first trades
+ * v15.0.29 - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -903,7 +903,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.23 (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.29 (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
