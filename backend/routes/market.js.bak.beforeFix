@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
 const derivService = require('../services/derivService');
@@ -62,34 +62,6 @@ router.get('/symbols', authMiddleware, async (req, res) => {
         indices: ['US500', 'USTEC', 'US30', 'GER40', 'UK100', 'FRA40', 'ESP35', 'NETH25', 'HK50', 'JP225', 'AUS200']
     };
     res.json({ success: true, symbols });
-});
-
-
-// ==================== BULK PRICES (for Invest grid) ====================
-router.get('/prices', authMiddleware, async (req, res) => {
-  try {
-    const symbolsParam = req.query.symbols || '';
-    const symbols = symbolsParam.split(',').map(s => s.trim()).filter(Boolean);
-    if (symbols.length === 0) return res.json({ success: true, prices: {} });
-
-    const prices = {};
-    for (const sym of symbols) {
-      try {
-        const result = await derivService.getCandles(sym, 60, 2);
-        if (result && result.history && result.history.times && result.history.times.length > 0) {
-          const closes = result.history.close || result.history.c || [];
-          const latest = closes[closes.length - 1];
-          const earliest = closes[0];
-          const change = earliest > 0 ? ((latest - earliest) / earliest) * 100 : 0;
-          prices[sym] = { price: latest, change24h: change };
-        }
-      } catch (e) { /* skip symbol */ }
-    }
-    res.json({ success: true, prices });
-  } catch (error) {
-    console.error('[MARKET/prices] error:', error.message);
-    res.json({ success: false, prices: {} });
-  }
 });
 
 module.exports = router;

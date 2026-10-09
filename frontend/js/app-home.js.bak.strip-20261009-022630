@@ -1,0 +1,321 @@
+﻿// ================================================================
+// MONIX v7.0 — Home tab (guest + connected)
+// ================================================================
+
+let homeGrowthChart = null;
+
+window.renderShellTab_home = function() {
+  const content = document.querySelector('.app-tab[data-shell-tab="home"]');
+  if (!content) return;
+
+  const u = MONIX_STATE.user || {};
+  const balance = MONIX_STATE.balance || 0;
+  const today = MONIX_STATE.todayProfit || 0;
+  const winRate = MONIX_STATE.winRate || 0;
+  const voucher = MONIX_STATE.voucher || {};
+  const connected = MONIX_IS_CONNECTED();
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  content.innerHTML = connected
+    ? renderHomeConnected(greeting, u, balance, today, winRate, voucher)
+    : renderHomeGuest(greeting, u);
+
+  if (connected) drawHomeGrowthChart(balance);
+  else startGuestTicker();
+};
+
+// ────────────────────────────────────────────────────────────────
+// HOME — GUEST (not connected)
+// ────────────────────────────────────────────────────────────────
+function renderHomeGuest(greeting, u) {
+  return `
+    <div class="app-hero">
+      <div class="app-hero-title">${greeting}, ${u.username || 'Investor'} 👋</div>
+      <div class="app-hero-sub">Let's get you investing</div>
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-rocket"></i>Your progress</div>
+      </div>
+      <div class="progress-list">
+        <div class="progress-item done">
+          <div class="progress-check"><i class="fa-solid fa-check"></i></div>
+          <span>Create account</span>
+        </div>
+        <div class="progress-item">
+          <div class="progress-check"></div>
+          <span>Connect your Deriv account</span>
+        </div>
+        <div class="progress-item">
+          <div class="progress-check"></div>
+          <span>Choose strategy</span>
+        </div>
+        <div class="progress-item">
+          <div class="progress-check"></div>
+          <span>Start earning</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-panel-title" style="margin:20px 0 10px;">
+      <div class="app-panel-title-left"><i class="fa-solid fa-signal"></i>Live Markets</div>
+      <a class="app-panel-link" data-shell-tab="invest">See all →</a>
+    </div>
+    <div class="live-market-card" data-shell-tab="invest">
+      <div class="live-market-icon">📊</div>
+      <div class="live-market-body">
+        <div class="live-market-name">R_75 Volatility</div>
+        <div class="live-market-price" id="guestLivePrice">$—</div>
+        <div class="live-market-change up" id="guestLiveChange">Loading…</div>
+      </div>
+      <i class="fa-solid fa-arrow-right" style="color:var(--muted);"></i>
+    </div>
+
+    <div class="two-card-grid" style="margin-top:20px;">
+      <div class="feature-card">
+        <div class="feature-card-tag">COMING SOON</div>
+        <div class="feature-card-title">💰 Easy Start</div>
+        <div class="feature-card-desc">Invest without a Deriv account. Just deposit via EcoCash.</div>
+        <div class="feature-bullets">
+          <div><i class="fa-solid fa-check"></i>$5 minimum</div>
+          <div><i class="fa-solid fa-check"></i>1-tap deposit</div>
+          <div><i class="fa-solid fa-check"></i>AI invests for you</div>
+        </div>
+        <button class="app-btn app-btn-block" onclick="window.monixOpenWaitlist()">
+          <i class="fa-solid fa-envelope"></i> Join waitlist
+        </button>
+      </div>
+
+      <div class="two-card-or">OR</div>
+
+      <div class="deriv-card">
+        <div class="deriv-card-title"><i class="fa-solid fa-key" style="color:var(--accent-hi);"></i>Connect Deriv</div>
+        <div class="deriv-card-desc">Already have a Deriv account? Paste your API key and MONIX AI starts investing today.</div>
+        <button class="app-btn app-btn-block" onclick="window.monixOpenApiKeys()">
+          <i class="fa-solid fa-arrow-right"></i> Connect now
+        </button>
+      </div>
+    </div>
+
+    <div class="app-panel" style="margin-top:20px;">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-circle-info"></i>What is Deriv?</div>
+      </div>
+      <div style="font-size:13px;color:var(--meta);line-height:1.6;">
+        Deriv is a regulated broker offering trading on volatility indices, forex, commodities and crypto. MONIX connects to your existing Deriv account to invest on your behalf.
+      </div>
+      <a href="https://deriv.com" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:12.5px;color:var(--accent-hi);text-decoration:none;font-weight:600;">
+        Learn more at deriv.com →
+      </a>
+    </div>
+  `;
+}
+
+// ────────────────────────────────────────────────────────────────
+// HOME — CONNECTED
+// ────────────────────────────────────────────────────────────────
+function renderHomeConnected(greeting, u, balance, today, winRate, voucher) {
+  const allocs = [
+    { icon: '💱', label: 'Forex',       pct: 42, amt: balance * 0.42 },
+    { icon: '📈', label: 'Volatility',  pct: 28, amt: balance * 0.28 },
+    { icon: '🪙', label: 'Crypto',      pct: 18, amt: balance * 0.18 },
+    { icon: '🥇', label: 'Commodities', pct: 12, amt: balance * 0.12 },
+  ];
+
+  const allocRows = allocs.map(a => `
+    <div class="alloc-row">
+      <span class="alloc-icon">${a.icon}</span>
+      <span class="alloc-label">${a.label}</span>
+      <div class="alloc-bar"><div class="alloc-fill" style="width:${a.pct}%"></div></div>
+      <span class="alloc-pct">${a.pct}%</span>
+      <span class="alloc-amt">$${a.amt.toFixed(0)}</span>
+    </div>
+  `).join('');
+
+  const positionsHtml = (MONIX_STATE.positions || []).length > 0
+    ? MONIX_STATE.positions.slice(0, 3).map(p => `
+      <div class="app-act-row">
+        <div class="app-act-icon">${p.action === 'BUY' ? '📈' : '📉'}</div>
+        <div class="app-act-body">
+          <div class="app-act-title">${p.action} ${p.symbol} · $${(p.stake || 0).toFixed(2)}</div>
+          <div class="app-act-meta">Entry $${(p.entry || 0).toFixed(2)} · Now $${(p.current || 0).toFixed(2)}</div>
+        </div>
+        <div class="app-act-amount ${(p.pnl || 0) >= 0 ? 'up' : 'down'}">
+          ${(p.pnl || 0) >= 0 ? '+' : ''}$${Math.abs(p.pnl || 0).toFixed(2)}
+        </div>
+      </div>
+    `).join('')
+    : `
+      <div class="app-empty" style="padding:16px;">
+        <div class="app-empty-title" style="font-size:13px;">No open positions</div>
+        <div class="app-empty-desc">Your trades will appear here</div>
+      </div>
+    `;
+
+  return `
+    <div class="app-hero">
+      <div class="app-hero-title">${greeting}, ${u.username || 'Investor'} 👋</div>
+      <div class="app-hero-sub">
+        <span class="status-pill connected"><span class="dot"></span>Connected · ${MONIX_STATE.strategy || 'Balanced'}</span>
+      </div>
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-chart-line"></i>Portfolio Value</div>
+      </div>
+      <div style="font-size:32px;font-weight:800;letter-spacing:-1px;color:var(--text);">
+        $${balance.toFixed(2)}
+      </div>
+      <div class="app-kpi-delta ${today >= 0 ? 'up' : 'down'}" style="margin-top:6px;font-size:13px;">
+        ${today >= 0 ? '▲' : '▼'} ${today >= 0 ? '+' : ''}$${today.toFixed(2)} today
+      </div>
+      <div class="app-chart-wrap" style="margin-top:14px;">
+        <canvas id="homeGrowthChart"></canvas>
+      </div>
+    </div>
+
+    <div class="app-kpi-grid">
+      <div class="app-kpi">
+        <div class="app-kpi-label">Today</div>
+        <div class="app-kpi-value" style="color:${today >= 0 ? 'var(--success)' : 'var(--danger)'}">
+          ${today >= 0 ? '+' : ''}$${today.toFixed(2)}
+        </div>
+        <div class="app-kpi-delta ${today >= 0 ? 'up' : 'down'}">
+          ${today >= 0 ? '▲' : '▼'} ${(balance > 0 ? Math.abs(today / balance * 100) : 0).toFixed(2)}%
+        </div>
+      </div>
+      <div class="app-kpi">
+        <div class="app-kpi-label">Success rate</div>
+        <div class="app-kpi-value">${winRate}%</div>
+        <div class="app-kpi-delta">${MONIX_STATE.totalTrades || 0} trades</div>
+      </div>
+      <div class="app-kpi">
+        <div class="app-kpi-label">Voucher</div>
+        <div class="app-kpi-value" style="font-size:14px;font-family:monospace;color:var(--accent-hi);">${voucher.code || 'N/A'}</div>
+        <div class="app-kpi-delta">${(voucher.remaining || 0).toLocaleString()} left</div>
+      </div>
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-chart-pie"></i>Your Portfolio</div>
+      </div>
+      ${allocRows}
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-robot"></i>MONIX AI</div>
+      </div>
+      <div class="switch-row">
+        <div>
+          <div class="switch-label">Auto-trading</div>
+          <div class="switch-sub">${MONIX_STATE.autoTrade ? 'AI places trades for you' : 'You approve each trade'}</div>
+        </div>
+        <div class="switch ${MONIX_STATE.autoTrade ? 'on' : ''}" id="homeAutoTradeSwitch"></div>
+      </div>
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-briefcase"></i>Open Positions</div>
+        <a class="app-panel-link" data-shell-tab="activity">See all →</a>
+      </div>
+      ${positionsHtml}
+    </div>
+
+    <div class="app-panel-title" style="margin:20px 0 12px;">
+      <div class="app-panel-title-left"><i class="fa-solid fa-bolt"></i>Quick Actions</div>
+    </div>
+    <div class="app-actions" style="margin-bottom:16px;">
+      <div class="app-action" data-shell-tab="invest">
+        <div class="app-action-icon"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="app-action-label">Invest</div>
+      </div>
+      <div class="app-action" data-shell-tab="wallet">
+        <div class="app-action-icon"><i class="fa-solid fa-wallet"></i></div>
+        <div class="app-action-label">Wallet</div>
+      </div>
+      <div class="app-action" data-shell-tab="activity">
+        <div class="app-action-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+        <div class="app-action-label">Activity</div>
+      </div>
+    </div>
+
+    <div class="app-suggestion">
+      <div class="app-suggestion-icon"><i class="fa-solid fa-lightbulb"></i></div>
+      <div class="app-suggestion-body">
+        <div class="app-suggestion-title">MONIX AI suggests</div>
+        <div class="app-suggestion-desc">You could earn 12% more annually by shifting $200 to crypto. Based on your balanced strategy.</div>
+        <div class="app-suggestion-actions">
+          <button class="app-btn app-btn-ghost" style="height:30px;font-size:12px;">Dismiss</button>
+          <button class="app-btn" style="height:30px;font-size:12px;">Apply suggestion</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ────────────────────────────────────────────────────────────────
+// CHARTS
+// ────────────────────────────────────────────────────────────────
+function drawHomeGrowthChart(currentBalance) {
+  const canvas = document.getElementById('homeGrowthChart');
+  if (!canvas || !window.Chart) return;
+
+  if (homeGrowthChart) { homeGrowthChart.destroy(); homeGrowthChart = null; }
+
+  const points = 30;
+  const data = [];
+  const labels = [];
+  let value = Math.max(currentBalance * 0.92, 10);
+  for (let i = 0; i < points; i++) {
+    value = value * (1 + (Math.random() * 0.03 - 0.01));
+    data.push(value);
+    const d = new Date();
+    d.setDate(d.getDate() - (points - 1 - i));
+    labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+  }
+  data[data.length - 1] = currentBalance;
+
+  homeGrowthChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets: [{
+      data, borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)',
+      fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false } }
+    }
+  });
+}
+
+// Guest live ticker (uses public fake-feed from investState)
+let guestTickerInterval = null;
+function startGuestTicker() {
+  if (guestTickerInterval) return;
+
+  const priceEl = document.getElementById('guestLivePrice');
+  const changeEl = document.getElementById('guestLiveChange');
+  if (!priceEl || !changeEl) return;
+
+  let price = 46005;
+  let change = 0.96;
+
+  const update = () => {
+    price = price * (1 + (Math.random() - 0.5) * 0.002);
+    change = change + (Math.random() - 0.5) * 0.1;
+    priceEl.textContent = '$' + price.toFixed(2);
+    changeEl.textContent = (change >= 0 ? '▲ ' : '▼ ') + Math.abs(change).toFixed(2) + '% today';
+    changeEl.className = 'live-market-change ' + (change >= 0 ? 'up' : 'down');
+  };
+
+  update();
+  guestTickerInterval = setInterval(update, 3000);
+}

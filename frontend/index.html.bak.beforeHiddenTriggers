@@ -13,7 +13,7 @@
 <body class="dark-theme">
 
 <!-- ============================================================ -->
-<!-- 🚀 LOADING SCREEN - GLOWING "M"                              -->
+<!-- ðŸš€ LOADING SCREEN - GLOWING "M"                              -->
 <!-- ============================================================ -->
 <div id="loadingScreen">
     <div class="loading-container">
@@ -121,7 +121,7 @@
             <div class="mb-4">
                 <label class="block text-sm text-slate-400 mb-2">DEMO Account Token</label>
                 <input type="text" id="demoToken" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white font-mono text-sm" placeholder="Enter your Deriv demo token">
-                <p class="text-xs text-slate-500 mt-1"> Get from Deriv  Settings  API Token (Demo account)</p>
+                <p class="text-xs text-slate-500 mt-1">ðŸ“Œ Get from Deriv â†’ Settings â†’ API Token (Demo account)</p>
             </div>
             <div class="mb-4">
                 <label class="block text-sm text-slate-400 mb-2">REAL Account Token</label>
@@ -131,16 +131,16 @@
                         <i class="fas fa-eye"></i>
                     </button>
                 </div>
-                <p class="text-xs text-amber-500 mt-1">⚠️ WARNING: This is for REAL money trading! Keep secure!</p>
-                <p class="text-xs text-slate-500 mt-1"> Get from Deriv  Settings  API Token (Real account)</p>
+                <p class="text-xs text-amber-500 mt-1">âš ï¸ WARNING: This is for REAL money trading! Keep secure!</p>
+                <p class="text-xs text-slate-500 mt-1">ðŸ“Œ Get from Deriv â†’ Settings â†’ API Token (Real account)</p>
             </div>
-            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition"> SAVE API KEYS</button>
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">ðŸ’¾ SAVE API KEYS</button>
         </form>
         <div class="mt-4 p-3 bg-slate-800/50 rounded-lg">
-            <p class="text-xs text-slate-400">🔑 How to get API token:</p>
+            <p class="text-xs text-slate-400">ðŸ”‘ How to get API token:</p>
             <ol class="text-xs text-slate-500 list-decimal list-inside mt-1 space-y-1">
                 <li>Login to your Deriv account</li>
-                <li>Go to Settings  API Token</li>
+                <li>Go to Settings â†’ API Token</li>
                 <li>Create new token with "trade" permission</li>
                 <li>Copy and paste here</li>
             </ol>
@@ -161,14 +161,14 @@
             <div class="mb-4">
                 <label class="block text-sm text-slate-400 mb-2">Default Symbol</label>
                 <select id="defaultSymbol" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white">
-                    <optgroup label="📊 Volatility Indices">
+                    <optgroup label="ðŸ“Š Volatility Indices">
                         <option>R_75</option>
                         <option>R_10</option>
                         <option>R_25</option>
                         <option>R_50</option>
                         <option>R_100</option>
                     </optgroup>
-                    <optgroup label=" Forex">
+                    <optgroup label="ðŸ’± Forex">
                         <option>EUR/USD</option>
                         <option>GBP/USD</option>
                         <option>USD/JPY</option>
@@ -242,7 +242,7 @@
 <!-- MAIN APP CONTAINER                                           -->
 <!-- ============================================================ -->
 <div id="appContainer" class="hidden">
-    <!--  APP SHELL  -->
+    <!-- ═══════════ APP SHELL ═══════════ -->
     <div class="app-shell">
 
         <!-- SIDEBAR (desktop) -->
@@ -341,17 +341,11 @@
     <!-- BOTTOM NAV (mobile) -->
     <nav class="app-bottom-nav" id="appBottomNav"></nav>
 
-    <!--  HIDDEN TRIGGERS 
-         These buttons are clicked by data-shell-action handlers.
-         They open the modals defined at the top of the page.
+    <!-- ═══════════ HIDDEN LEGACY LAYER ═══════════
+         Everything below is hidden but exists so old code keeps working.
+         The old "dashboardPage" etc are still here for backwards compat.
     -->
-    <div style="display:none;" aria-hidden="true">
-        <button id="openApiKeys" type="button"></button>
-        <button id="openSettings" type="button"></button>
-        <button id="adminLink" type="button"></button>
-        <button id="logoutBtn" type="button"></button>
-
-        <!-- Legacy page containers so old app.js logic still works -->
+    <div style="display:none;">
         <div id="dashboardPage" class="page-content"></div>
         <div id="performancePage" class="page-content"></div>
         <div id="historyPage" class="page-content"></div>

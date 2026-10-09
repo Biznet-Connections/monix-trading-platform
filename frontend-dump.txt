@@ -1,0 +1,4318 @@
+﻿MONIX FRONTEND DUMP - 2026-10-08 19:17
+================================================================================
+
+================================================================================
+FILE: frontend/index.html
+SIZE: 37.1 KB
+================================================================================
+?<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>MONIX AI TRADING PLATFORM v6.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="dark-theme">
+
+<!-- ============================================================ -->
+<!-- ðŸš€ LOADING SCREEN - GLOWING "M"                              -->
+<!-- ============================================================ -->
+<div id="loadingScreen">
+    <div class="loading-container">
+        <!-- Glowing "M" -->
+        <div class="m-wrapper">
+            <div class="glowing-m">M</div>
+            <div class="glow-ring"></div>
+            <div class="glow-ring-2"></div>
+            <div class="particles">
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+            </div>
+        </div>
+
+        <!-- Typing Text -->
+        <div class="loading-text-wrapper">
+            <span class="loading-text" id="typingText"></span>
+            <span class="cursor-blink">|</span>
+        </div>
+
+        <!-- Version -->
+        <div class="loading-version">v6.0 PROFESSIONAL</div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- LOGIN / REGISTER MODAL                                       -->
+<!-- ============================================================ -->
+<div id="authModal" class="modal hidden">
+    <div class="modal-content glass-card" style="max-width: 450px; width: 90%;">
+        <div class="flex border-b border-slate-700 mb-4">
+            <button id="loginTab" class="tab-btn active px-6 py-3 text-sm font-semibold">LOGIN</button>
+            <button id="registerTab" class="tab-btn px-6 py-3 text-sm font-semibold text-slate-400">REGISTER</button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="loginForm" class="tab-pane active">
+            <form id="loginFormElement">
+                <div class="mb-4">
+                    <label class="block text-sm text-slate-400 mb-2">Email</label>
+                    <input type="email" id="loginEmail" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-indigo-500" required>
+                </div>
+                <div class="mb-4 relative">
+                    <label class="block text-sm text-slate-400 mb-2">Password</label>
+                    <input type="password" id="loginPassword" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-indigo-500 pr-10" required>
+                    <button type="button" id="toggleLoginPassword" class="absolute right-3 bottom-3 text-slate-400 hover:text-white">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">LOGIN</button>
+                <p class="text-center text-xs text-slate-500 mt-4">
+                    <a href="#" id="forgotPasswordLink" class="text-indigo-400 hover:underline">Forgot Password?</a>
+                </p>
+            </form>
+        </div>
+
+        <!-- Register Form -->
+        <div id="registerForm" class="tab-pane hidden">
+            <form id="registerFormElement">
+                <div class="mb-3">
+                    <label class="block text-sm text-slate-400 mb-2">Username</label>
+                    <input type="text" id="regUsername" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm text-slate-400 mb-2">Email</label>
+                    <input type="email" id="regEmail" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white" required>
+                </div>
+                <div class="mb-3 relative">
+                    <label class="block text-sm text-slate-400 mb-2">Password</label>
+                    <input type="password" id="regPassword" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white pr-10" required>
+                    <button type="button" id="toggleRegPassword" class="absolute right-3 bottom-3 text-slate-400 hover:text-white">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm text-slate-400 mb-2">Voucher Code</label>
+                    <input type="text" id="regVoucher" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white" required placeholder="Enter your voucher code">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">REGISTER</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- API KEYS MODAL                                               -->
+<!-- ============================================================ -->
+<div id="apiKeysModal" class="modal hidden">
+    <div class="modal-content glass-card" style="max-width: 500px; width: 90%;">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold"><i class="fas fa-key text-indigo-400 mr-2"></i>API Keys</h2>
+            <button class="close-modal text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        <form id="apiKeysForm">
+            <div class="mb-4">
+                <label class="block text-sm text-slate-400 mb-2">DEMO Account Token</label>
+                <input type="text" id="demoToken" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white font-mono text-sm" placeholder="Enter your Deriv demo token">
+                <p class="text-xs text-slate-500 mt-1">ðŸ“Œ Get from Deriv â†’ Settings â†’ API Token (Demo account)</p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm text-slate-400 mb-2">REAL Account Token</label>
+                <div class="relative">
+                    <input type="password" id="realToken" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white font-mono text-sm pr-10" placeholder="Enter your Deriv real token">
+                    <button type="button" id="toggleRealToken" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <p class="text-xs text-amber-500 mt-1">âš ï¸ WARNING: This is for REAL money trading! Keep secure!</p>
+                <p class="text-xs text-slate-500 mt-1">ðŸ“Œ Get from Deriv â†’ Settings â†’ API Token (Real account)</p>
+            </div>
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">ðŸ’¾ SAVE API KEYS</button>
+        </form>
+        <div class="mt-4 p-3 bg-slate-800/50 rounded-lg">
+            <p class="text-xs text-slate-400">ðŸ”‘ How to get API token:</p>
+            <ol class="text-xs text-slate-500 list-decimal list-inside mt-1 space-y-1">
+                <li>Login to your Deriv account</li>
+                <li>Go to Settings â†’ API Token</li>
+                <li>Create new token with "trade" permission</li>
+                <li>Copy and paste here</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SETTINGS MODAL                                               -->
+<!-- ============================================================ -->
+<div id="settingsModal" class="modal hidden">
+    <div class="modal-content glass-card" style="max-width: 500px; width: 90%;">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold"><i class="fas fa-cog text-indigo-400 mr-2"></i>Settings</h2>
+            <button class="close-modal text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        <form id="settingsForm">
+            <div class="mb-4">
+                <label class="block text-sm text-slate-400 mb-2">Default Symbol</label>
+                <select id="defaultSymbol" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white">
+                    <optgroup label="ðŸ“Š Volatility Indices">
+                        <option>R_75</option>
+                        <option>R_10</option>
+                        <option>R_25</option>
+                        <option>R_50</option>
+                        <option>R_100</option>
+                    </optgroup>
+                    <optgroup label="ðŸ’± Forex">
+                        <option>EUR/USD</option>
+                        <option>GBP/USD</option>
+                        <option>USD/JPY</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm text-slate-400 mb-2">Default Stake ($)</label>
+                <input type="number" id="defaultStake" step="0.01" min="0.01" max="1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white">
+            </div>
+            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition">SAVE SETTINGS</button>
+        </form>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ADMIN MODAL                                                  -->
+<!-- ============================================================ -->
+<div id="adminModal" class="modal hidden">
+    <div class="modal-content glass-card" style="max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold"><i class="fas fa-shield-alt text-indigo-400 mr-2"></i>Admin Panel</h2>
+            <button class="close-modal text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        <div class="flex border-b border-slate-700 mb-4">
+            <button class="admin-tab active px-4 py-2 text-sm" data-tab="vouchers">Vouchers</button>
+            <button class="admin-tab px-4 py-2 text-sm text-slate-400" data-tab="users">Users</button>
+            <button class="admin-tab px-4 py-2 text-sm text-slate-400" data-tab="broadcast">Broadcast</button>
+            <button class="admin-tab px-4 py-2 text-sm text-slate-400" data-tab="stats">Stats</button>
+        </div>
+
+        <!-- Vouchers Tab -->
+        <div id="vouchersTab" class="admin-tab-pane active">
+            <div class="mb-4">
+                <h3 class="font-semibold mb-2">Generate New Voucher</h3>
+                <div class="flex gap-3 flex-wrap">
+                    <input type="number" id="voucherDays" placeholder="Days valid" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 w-32">
+                    <input type="number" id="voucherTrades" placeholder="Trades limit" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 w-32">
+                    <button id="generateVoucherBtn" class="bg-indigo-600 px-4 py-2 rounded-lg">Generate</button>
+                </div>
+            </div>
+            <div id="vouchersList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="usersTab" class="admin-tab-pane hidden">
+            <div id="usersList" class="space-y-2 max-h-80 overflow-y-auto"></div>
+        </div>
+
+        <!-- Broadcast Tab -->
+        <div id="broadcastTab" class="admin-tab-pane hidden">
+            <div class="mb-3">
+                <label class="block text-sm text-slate-400 mb-2">Subject</label>
+                <input type="text" id="broadcastSubject" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm text-slate-400 mb-2">Message</label>
+                <textarea id="broadcastMessage" rows="5" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2"></textarea>
+            </div>
+            <button id="sendBroadcastBtn" class="w-full bg-indigo-600 py-2 rounded-lg">Send to All Users</button>
+        </div>
+
+        <!-- Stats Tab -->
+        <div id="statsTab" class="admin-tab-pane hidden">
+            <div id="systemStats" class="space-y-2"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MAIN APP CONTAINER                                           -->
+<!-- ============================================================ -->
+<div id="appContainer" class="hidden">
+    <!-- Mobile Header -->
+    <div id="mobileHeader" class="fixed top-0 left-0 right-0 z-30 flex lg:hidden items-center gap-3 p-4 bg-indigo-900/80 backdrop-blur-md border-b border-indigo-500/20">
+        <button id="mobileMenuBtn" class="bg-indigo-600 p-3 rounded-xl shadow-lg cursor-pointer">
+            <i class="fas fa-bars text-white text-xl"></i>
+        </button>
+        <div id="mobileBrand" class="text-white font-bold text-lg">
+            MONIX <span class="text-indigo-400">AI</span>
+        </div>
+    </div>
+
+    <!-- Sidebar Drawer -->
+    <div id="sidebarDrawer" class="fixed top-0 left-0 z-50 w-64 lg:w-48 h-full sidebar-glass flex flex-col shadow-2xl transition-all duration-300 -translate-x-full lg:translate-x-0">
+        <div class="absolute top-4 right-4">
+            <button id="closeDrawerBtn" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <div class="p-5 border-b border-indigo-500/20 pt-16 lg:pt-5">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2 rounded-xl">
+                    <i class="fas fa-robot text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg">MONIX <span class="text-indigo-400">AI</span></h1>
+                    <p class="text-[10px] text-slate-500">v6.0 Professional</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-1">
+            <a href="#" data-page="dashboard" class="nav-link flex items-center gap-3 px-4 py-3 bg-indigo-600/20 text-indigo-400 rounded-xl transition"><i class="fas fa-tachometer-alt w-5"></i><span>Dashboard</span></a>
+            <a href="#" data-page="performance" class="nav-link flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 rounded-xl transition"><i class="fas fa-chart-line w-5"></i><span>Performance</span></a>
+            <a href="#" data-page="history" class="nav-link flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 rounded-xl transition"><i class="fas fa-history w-5"></i><span>Trade History</span></a>
+            <a href="#" data-page="leaderboard" class="nav-link flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 rounded-xl transition"><i class="fas fa-trophy w-5"></i><span>Leaderboard</span></a>
+            <a href="#" data-page="insights" class="nav-link flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 rounded-xl transition"><i class="fas fa-brain w-5"></i><span>AI Insights</span></a>
+            <a href="#" id="openApiKeys" class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 rounded-xl transition"><i class="fas fa-key w-5"></i><span>API Keys</span></a>
+            <a href="#" id="openSettings" class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 rounded-xl transition"><i class="fas fa-cog w-5"></i><span>Settings</span></a>
+            <a href="#" id="adminLink" class="admin-only hidden flex items-center gap-3 px-4 py-3 text-amber-400 hover:bg-slate-800/50 rounded-xl transition"><i class="fas fa-shield-alt w-5"></i><span>Admin Panel</span></a>
+        </nav>
+
+        <div class="p-4 border-t border-indigo-500/20">
+            <div class="bg-slate-800/50 p-3 rounded-xl flex items-center gap-3">
+                <div id="userAvatar" class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center">
+                    <i class="fas fa-user text-white"></i>
+                </div>
+                <div class="flex-1">
+                    <p id="userName" class="text-sm font-semibold">Loading...</p>
+                    <p id="userEmail" class="text-[10px] text-slate-500">Loading...</p>
+                </div>
+                <i id="logoutBtn" class="fas fa-sign-out-alt text-slate-500 cursor-pointer hover:text-red-400 transition"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Drawer Overlay -->
+    <div id="drawerOverlay" class="fixed top-0 left-0 w-full h-full bg-black/50 z-40 hidden"></div>
+
+    <!-- Main Content -->
+    <div class="lg:ml-48 main-content transition-all duration-300 p-4 md:p-6 pt-20 lg:pt-6" id="mainContent">
+        <!-- Dashboard Page -->
+        <div id="dashboardPage" class="page-content">
+            <!-- Top Bar with Desktop Hamburger -->
+            <button id="desktopHamburger" class="hidden lg:flex items-center justify-center w-10 h-10 mb-4 bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg cursor-pointer text-white transition">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <div>
+                    <h2 class="text-2xl font-bold">Dashboard</h2>
+                    <p class="text-slate-400 text-sm">Welcome back, <span id="welcomeName">Trader</span>! Ready to trade?</p>
+                </div>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <button id="themeToggle" class="glass-card px-4 py-2 rounded-xl text-sm hover:bg-indigo-600/20 transition flex items-center gap-2">
+                        <i id="themeIcon" class="fas fa-moon"></i>
+                        <span id="themeText">Dark Mode</span>
+                    </button>
+                    <div class="glass-card rounded-xl px-4 py-2">
+                        <span class="text-xs text-slate-400">Current Mode</span>
+                        <div class="flex gap-2 mt-1">
+                            <button id="demoBtn" class="px-3 py-1 rounded-lg text-xs bg-slate-700 text-slate-400 transition">DEMO</button>
+                            <button id="realBtn" class="px-3 py-1 rounded-lg text-xs bg-emerald-500 text-white shadow-lg transition">REAL</button>
+                        </div>
+                    </div>
+                    <button id="switchModeBtn" class="glass-card px-4 py-2 rounded-xl text-sm hover:bg-indigo-600/20 transition"><i class="fas fa-exchange-alt mr-2"></i>SWITCH</button>
+                </div>
+            </div>
+
+            <!-- Stats Cards - 3 Column -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+                <div class="glass-card p-6 rounded-2xl hover-card transition">
+                    <p class="text-slate-400 text-sm font-medium">ðŸ’° Balance</p>
+                    <h2 id="balanceAmount" class="text-4xl font-bold mt-2">$0.00</h2>
+                    <div class="mt-4">
+                        <span id="todayProfit" class="text-emerald-400 text-sm"><i class="fas fa-arrow-up"></i> Today: +$0.00</span>
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl hover-card transition border-l-4 border-indigo-500">
+                    <p class="text-slate-400 text-sm font-medium">ðŸŽ« Active Voucher</p>
+                    <h2 id="voucherCode" class="text-xl font-mono font-bold mt-2 text-indigo-300">MONIX-XXXX</h2>
+                    <div class="mt-3 flex justify-between text-xs">
+                        <span id="tradesRemaining" class="text-slate-500">Trades Left: 0/0</span>
+                        <span id="voucherExpiry" class="text-slate-500">Expires: --</span>
+                    </div>
+                    <div class="w-full bg-slate-700 h-2 mt-3 rounded-full overflow-hidden">
+                        <div id="voucherProgress" class="bg-indigo-500 h-full w-0 rounded-full"></div>
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl hover-card transition">
+                    <p class="text-slate-400 text-sm font-medium">ðŸ“Š Win Rate</p>
+                    <h2 id="winRateDisplay" class="text-4xl font-bold mt-2">0%</h2>
+                    <div class="mt-4">
+                        <span id="totalTradesDisplay" class="text-slate-400 text-sm">0 trades</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Locked Balance Panel -->
+            <div id="lockedBalancePanel" class="glass-card p-4 rounded-xl mt-0 mb-4 hidden">
+                <div class="flex justify-between text-sm mb-2">
+                    <span class="text-slate-400">ðŸ’° Total Balance:</span>
+                    <span id="totalBalance" class="font-bold">$0.00</span>
+                </div>
+                <div class="flex justify-between text-sm mb-2">
+                    <span class="text-slate-400">ðŸ”’ Locked in Trades:</span>
+                    <span id="lockedBalance" class="font-bold text-yellow-400">$0.00</span>
+                </div>
+                <div class="flex justify-between text-sm pt-2 border-t border-slate-700">
+                    <span class="text-slate-400">âœ… Available:</span>
+                    <span id="availableBalance" class="font-bold text-emerald-400">$0.00</span>
+                </div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="flex justify-between items-center mb-4 text-xs text-slate-400 glass-card px-5 py-3 rounded-xl">
+                <div><span id="connectionStatus" class="text-emerald-400">ðŸŸ¢</span> <span id="connectionText">Connected</span></div>
+                <div id="serverTime">Server: --:--:--</div>
+                <div id="marketStatus" class="text-emerald-400">Market: OPEN</div>
+            </div>
+
+            <!-- Chart - Full Width -->
+            <div class="glass-card p-5 rounded-2xl mb-8">
+                <div class="flex justify-between items-center mb-5 flex-wrap gap-3">
+                    <div class="flex gap-3 flex-wrap">
+                        <select id="symbolSelect" class="bg-slate-800 rounded-lg px-4 py-2 text-sm border border-slate-700">
+                            <optgroup label="ðŸ“Š Volatility Indices (1s)"><option>R_10</option><option>R_25</option><option>R_50</option><option selected>R_75</option><option>R_100</option></optgroup>
+                            <optgroup label="ðŸ“ˆ Volatility Indices (2s)"><option>R_10_2S</option><option>R_25_2S</option><option>R_50_2S</option><option>R_75_2S</option><option>R_100_2S</option></optgroup>
+                            <optgroup label="ðŸ’¥ Boom & Crash Indices"><option>Boom 300</option><option>Boom 500</option><option>Boom 1000</option><option>Crash 300</option><option>Crash 500</option><option>Crash 1000</option></optgroup>
+                            <optgroup label="ðŸ“‰ Step Indices"><option>Step 200</option><option>Step 300</option><option>Step 400</option><option>Step 500</option></optgroup>
+                            <optgroup label="ðŸ† Derived Indices"><option>1HZ10</option><option>1HZ25</option><option>1HZ50</option><option>1HZ75</option><option>1HZ100</option></optgroup>
+                            <optgroup label="ðŸ’± Major Forex"><option>EUR/USD</option><option>GBP/USD</option><option>USD/JPY</option><option>AUD/USD</option><option>USD/CAD</option><option>NZD/USD</option><option>USD/CHF</option></optgroup>
+                            <optgroup label="ðŸ’± Minor Forex"><option>EUR/GBP</option><option>EUR/JPY</option><option>GBP/JPY</option><option>AUD/JPY</option><option>CAD/JPY</option><option>CHF/JPY</option><option>EUR/AUD</option><option>GBP/AUD</option></optgroup>
+                            <optgroup label="ðŸ¥‡ Commodities"><option>XAU/USD (Gold)</option><option>XAG/USD (Silver)</option><option>XPT/USD (Platinum)</option><option>XPD/USD (Palladium)</option><option>WTI (Oil)</option><option>Brent (Oil)</option></optgroup>
+                            <optgroup label="ðŸª™ Cryptocurrencies"><option>BTC/USD (Bitcoin)</option><option>ETH/USD (Ethereum)</option><option>LTC/USD (Litecoin)</option><option>XRP/USD (Ripple)</option><option>ADA/USD (Cardano)</option><option>DOT/USD (Polkadot)</option><option>SOL/USD (Solana)</option><option>DOGE/USD (Dogecoin)</option></optgroup>
+                            <optgroup label="ðŸ“Š Stock Indices"><option>US500 (S&P 500)</option><option>USTEC (Nasdaq)</option><option>US30 (Dow Jones)</option><option>GER40 (DAX)</option><option>UK100 (FTSE)</option><option>FRA40 (CAC 40)</option><option>ESP35 (IBEX 35)</option><option>NETH25 (AEX)</option><option>HK50 (Hang Seng)</option><option>JP225 (Nikkei)</option><option>AUS200 (ASX 200)</option></optgroup>
+                        </select>
+                        <div class="flex bg-slate-800 rounded-lg p-1 text-xs gap-1">
+                            <button data-tf="1m" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">1m</button>
+                            <button data-tf="5m" class="tf-btn px-3 py-1.5 rounded bg-indigo-600 text-white transition">5m</button>
+                            <button data-tf="15m" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">15m</button>
+                            <button data-tf="1h" class="tf-btn px-3 py-1.5 rounded hover:bg-slate-700 transition">1h</button>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-slate-400 text-xs">Live Price</span>
+                        <p id="livePrice" class="text-2xl font-bold text-emerald-400">$0.00</p>
+                    </div>
+                </div>
+                <div id="candlestick-chart" class="w-full" style="height: 500px;"></div>
+                <div class="mt-5 flex justify-between text-sm text-slate-400">
+                    <span>ðŸŸ¢ Support: <span id="supportLevel">$0.00</span></span>
+                    <span>ðŸ”´ Resistance: <span id="resistanceLevel">$0.00</span></span>
+                    <span class="text-amber-400">ðŸ“Š RSI: <span id="rsiValue">--</span></span>
+                </div>
+            </div>
+
+            <!-- Recent Trades Table - Full Width -->
+            <div class="glass-card rounded-2xl overflow-hidden mb-8">
+                <div class="p-5 border-b border-slate-700 flex justify-between items-center cursor-pointer" onclick="toggleCollapsible('recentTradesContent', 'recentTradesIcon')">
+                    <h3 class="font-bold"><i class="fas fa-history mr-2 text-indigo-400"></i>ðŸ“Š RECENT TRADES <span id="recentTradesCount" class="text-xs text-slate-500 ml-2">(0)</span></h3>
+                    <div class="flex items-center gap-3">
+                        <button id="copyAllTradesBtn" class="text-xs text-indigo-400 hover:text-indigo-300 transition" onclick="event.stopPropagation(); window.copyAllTrades()" title="Copy all trades to clipboard">ðŸ“‹ Copy All</button>
+                        <button id="refreshTradesBtn" class="text-xs text-indigo-400 hover:underline" onclick="event.stopPropagation(); window.loadRecentTrades()">REFRESH</button>
+                        <button id="deleteAllTradesBtn" class="text-xs text-red-400 hover:text-red-300 transition" onclick="event.stopPropagation(); window.deleteAllTrades()" title="Hide trades from UI (AI still learns)">ðŸ—‘ï¸ Clear View</button>
+                        <i id="recentTradesIcon" class="fas fa-chevron-down text-slate-400 transition-transform"></i>
+                    </div>
+                </div>
+                <div id="recentTradesContent" class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-800/50 text-slate-400 text-xs uppercase">
+                            <tr><th class="p-4">Time</th><th class="p-4">Symbol</th><th class="p-4">Action</th><th class="p-4">Entry</th><th class="p-4">Exit</th><th class="p-4 text-right">Profit</th><th class="p-4 text-center">Status</th><th class="p-4 text-center">ðŸ“‹</th></tr>
+                        </thead>
+                        <tbody id="recentTradesBody" class="divide-y divide-slate-700/50">
+                            <tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet. Execute a trade to see results!</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Page -->
+        <div id="performancePage" class="page-content hidden">
+            <div class="glass-card p-5 rounded-2xl mb-6">
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold"><i class="fas fa-chart-line text-indigo-400 mr-2"></i>Performance Statistics</h2></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-6">
+                    <div class="bg-slate-800/30 p-4 rounded-xl"><p id="statWinRate" class="text-3xl font-bold text-emerald-400">0%</p><p class="text-xs text-slate-500">Win Rate</p></div>
+                    <div class="bg-slate-800/30 p-4 rounded-xl"><p id="statTotalTrades" class="text-3xl font-bold">0</p><p class="text-xs text-slate-500">Total Trades</p></div>
+                    <div class="bg-slate-800/30 p-4 rounded-xl"><p id="statNetProfit" class="text-3xl font-bold">$0</p><p class="text-xs text-slate-500">Net Profit</p></div>
+                    <div class="bg-slate-800/30 p-4 rounded-xl"><p id="statBestStreak" class="text-3xl font-bold">0</p><p class="text-xs text-slate-500">Best Streak</p></div>
+                </div>
+                <div id="symbolStatsContainer" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Trade History Page -->
+        <div id="historyPage" class="page-content hidden">
+            <div class="glass-card p-5 rounded-2xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold"><i class="fas fa-history text-indigo-400 mr-2"></i>Trade History</h2>
+                    <button id="deleteHistoryBtn" class="text-red-400 hover:text-red-300 text-sm bg-red-500/10 px-3 py-1 rounded-lg transition" onclick="window.deleteAllTrades()">
+                        <i class="fas fa-trash-alt mr-1"></i> Clear View
+                    </button>
+                </div>
+                <div class="flex gap-3 mb-4 flex-wrap">
+                    <select id="historyFilterSymbol" class="bg-slate-800 rounded-lg px-3 py-2 text-sm"><option value="">All Symbols</option><option>R_75</option><option>EUR/USD</option><option>XAU/USD</option></select>
+                    <select id="historyFilterStatus" class="bg-slate-800 rounded-lg px-3 py-2 text-sm"><option value="">All Status</option><option>WIN</option><option>LOSS</option></select>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-800/50"><tr><th class="p-3">Date</th><th>Symbol</th><th>Action</th><th>Entry</th><th>Exit</th><th>Profit</th><th>Status</th></tr></thead>
+                        <tbody id="historyTradesBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Page -->
+        <div id="leaderboardPage" class="page-content hidden">
+            <div class="glass-card p-5 rounded-2xl">
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold"><i class="fas fa-trophy text-yellow-500 mr-2"></i>Leaderboard</h2></div>
+                <div id="leaderboardBody" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- AI Insights Page -->
+        <div id="insightsPage" class="page-content hidden">
+            <div class="glass-card p-5 rounded-2xl">
+                <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold"><i class="fas fa-brain text-indigo-400 mr-2"></i>AI Insights & Learning</h2></div>
+                <div id="fullInsightsContent" class="space-y-6"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TOAST NOTIFICATION CONTAINER                                 -->
+<!-- ============================================================ -->
+<div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+<!-- ============================================================ -->
+<!-- AI REASON MODAL POPUP (Hidden - kept for JS compatibility)   -->
+<!-- ============================================================ -->
+<div id="aiReasonModal" class="modal hidden" style="display: none !important;"></div>
+
+<!-- ============================================================ -->
+<!-- JAVASCRIPT FILES                                             -->
+<!-- ============================================================ -->
+<script src="/js/api.js"></script>
+<script src="/js/websocket.js"></script>
+<script src="/js/chart.js"></script>
+<script src="/js/trading.js"></script>
+<script src="/js/admin.js"></script>
+<script src="/js/app.js"></script>
+
+<script>
+// Collapsible toggle function
+function toggleCollapsible(contentId, iconId) {
+    const content = document.getElementById(contentId);
+    const icon = document.getElementById(iconId);
+    if (!content || !icon) return;
+    const isHidden = content.style.display === 'none' || !content.style.display;
+    content.style.display = isHidden ? 'block' : 'none';
+    icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+    localStorage.setItem(`collapsible_${contentId}`, isHidden ? 'open' : 'closed');
+}
+
+// Restore collapsible states on load
+document.addEventListener('DOMContentLoaded', () => {
+    ['recentTradesContent'].forEach(id => {
+        const state = localStorage.getItem(`collapsible_${id}`);
+        const content = document.getElementById(id);
+        const icon = document.getElementById(id.replace('Content', 'Icon'));
+        if (content && icon) {
+            if (state === 'closed') {
+                content.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+    });
+});
+
+// REAL token eye toggle
+const toggleRealToken = document.getElementById('toggleRealToken');
+const realTokenInput = document.getElementById('realToken');
+if (toggleRealToken && realTokenInput) {
+    toggleRealToken.addEventListener('click', function() {
+        const type = realTokenInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        realTokenInput.setAttribute('type', type);
+        this.querySelector('i').classList.toggle('fa-eye');
+        this.querySelector('i').classList.toggle('fa-eye-slash');
+    });
+}
+
+// Login password eye toggle
+const toggleLoginPassword = document.getElementById('toggleLoginPassword');
+const loginPasswordInput = document.getElementById('loginPassword');
+if (toggleLoginPassword && loginPasswordInput) {
+    toggleLoginPassword.addEventListener('click', function() {
+        const type = loginPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        loginPasswordInput.setAttribute('type', type);
+        this.querySelector('i').classList.toggle('fa-eye');
+        this.querySelector('i').classList.toggle('fa-eye-slash');
+    });
+}
+
+// Register password eye toggle
+const toggleRegPassword = document.getElementById('toggleRegPassword');
+const regPasswordInput = document.getElementById('regPassword');
+if (toggleRegPassword && regPasswordInput) {
+    toggleRegPassword.addEventListener('click', function() {
+        const type = regPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        regPasswordInput.setAttribute('type', type);
+        this.querySelector('i').classList.toggle('fa-eye');
+        this.querySelector('i').classList.toggle('fa-eye-slash');
+    });
+}
+</script>
+</body>
+</html>
+
+================================================================================
+FILE: frontend/css/style.css
+SIZE: 14.5 KB
+================================================================================
+/* Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    transition: all 0.3s ease;
+    min-height: 100vh;
+}
+
+body.dark-theme {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    color: #f8fafc;
+}
+
+body.light-theme {
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+    color: #0f172a;
+}
+
+/* ================================================================ */
+/* ðŸš€ LOADING SCREEN - GLOWING "M"                                  */
+/* ================================================================ */
+#loadingScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0a0a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    transition: opacity 0.8s ease, visibility 0.8s ease;
+}
+
+#loadingScreen.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    position: relative;
+}
+
+/* ---------- GLOWING "M" ---------- */
+.m-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 200px;
+    height: 200px;
+}
+
+.glowing-m {
+    font-size: 160px;
+    font-weight: 900;
+    font-family: 'Arial Black', 'Impact', sans-serif;
+    letter-spacing: -10px;
+    line-height: 1;
+    position: relative;
+    z-index: 2;
+    background: linear-gradient(135deg, #ffffff 0%, #c4b5fd 40%, #818cf8 70%, #6366f1 100%);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientShift 4s ease-in-out infinite, floatPulse 3s ease-in-out infinite;
+    filter: drop-shadow(0 0 40px rgba(99, 102, 241, 0.8))
+            drop-shadow(0 0 80px rgba(99, 102, 241, 0.4))
+            drop-shadow(0 0 120px rgba(99, 102, 241, 0.2));
+}
+
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes floatPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
+/* ---------- GLOW RINGS ---------- */
+.glow-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    border: 2px solid rgba(99, 102, 241, 0.15);
+    animation: ringPulse 3s ease-in-out infinite;
+    z-index: 1;
+}
+
+.glow-ring-2 {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    border: 1px solid rgba(99, 102, 241, 0.08);
+    animation: ringPulse 3s ease-in-out infinite 0.5s;
+    z-index: 0;
+}
+
+@keyframes ringPulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+    50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.2; }
+}
+
+/* ---------- PARTICLES ---------- */
+.particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: radial-gradient(circle, #818cf8, transparent);
+    border-radius: 50%;
+    animation: particleFloat 4s ease-in-out infinite;
+}
+
+.particle:nth-child(1) { top: 10%; left: 20%; animation-delay: 0s; width: 6px; height: 6px; }
+.particle:nth-child(2) { top: 15%; right: 15%; animation-delay: 0.4s; }
+.particle:nth-child(3) { bottom: 20%; left: 10%; animation-delay: 0.8s; width: 8px; height: 8px; }
+.particle:nth-child(4) { bottom: 15%; right: 20%; animation-delay: 1.2s; }
+.particle:nth-child(5) { top: 45%; left: 5%; animation-delay: 0.2s; width: 5px; height: 5px; }
+.particle:nth-child(6) { top: 40%; right: 5%; animation-delay: 0.6s; }
+.particle:nth-child(7) { top: 5%; left: 50%; animation-delay: 1s; width: 7px; height: 7px; }
+.particle:nth-child(8) { bottom: 5%; left: 50%; animation-delay: 1.4s; }
+.particle:nth-child(9) { top: 30%; left: 30%; animation-delay: 0.3s; width: 4px; height: 4px; }
+.particle:nth-child(10) { top: 30%; right: 30%; animation-delay: 0.7s; }
+.particle:nth-child(11) { bottom: 30%; left: 30%; animation-delay: 1.1s; width: 6px; height: 6px; }
+.particle:nth-child(12) { bottom: 30%; right: 30%; animation-delay: 1.5s; }
+
+@keyframes particleFloat {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.2; }
+    25% { transform: translate(-15px, -20px) scale(1.5); opacity: 0.8; }
+    50% { transform: translate(10px, -30px) scale(1); opacity: 0.4; }
+    75% { transform: translate(-10px, -10px) scale(1.3); opacity: 0.7; }
+}
+
+/* ---------- TYPING TEXT ---------- */
+.loading-text-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-height: 40px;
+}
+
+.loading-text {
+    font-size: 18px;
+    font-weight: 300;
+    letter-spacing: 6px;
+    color: #c4b5fd;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #c4b5fd, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    min-width: 10px;
+}
+
+.cursor-blink {
+    font-size: 24px;
+    font-weight: 300;
+    color: #818cf8;
+    animation: blink 0.8s step-end infinite;
+    -webkit-text-fill-color: #818cf8;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* ---------- VERSION ---------- */
+.loading-version {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: rgba(99, 102, 241, 0.3);
+    font-family: 'Courier New', monospace;
+    margin-top: 5px;
+    animation: versionPulse 2s ease-in-out infinite;
+}
+
+@keyframes versionPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
+}
+
+/* ---------- LOADING SCREEN RESPONSIVE ---------- */
+@media (max-width: 640px) {
+    .glowing-m { font-size: 100px; letter-spacing: -6px; }
+    .m-wrapper { width: 140px; height: 140px; }
+    .glow-ring { width: 160px; height: 160px; }
+    .glow-ring-2 { width: 200px; height: 200px; }
+    .loading-text { font-size: 14px; letter-spacing: 4px; }
+    .loading-version { font-size: 9px; }
+}
+
+@media (max-width: 400px) {
+    .glowing-m { font-size: 72px; letter-spacing: -4px; }
+    .m-wrapper { width: 100px; height: 100px; }
+    .glow-ring { width: 120px; height: 120px; }
+    .glow-ring-2 { width: 150px; height: 150px; }
+    .loading-text { font-size: 11px; letter-spacing: 3px; }
+}
+
+/* ================================================================ */
+/* GLASS CARD EFFECT                                               */
+/* ================================================================ */
+.glass-card {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    transition: all 0.3s ease;
+}
+
+body.light-theme .glass-card {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-glass {
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(12px);
+    border-right: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+body.light-theme .sidebar-glass {
+    background: rgba(255, 255, 255, 0.95);
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* ================================================================ */
+/* MODAL STYLES                                                    */
+/* ================================================================ */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    border-radius: 1rem;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ================================================================ */
+/* SIDEBAR DRAWER                                                  */
+/* ================================================================ */
+.sidebar-drawer {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+    z-index: 100;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 280px;
+}
+
+.sidebar-drawer.open {
+    transform: translateX(0);
+}
+
+.mobile-menu-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 50;
+}
+
+.mobile-menu-btn:hover {
+    background: rgba(99, 102, 241, 0.3);
+    transform: scale(1.05);
+}
+
+@media (min-width: 1024px) {
+    .sidebar-drawer { transform: translateX(-100%); position: fixed; }
+    .sidebar-drawer.open { transform: translateX(0); }
+    .mobile-menu-btn { display: flex !important; }
+    .main-content { margin-left: 0 !important; }
+}
+
+@media (max-width: 1023px) {
+    .main-content { margin-left: 0 !important; }
+    .mobile-menu-btn { display: flex !important; }
+}
+
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 90;
+    display: none;
+}
+
+.drawer-overlay.open { display: block; }
+
+#closeDrawerBtn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+#closeDrawerBtn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+/* ================================================================ */
+/* TABS                                                             */
+/* ================================================================ */
+.tab-btn {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.tab-btn.active {
+    color: #4f46e5;
+    border-bottom: 2px solid #4f46e5;
+}
+
+.tab-pane { display: block; }
+.tab-pane.hidden { display: none; }
+
+.admin-tab {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-tab.active {
+    color: #4f46e5;
+    border-bottom: 2px solid #4f46e5;
+}
+
+.admin-tab-pane { display: block; }
+.admin-tab-pane.hidden { display: none; }
+
+/* ================================================================ */
+/* SCROLLBAR                                                        */
+/* ================================================================ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1e293b; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 10px; }
+body.light-theme ::-webkit-scrollbar-track { background: #cbd5e1; }
+body.light-theme ::-webkit-scrollbar-thumb { background: #6366f1; }
+
+/* ================================================================ */
+/* HOVER EFFECTS                                                    */
+/* ================================================================ */
+.hover-card:hover {
+    transform: translateY(-2px);
+    transition: all 0.2s ease;
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ================================================================ */
+/* ANIMATIONS                                                       */
+/* ================================================================ */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ================================================================ */
+/* TOAST NOTIFICATIONS                                              */
+/* ================================================================ */
+.toast {
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(8px);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    min-width: 250px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast-success { border-left: 4px solid #22c55e; }
+.toast-error { border-left: 4px solid #ef4444; }
+.toast-info { border-left: 4px solid #4f46e5; }
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* ================================================================ */
+/* LOADING SPINNER                                                  */
+/* ================================================================ */
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(99, 102, 241, 0.3);
+    border-top-color: #4f46e5;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ================================================================ */
+/* RESPONSIVE TABLES                                                */
+/* ================================================================ */
+@media (max-width: 768px) {
+    .overflow-x-auto {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    table { min-width: 600px; }
+    .p-4 { padding: 0.75rem; }
+}
+
+a, button, .nav-link, #openApiKeys, #openSettings, #adminLink, .tf-btn, .tab-btn, .admin-tab {
+    cursor: pointer;
+}
+
+.drawer-overlay { pointer-events: auto; }
+.sidebar-drawer nav a { pointer-events: auto; z-index: 101; }
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes signalPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+@media (max-width: 640px) {
+    #aiReasonModal .modal-content { width: 95%; margin: 0 auto; }
+}
+
+
+/* ================================================================ */
+/* DESKTOP SIDEBAR COLLAPSE                                          */
+/* ================================================================ */
+@media (min-width: 1024px) {
+    body.sidebar-collapsed #sidebarDrawer {
+        transform: translateX(-100%) !important;
+    }
+    body.sidebar-collapsed .main-content {
+        margin-left: 0 !important;
+    }
+    body.sidebar-collapsed #desktopHamburger {
+        position: fixed;
+        left: 1rem;
+        top: 1rem;
+        z-index: 60;
+    }
+}
+
+================================================================================
+FILE: frontend/js/app.js
+SIZE: 46.8 KB
+================================================================================
+// ================================================================
+// ðŸš€ MONIX APP - COMPLETE WITH SLOW PREMIUM LOADING
+// ================================================================
+
+let currentUser = null;
+let currentPage = 'dashboard';
+let isReconnecting = false;
+let autoBalanceInterval = null;
+let loadingComplete = false;
+
+console.log('Ã°Å¸â€Âµ MONIX App Initializing...');
+
+// ================================================================
+// DOM ELEMENTS
+// ================================================================
+const loadingScreen = document.getElementById('loadingScreen');
+const authModal = document.getElementById('authModal');
+const appContainer = document.getElementById('appContainer');
+const loginTab = document.getElementById('loginTab');
+const registerTab = document.getElementById('registerTab');
+const loginForm = document.getElementById('loginForm');
+const registerForm = document.getElementById('registerForm');
+const themeToggle = document.getElementById('themeToggle');
+const themeIcon = document.getElementById('themeIcon');
+const themeText = document.getElementById('themeText');
+const logoutBtn = document.getElementById('logoutBtn');
+const openApiKeys = document.getElementById('openApiKeys');
+const openSettings = document.getElementById('openSettings');
+const viewFullInsights = document.getElementById('viewFullInsights');
+
+const navLinks = document.querySelectorAll('.nav-link');
+const pages = document.querySelectorAll('.page-content');
+
+const mobileHeader = document.getElementById('mobileHeader');
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const sidebarDrawer = document.getElementById('sidebarDrawer');
+const drawerOverlay = document.getElementById('drawerOverlay');
+const closeDrawerBtn = document.getElementById('closeDrawerBtn');
+
+// ================================================================
+// LOADING SCREEN LOGIC - SLOW & PREMIUM
+// ================================================================
+
+function showLoadingScreen() {
+    console.log('Ã°Å¸Å½Â¬ Loading screen started...');
+    loadingScreen.classList.remove('hidden');
+    startTypingEffect();
+}
+
+function hideLoadingScreen() {
+    console.log('Ã°Å¸Å½Â¬ Loading screen complete!');
+    loadingScreen.classList.add('hidden');
+    loadingComplete = true;
+}
+
+function startTypingEffect() {
+    const textElement = document.getElementById('typingText');
+    if (!textElement) return;
+
+    const text = 'AUTOMATED TRADES';
+    let index = 0;
+    let isDeleting = false;
+
+    function typeStep() {
+        if (!loadingScreen || loadingScreen.classList.contains('hidden')) {
+            return;
+        }
+
+        if (!isDeleting) {
+            textElement.textContent = text.substring(0, index + 1);
+            index++;
+
+            if (index === text.length) {
+                // Hold for 2.5 seconds to let user appreciate the full text
+                setTimeout(() => {
+                    hideLoadingScreen();
+                    showAuthOrApp();
+                }, 2500);
+                return;
+            }
+
+            // Slower typing: 150-220ms per character (premium feel)
+            const delay = 150 + Math.random() * 70;
+            setTimeout(typeStep, delay);
+        }
+    }
+
+    // Let the M glow build up for 1.5 seconds before typing starts
+    setTimeout(typeStep, 1500);
+}
+
+function showAuthOrApp() {
+    const token = localStorage.getItem('monix_token');
+
+    if (token) {
+        window.api.verifyToken()
+            .then(result => {
+                if (result.valid) {
+                    console.log('âœ… Token valid - showing app');
+                    currentUser = result.user;
+                    showApp();
+                } else {
+                    console.log('âš ï¸ Token invalid - showing login');
+                    showAuthModal();
+                }
+            })
+            .catch(() => {
+                console.log('âš ï¸ Token verification failed - showing login');
+                showAuthModal();
+            });
+    } else {
+        console.log('Ã°Å¸â€â€˜ No token - showing login');
+        showAuthModal();
+    }
+}
+
+// ================================================================
+// HELPER FUNCTIONS
+// ================================================================
+
+function logToTerminal(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`[${timestamp}] ${message}`);
+}
+
+// ================================================================
+// TOAST NOTIFICATION
+// ================================================================
+
+function showToast(title, message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    let icon = '';
+    switch (type) {
+        case 'success': icon = 'âœ…'; break;
+        case 'error': icon = 'Ã¢ÂÅ’'; break;
+        default: icon = 'Ã¢â€žÂ¹Ã¯Â¸Â';
+    }
+
+    toast.innerHTML = `
+        <div class="flex items-start gap-3">
+            <span class="text-lg">${icon}</span>
+            <div class="flex-1">
+                <p class="font-semibold text-sm">${title}</p>
+                <p class="text-xs text-slate-400 mt-1">${message}</p>
+            </div>
+            <button class="text-slate-500 hover:text-white" onclick="this.parentElement.parentElement.remove()">Ã¢Å“â€¢</button>
+        </div>
+    `;
+
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+window.showToast = showToast;
+
+// ================================================================
+// AUTO BALANCE REFRESH
+// ================================================================
+
+async function refreshBalance() {
+    try {
+        if (!currentUser) return;
+
+        const profile = await window.api.getUserProfile();
+        if (profile && profile.derivBalance && profile.derivBalance.balance !== undefined) {
+            const balanceNum = typeof profile.derivBalance.balance === 'number'
+                ? profile.derivBalance.balance
+                : parseFloat(profile.derivBalance.balance);
+
+            const balanceEl = document.getElementById('balanceAmount');
+            if (balanceEl) {
+                balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
+            }
+
+            const totalEl = document.getElementById('totalBalance');
+            if (totalEl) {
+                totalEl.textContent = `$${balanceNum.toFixed(2)}`;
+            }
+
+            const lockedEl = document.getElementById('lockedBalance');
+            const locked = parseFloat(lockedEl?.textContent?.replace('$', '') || 0);
+            const availableEl = document.getElementById('availableBalance');
+            if (availableEl) {
+                availableEl.textContent = `$${(balanceNum - locked).toFixed(2)}`;
+            }
+
+            if (profile.stats?.today_profit !== undefined) {
+                const todayProfitEl = document.getElementById('todayProfit');
+                const todayProfit = profile.stats.today_profit || 0;
+                if (todayProfitEl) {
+                    todayProfitEl.innerHTML = `<i class="fas fa-arrow-${todayProfit >= 0 ? 'up' : 'down'}"></i> Today: ${todayProfit >= 0 ? '+' : ''}$${todayProfit.toFixed(2)}`;
+                    todayProfitEl.className = todayProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
+                }
+            }
+
+            if (profile.stats?.win_rate !== undefined) {
+                const winRateEl = document.getElementById('winRateDisplay');
+                if (winRateEl) {
+                    winRateEl.innerHTML = `Win Rate: ${profile.stats.win_rate}%`;
+                }
+            }
+
+            logToTerminal(`ðŸ’° Auto-refresh balance: $${balanceNum.toFixed(2)}`);
+        }
+
+        if (window.updateLockedBalance) {
+            await window.updateLockedBalance();
+        }
+    } catch (error) {
+        // Silent fail
+    }
+}
+
+function startAutoBalanceRefresh() {
+    if (autoBalanceInterval) clearInterval(autoBalanceInterval);
+    autoBalanceInterval = setInterval(() => {
+        if (currentUser && document.getElementById('dashboardPage')?.classList.contains('hidden') === false) {
+            refreshBalance();
+        }
+    }, 5000);
+}
+
+function stopAutoBalanceRefresh() {
+    if (autoBalanceInterval) {
+        clearInterval(autoBalanceInterval);
+        autoBalanceInterval = null;
+    }
+}
+
+// ================================================================
+// MOBILE DRAWER
+// ================================================================
+
+function initMobileDrawer() {
+    logToTerminal('ðŸ“± Initializing mobile drawer');
+
+    function closeDrawer() {
+        if (sidebarDrawer) sidebarDrawer.style.transform = 'translateX(-100%)';
+        if (drawerOverlay) drawerOverlay.classList.add('hidden');
+        document.body.style.overflow = '';
+        if (mobileHeader) mobileHeader.style.display = 'flex';
+    }
+
+    function openDrawer() {
+        if (sidebarDrawer) sidebarDrawer.style.transform = 'translateX(0)';
+        if (drawerOverlay) drawerOverlay.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        if (mobileHeader) mobileHeader.style.display = 'none';
+    }
+
+    if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (window.innerWidth >= 1024) {
+                document.body.classList.toggle('sidebar-collapsed');
+            } else {
+                openDrawer();
+            }
+        });
+    }
+    
+    // Desktop hamburger button
+    const __desktopHam = document.getElementById('desktopHamburger');
+    if (__desktopHam) {
+        __desktopHam.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            document.body.classList.toggle('sidebar-collapsed');
+        });
+    }
+
+    if (closeDrawerBtn) {
+        closeDrawerBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeDrawer();
+        });
+    }
+
+    if (drawerOverlay) {
+        drawerOverlay.addEventListener('click', () => {
+            closeDrawer();
+        });
+    }
+}
+
+// ================================================================
+// PAGE CLOSE BUTTONS
+// ================================================================
+
+function setupPageCloseButtons() {
+    const pagesWithClose = ['insightsPage', 'performancePage', 'historyPage', 'leaderboardPage'];
+
+    pagesWithClose.forEach(pageId => {
+        const page = document.getElementById(pageId);
+        if (page && !page.querySelector('.page-close-btn')) {
+            const headerDiv = page.querySelector('.glass-card > div:first-child');
+            if (headerDiv && !headerDiv.querySelector('.page-close-btn')) {
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'page-close-btn text-slate-400 hover:text-white text-2xl ml-auto';
+                closeBtn.innerHTML = '&times;';
+                closeBtn.style.background = 'none';
+                closeBtn.style.border = 'none';
+                closeBtn.style.cursor = 'pointer';
+                closeBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    logToTerminal(`Ã¢ÂÅ’ [UI] Closing ${pageId}, returning to dashboard`);
+                    switchPage('dashboard');
+                };
+                headerDiv.appendChild(closeBtn);
+                logToTerminal(`âœ… [UI] Added close button to ${pageId}`);
+            }
+        }
+    });
+}
+
+// ================================================================
+// AUTH MODAL SETUP
+// ================================================================
+
+function setupAuthModal() {
+    logToTerminal('Ã°Å¸â€Â Setting up auth modal');
+
+    if (loginTab && registerTab) {
+        loginTab.addEventListener('click', () => {
+            loginTab.classList.add('active');
+            registerTab.classList.remove('active');
+            loginForm.classList.remove('hidden');
+            registerForm.classList.add('hidden');
+        });
+
+        registerTab.addEventListener('click', () => {
+            registerTab.classList.add('active');
+            loginTab.classList.remove('active');
+            registerForm.classList.remove('hidden');
+            loginForm.classList.add('hidden');
+        });
+    }
+
+    const loginFormElement = document.getElementById('loginFormElement');
+    if (loginFormElement) {
+        loginFormElement.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            logToTerminal(`Ã°Å¸â€Â Login attempt for: ${email}`);
+
+            try {
+                const result = await window.api.login(email, password);
+                if (result.success) {
+                    logToTerminal(`âœ… Login successful for ${email}`);
+                    currentUser = result.user;
+                    showApp();
+                    await loadUserData();
+                    showToast('Login Successful', `Welcome back ${result.user.username}!`, 'success');
+                } else {
+                    showToast('Login Failed', result.error || 'Invalid credentials', 'error');
+                }
+            } catch (error) {
+                showToast('Login Failed', error.message, 'error');
+            }
+        });
+    }
+
+    const registerFormElement = document.getElementById('registerFormElement');
+    if (registerFormElement) {
+        registerFormElement.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const voucher = document.getElementById('regVoucher').value;
+            logToTerminal(`Ã°Å¸â€œÂ Registration attempt for: ${email} (${username})`);
+
+            try {
+                const result = await window.api.register(username, email, password, voucher);
+                if (result.success) {
+                    logToTerminal(`âœ… Registration successful for ${email}`);
+                    currentUser = result.user;
+                    showApp();
+                    await loadUserData();
+                    showToast('Registration Successful', `Welcome to MONIX, ${username}!`, 'success');
+                } else {
+                    showToast('Registration Failed', result.error || 'Invalid voucher or data', 'error');
+                }
+            } catch (error) {
+                showToast('Registration Failed', error.message, 'error');
+            }
+        });
+    }
+}
+
+// ================================================================
+// MODAL SETUP
+// ================================================================
+
+function setupModals() {
+    logToTerminal('Ã°Å¸â€Â§ Setting up modals');
+
+    if (openApiKeys) {
+        openApiKeys.addEventListener('click', async () => {
+            const modal = document.getElementById('apiKeysModal');
+            if (modal) modal.classList.remove('hidden');
+            await loadApiKeysToForm();
+        });
+    }
+
+    if (openSettings) {
+        openSettings.addEventListener('click', async () => {
+            const modal = document.getElementById('settingsModal');
+            if (modal) modal.classList.remove('hidden');
+            await loadSettingsToForm();
+        });
+    }
+
+    if (viewFullInsights) {
+        viewFullInsights.addEventListener('click', () => {
+            switchPage('insights');
+        });
+    }
+
+    const apiKeysForm = document.getElementById('apiKeysForm');
+    if (apiKeysForm) {
+        apiKeysForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const demoToken = document.getElementById('demoToken').value;
+            const realToken = document.getElementById('realToken').value;
+
+            try {
+                const result = await window.api.updateApiKeys(demoToken, realToken);
+                if (result.reconnect?.success && result.reconnect?.balance !== undefined) {
+                    const balanceNum = typeof result.reconnect.balance === 'number' ? result.reconnect.balance : parseFloat(result.reconnect.balance);
+                    showToast('API Keys Saved', `Connected! Balance: $${balanceNum}`, 'success');
+                    const balanceEl = document.getElementById('balanceAmount');
+                    if (balanceEl) balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
+                } else {
+                    showToast('API Keys Saved', 'Keys saved but connection failed', 'warning');
+                }
+                document.getElementById('apiKeysModal').classList.add('hidden');
+                await loadUserData();
+                await refreshBalance();
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        });
+    }
+
+    const settingsForm = document.getElementById('settingsForm');
+    if (settingsForm) {
+        settingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const defaultSymbol = document.getElementById('defaultSymbol').value;
+            const defaultStake = parseFloat(document.getElementById('defaultStake').value);
+
+            try {
+                await window.api.updateUserSettings({
+                    default_symbol: defaultSymbol,
+                    base_stake: defaultStake
+                });
+                showToast('Settings Saved', 'Your preferences have been saved', 'success');
+                document.getElementById('settingsModal').classList.add('hidden');
+
+                const stakeSlider = document.getElementById('stakeSlider');
+                const stakeValue = document.getElementById('stakeValue');
+                if (stakeSlider) stakeSlider.value = defaultStake;
+                if (stakeValue) stakeValue.innerText = `$${defaultStake.toFixed(2)}`;
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        });
+    }
+
+    document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.closest('.modal').classList.add('hidden');
+        });
+    });
+
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    });
+}
+
+async function loadApiKeysToForm() {
+    try {
+        const profile = await window.api.getUserProfile();
+        if (profile && profile.user) {
+            const demoTokens = document.getElementById('demoToken');
+            const realTokens = document.getElementById('realToken');
+            if (demoTokens) demoTokens.value = profile.user.demo_token || '';
+            if (realTokens) realTokens.value = profile.user.real_token || '';
+        }
+    } catch (error) {
+        console.error('Failed to load API keys:', error);
+    }
+}
+
+async function loadSettingsToForm() {
+    try {
+        const profile = await window.api.getUserProfile();
+        if (profile && profile.user) {
+            document.getElementById('defaultSymbol').value = profile.user.default_symbol || 'R_75';
+            document.getElementById('defaultStake').value = profile.user.base_stake || 0.10;
+        }
+    } catch (error) {
+        console.error('Failed to load settings:', error);
+    }
+}
+
+// ================================================================
+// NAVIGATION
+// ================================================================
+
+function setupNavigation() {
+    logToTerminal('Ã°Å¸Â§Â­ Setting up navigation');
+
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const page = link.dataset.page;
+            if (page) {
+                switchPage(page);
+            }
+        });
+    });
+}
+
+function switchPage(page) {
+    currentPage = page;
+
+    navLinks.forEach(link => {
+        if (link.dataset.page === page) {
+            link.classList.add('bg-indigo-600/20', 'text-indigo-400');
+            link.classList.remove('text-slate-400');
+        } else {
+            link.classList.remove('bg-indigo-600/20', 'text-indigo-400');
+            link.classList.add('text-slate-400');
+        }
+    });
+
+    pages.forEach(p => p.classList.add('hidden'));
+    const activePage = document.getElementById(`${page}Page`);
+    if (activePage) activePage.classList.remove('hidden');
+
+    if (page === 'performance') setTimeout(() => loadPerformanceStats(), 100);
+    if (page === 'history') setTimeout(() => loadFullHistory(), 100);
+    if (page === 'leaderboard') setTimeout(() => loadLeaderboard(), 100);
+    if (page === 'insights') setTimeout(() => loadFullInsights(), 100);
+
+    if (page === 'dashboard') {
+        setTimeout(() => refreshBalance(), 100);
+    }
+
+    setTimeout(() => setupPageCloseButtons(), 200);
+}
+
+// ================================================================
+// DATA LOADING
+// ================================================================
+
+async function loadUserData() {
+    try {
+        logToTerminal('Ã°Å¸â€˜Â¤ Loading user data...');
+        const profile = await window.api.getUserProfile();
+
+        if (profile && profile.user) {
+            currentUser = profile.user;
+
+            document.getElementById('welcomeName').innerHTML = profile.user.username;
+            document.getElementById('userName').innerHTML = profile.user.username;
+            document.getElementById('userEmail').innerHTML = profile.user.email;
+
+            const hasDemoToken = profile.user.demo_token && profile.user.demo_token.length > 0;
+            const hasRealToken = profile.user.real_token && profile.user.real_token.length > 0;
+            const hasAnyApiKey = hasDemoToken || hasRealToken;
+            const currentMode = profile.user.is_demo ? 'DEMO' : 'REAL';
+
+            const balanceEl = document.getElementById('balanceAmount');
+            const connectionText = document.getElementById('connectionText');
+            const marketStatus = document.getElementById('marketStatus');
+
+            if (balanceEl) {
+                if (profile.derivBalance && profile.derivBalance.authorized) {
+                    const balanceNum = typeof profile.derivBalance.balance === 'number'
+                        ? profile.derivBalance.balance
+                        : parseFloat(profile.derivBalance.balance);
+                    balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
+                    if (connectionText) connectionText.innerHTML = `${currentMode} Connected (${profile.derivBalance.currency})`;
+                    if (marketStatus) marketStatus.innerHTML = `${currentMode} ACTIVE`;
+                    logToTerminal(`ðŸ’° Balance from Deriv API: $${balanceNum} ${profile.derivBalance.currency} (${currentMode})`);
+                }
+                else if (profile.user.is_demo === 0 && hasRealToken && (!profile.derivBalance || profile.derivBalance.balance === 0)) {
+                    balanceEl.innerHTML = `$0.00`;
+                    if (connectionText) connectionText.innerHTML = 'Connecting to REAL...';
+                    if (marketStatus) marketStatus.innerHTML = 'CONNECTING';
+                    logToTerminal('âš ï¸ REAL mode but balance is 0 - forcing reconnect');
+
+                    try {
+                        const reconnectResult = await window.api.reconnectDeriv();
+                        if (reconnectResult.success && reconnectResult.balance !== undefined) {
+                            balanceEl.innerHTML = `$${reconnectResult.balance.toFixed(2)}`;
+                            if (connectionText) connectionText.innerHTML = `REAL Connected`;
+                            if (marketStatus) marketStatus.innerHTML = `REAL ACTIVE`;
+                            logToTerminal(`ðŸ’° REAL balance fetched: $${reconnectResult.balance}`);
+                        }
+                    } catch (reconnectError) {
+                        logToTerminal(`Ã¢ÂÅ’ Force reconnect failed: ${reconnectError.message}`, 'error');
+                    }
+                }
+                else if (!hasAnyApiKey) {
+                    balanceEl.innerHTML = `$0.00`;
+                    if (connectionText) connectionText.innerHTML = 'No API Keys';
+                    if (marketStatus) marketStatus.innerHTML = 'READ-ONLY';
+                    logToTerminal('âš ï¸ No API keys found - showing $0 balance');
+                }
+                else if (hasAnyApiKey && !profile.derivBalance?.authorized && !isReconnecting) {
+                    balanceEl.innerHTML = `$0.00`;
+                    if (connectionText) connectionText.innerHTML = 'Connecting...';
+                    if (marketStatus) marketStatus.innerHTML = 'CONNECTING';
+                    logToTerminal('âš ï¸ API keys present but Deriv not authorized - attempting reconnect');
+
+                    isReconnecting = true;
+                    try {
+                        const reconnectResult = await window.api.reconnectDeriv();
+                        if (reconnectResult.success && reconnectResult.balance !== undefined) {
+                            const balanceNum = typeof reconnectResult.balance === 'number'
+                                ? reconnectResult.balance
+                                : parseFloat(reconnectResult.balance);
+                            balanceEl.innerHTML = `$${balanceNum.toFixed(2)}`;
+                            if (connectionText) connectionText.innerHTML = `${reconnectResult.mode || currentMode} Connected`;
+                            if (marketStatus) marketStatus.innerHTML = `${reconnectResult.mode || currentMode} ACTIVE`;
+                            logToTerminal(`ðŸ’° Reconnected! Balance: $${balanceNum}`);
+                        }
+                    } catch (reconnectError) {
+                        logToTerminal(`Ã¢ÂÅ’ Auto-reconnect failed: ${reconnectError.message}`, 'error');
+                    } finally {
+                        isReconnecting = false;
+                    }
+                }
+            }
+
+            document.getElementById('winRateDisplay').innerHTML = `Win Rate: ${profile.stats?.win_rate || 0}%`;
+
+            const todayProfit = profile.stats?.today_profit || 0;
+            const todayProfitEl = document.getElementById('todayProfit');
+            if (todayProfitEl) {
+                todayProfitEl.innerHTML = `<i class="fas fa-arrow-${todayProfit >= 0 ? 'up' : 'down'}"></i> Today: ${todayProfit >= 0 ? '+' : ''}$${todayProfit.toFixed(2)}`;
+                todayProfitEl.className = todayProfit >= 0 ? 'text-emerald-400' : 'text-red-400';
+            }
+
+            document.getElementById('voucherCode').innerHTML = profile.user.voucher_code || 'MONIX-XXXX';
+            document.getElementById('tradesRemaining').innerHTML = `Trades Left: ${profile.user.trades_remaining || 0}`;
+            if (profile.user.voucher_expiry) {
+                document.getElementById('voucherExpiry').innerHTML = `Expires: ${new Date(profile.user.voucher_expiry).toLocaleDateString()}`;
+            }
+
+            const pushSignalsToggle = document.getElementById('pushSignalsToggle');
+            const autoModeToggle = document.getElementById('autoModeToggle');
+            const jackpotToggle = document.getElementById('jackpotToggle');
+            const stakeSlider = document.getElementById('stakeSlider');
+            const stakeValue = document.getElementById('stakeValue');
+
+            if (pushSignalsToggle) pushSignalsToggle.checked = profile.user.push_signals === 1;
+            if (autoModeToggle) autoModeToggle.checked = profile.user.auto_mode === 1;
+            if (jackpotToggle) jackpotToggle.checked = profile.user.jackpot_mode === 1;
+            if (stakeSlider && profile.user.base_stake) stakeSlider.value = Math.max(profile.user.base_stake, 0.35);
+            if (stakeValue) stakeValue.innerText = `$${Math.max(profile.user.base_stake || 0.35, 0.35).toFixed(2)}`;
+
+            const adminLink = document.getElementById('adminLink');
+            if (adminLink && profile.user.is_admin) {
+                adminLink.classList.remove('hidden');
+                logToTerminal('Ã°Å¸â€˜â€˜ Admin access granted');
+            }
+
+            if (window.updateLockedBalance) await window.updateLockedBalance();
+            logToTerminal('âœ… User data loaded successfully');
+        }
+    } catch (error) {
+        logToTerminal(`Ã¢ÂÅ’ Failed to load user data: ${error.message}`, 'error');
+    }
+}
+
+async function loadPerformanceStats() {
+    try {
+        logToTerminal('ðŸ“ˆ Loading performance stats...');
+        const stats = await window.api.getTradeStats(30);
+        document.getElementById('statWinRate').innerHTML = `${stats.overall?.win_rate || 0}%`;
+        document.getElementById('statTotalTrades').innerHTML = stats.overall?.total_trades || 0;
+        const profit = stats.overall?.net_profit || 0;
+        document.getElementById('statNetProfit').innerHTML = `$${profit.toFixed(2)}`;
+        document.getElementById('statBestStreak').innerHTML = stats.overall?.best_streak || 0;
+
+        const symbolContainer = document.getElementById('symbolStatsContainer');
+        if (symbolContainer) {
+            if (stats.by_symbol && stats.by_symbol.length > 0) {
+                symbolContainer.innerHTML = `<h3 class="font-semibold mb-2">Performance by Symbol</h3>${stats.by_symbol.map(s => `<div class="flex justify-between items-center py-2 border-b border-slate-700"><span class="font-medium">${s.symbol}</span><div class="flex gap-4"><span class="text-sm">${s.total} trades</span><span class="text-sm ${s.win_rate >= 50 ? 'text-emerald-400' : 'text-red-400'}">${s.win_rate}% win</span><span class="text-sm ${s.total_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">$${s.total_profit?.toFixed(2)}</span></div></div>`).join('')}`;
+            } else {
+                symbolContainer.innerHTML = '<p class="text-center text-slate-500">No trades yet</p>';
+            }
+        }
+        logToTerminal('âœ… Performance stats loaded');
+    } catch (error) {
+        logToTerminal(`Ã¢ÂÅ’ Failed to load performance stats: ${error.message}`, 'error');
+    }
+}
+
+async function loadFullHistory() {
+    try {
+        logToTerminal('Ã°Å¸â€œÅ“ Loading trade history...');
+        const trades = await window.api.getTradeHistory(100);
+        const tbody = document.getElementById('historyTradesBody');
+        const symbolFilter = document.getElementById('historyFilterSymbol');
+        const statusFilter = document.getElementById('historyFilterStatus');
+
+        if (!tbody) return;
+
+        function renderFiltered() {
+            let filtered = [...trades];
+            if (symbolFilter && symbolFilter.value) filtered = filtered.filter(t => t.symbol === symbolFilter.value);
+            if (statusFilter && statusFilter.value) filtered = filtered.filter(t => t.status === statusFilter.value);
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No trades found</tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(trade => `<tr class="border-b border-slate-700"><td class="p-3 text-xs">${new Date(trade.executed_at).toLocaleString()}</td><td class="p-3 font-medium">${trade.symbol}</td><td class="p-3 ${trade.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}">${trade.action}</td><td class="p-3">$${trade.entry_price?.toFixed(2)}</td><td class="p-3">$${trade.exit_price?.toFixed(2) || '--'}</td><td class="p-3 ${trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.profit >= 0 ? '+' : ''}$${trade.profit?.toFixed(2)}</td><td class="p-3"><span class="px-2 py-1 rounded text-xs ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-red-500/20 text-red-500'}">${trade.status || 'PENDING'}</span></td></tr>`).join('');
+        }
+
+        if (symbolFilter) symbolFilter.addEventListener('change', renderFiltered);
+        if (statusFilter) statusFilter.addEventListener('change', renderFiltered);
+        renderFiltered();
+        logToTerminal(`âœ… Loaded ${trades.length} trades`);
+    } catch (error) {
+        logToTerminal(`Ã¢ÂÅ’ Failed to load trade history: ${error.message}`, 'error');
+    }
+}
+
+async function loadLeaderboard() {
+    try {
+        logToTerminal('Ã°Å¸Ââ€  Loading leaderboard...');
+        const leaderboard = await window.api.getLeaderboard();
+        const container = document.getElementById('leaderboardBody');
+
+        if (!container) return;
+
+        if (!leaderboard || leaderboard.length === 0) {
+            container.innerHTML = '<p class="text-center text-slate-500">No traders yet</p>';
+            return;
+        }
+
+        function maskUsername(username) {
+            if (!username) return '****';
+            if (username.length <= 4) return username;
+            return username.substring(0, 2) + '***' + username.substring(username.length - 2);
+        }
+
+        container.innerHTML = leaderboard.map((user, index) => `<div class="flex items-center justify-between bg-slate-800/30 p-3 rounded-lg"><div class="flex items-center gap-3"><span class="text-2xl ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-slate-400' : index === 2 ? 'text-amber-600' : 'text-slate-500'}">${index === 0 ? 'ðŸ¥‡' : index === 1 ? 'Ã°Å¸Â¥Ë†' : index === 2 ? 'Ã°Å¸Â¥â€°' : `${index + 1}`}</span><div><p class="font-medium">${maskUsername(user.username)}</p><p class="text-xs text-slate-500">${user.total_trades || 0} trades | ${user.win_rate || 0}% win</p></div></div><div class="text-right"><p class="font-bold text-emerald-400">+$${user.net_profit?.toFixed(2)}</p><p class="text-xs text-slate-500">Best: ${user.best_streak || 0} streak</p></div></div>`).join('');
+        logToTerminal(`âœ… Leaderboard loaded with ${leaderboard.length} traders`);
+    } catch (error) {
+        logToTerminal(`Ã¢ÂÅ’ Failed to load leaderboard: ${error.message}`, 'error');
+    }
+}
+
+async function loadFullInsights() {
+    try {
+        logToTerminal('ðŸ§  Loading full insights page...');
+
+        const currentSymbol = document.getElementById('symbolSelect')?.value || null;
+
+        const insights = await window.api.getAIInsights(currentSymbol);
+        const container = document.getElementById('fullInsightsContent');
+
+        if (!container) return;
+
+        if (!insights.user_stats || insights.user_stats.total_trades === 0) {
+            container.innerHTML = `
+                <div class="bg-amber-500/20 p-6 rounded-lg text-center border border-amber-500/30">
+                    <i class="fas fa-chart-line text-4xl text-amber-400 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">No Trades Yet</h3>
+                    <p class="text-slate-400 mb-4">Execute a trade to generate AI insights!</p>
+                    <div class="text-sm text-slate-500 mb-4">Go to Dashboard and click GET SIGNAL to start trading</div>
+                    <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
+                </div>
+            `;
+            logToTerminal('ðŸ§  No trades yet - showing placeholder');
+            return;
+        }
+
+        if (insights.user_stats.total_trades < 3) {
+            const tradesNeeded = 3 - insights.user_stats.total_trades;
+            container.innerHTML = `
+                <div class="bg-blue-500/20 p-6 rounded-lg text-center border border-blue-500/30">
+                    <i class="fas fa-spinner fa-pulse text-4xl text-blue-400 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">Gathering Trading Data...</h3>
+                    <p class="text-slate-400 mb-4">AI needs more data. Complete ${tradesNeeded} more trade(s) for pattern analysis.</p>
+                    <div class="text-sm text-slate-500 mb-4">Current trades: ${insights.user_stats.total_trades}/3 needed</div>
+                    <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
+                </div>
+            `;
+            logToTerminal(`ðŸ§  Only ${insights.user_stats.total_trades} trades - need ${tradesNeeded} more for insights`);
+            return;
+        }
+
+        const symbolInfo = insights.current_symbol && insights.current_symbol !== 'all'
+            ? `<div class="text-xs text-indigo-400 mb-2">ðŸ“Š Showing insights for: ${insights.current_symbol}</div>`
+            : '';
+
+        container.innerHTML = `
+            ${symbolInfo}
+            <div class="bg-slate-800/30 p-4 rounded-lg">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold"><i class="fas fa-chart-line text-emerald-400 mr-2"></i>Your Stats</h3>
+                    <span class="text-xs px-2 py-1 rounded-full bg-indigo-600/20 text-indigo-400">${insights.user_stats.total_trades} trades</span>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                        <div class="text-2xl font-bold text-emerald-400">${insights.user_stats.win_rate || 0}%</div>
+                        <div class="text-xs text-slate-500">Win Rate</div>
+                    </div>
+                    <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                        <div class="text-2xl font-bold">${insights.user_stats.total_trades || 0}</div>
+                        <div class="text-xs text-slate-500">Total Trades</div>
+                    </div>
+                    <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                        <div class="text-2xl font-bold ${(insights.user_stats.net_profit || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}">$${(insights.user_stats.net_profit || 0).toFixed(2)}</div>
+                        <div class="text-xs text-slate-500">Net Profit</div>
+                    </div>
+                    <div class="text-center p-2 bg-slate-700/30 rounded-lg">
+                        <div class="text-2xl font-bold">${insights.user_stats.avg_win_confidence || 0}%</div>
+                        <div class="text-xs text-slate-500">Avg Confidence</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/30 p-4 rounded-lg">
+                <h3 class="font-semibold mb-3"><i class="fas fa-trophy text-yellow-500 mr-2"></i>Top Winning Patterns</h3>
+                ${insights.top_patterns?.length > 0 ? insights.top_patterns.map(p => `
+                    <div class="flex justify-between items-center py-2 border-b border-slate-700">
+                        <div>
+                            <span class="font-medium">${p.pattern_name}</span>
+                            <span class="text-xs text-slate-500 ml-2">on ${p.symbol}</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-emerald-400 font-bold">${p.win_rate}%</span>
+                            <span class="text-xs text-slate-500">(${p.times_used} trades)</span>
+                        </div>
+                    </div>
+                `).join('') : '<p class="text-slate-500 text-center py-4">No winning patterns identified yet</p>'}
+            </div>
+
+            <div class="bg-slate-800/30 p-4 rounded-lg">
+                <h3 class="font-semibold mb-3"><i class="fas fa-exclamation-triangle text-red-400 mr-2"></i>Patterns to Avoid</h3>
+                ${insights.worst_patterns?.length > 0 ? insights.worst_patterns.map(p => `
+                    <div class="flex justify-between items-center py-2 border-b border-slate-700">
+                        <div>
+                            <span class="font-medium">${p.pattern_name}</span>
+                            <span class="text-xs text-slate-500 ml-2">on ${p.symbol}</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-red-400 font-bold">${p.win_rate}%</span>
+                            <span class="text-xs text-slate-500">(${p.times_used} trades)</span>
+                        </div>
+                    </div>
+                `).join('') : '<p class="text-slate-500 text-center py-4">No losing patterns identified yet</p>'}
+            </div>
+
+            <div class="bg-indigo-600/20 p-4 rounded-lg border border-indigo-500/30">
+                <h3 class="font-semibold mb-2"><i class="fas fa-brain text-indigo-400 mr-2"></i>AI Trading Advice</h3>
+                <ul class="space-y-2">
+                    ${insights.advice?.adjustments?.map(a => `<li class="text-sm flex items-start gap-2"><i class="fas fa-lightbulb text-yellow-500 text-xs mt-0.5"></i><span>${a}</span></li>`).join('') || '<li>Complete more trades for AI advice</li>'}
+                </ul>
+                ${insights.advice?.confidence_adjustment ? `<p class="text-xs text-slate-400 mt-3 pt-2 border-t border-indigo-500/30">Suggested confidence adjustment: ${insights.advice.confidence_adjustment > 0 ? '+' : ''}${insights.advice.confidence_adjustment}%</p>` : ''}
+                ${insights.advice?.stake_adjustment ? `<p class="text-xs text-slate-400">Suggested stake adjustment: ${insights.advice.stake_adjustment > 0 ? '+' : ''}$${Math.abs(insights.advice.stake_adjustment).toFixed(2)}</p>` : ''}
+            </div>
+        `;
+
+        logToTerminal(`âœ… Full insights displayed for symbol: ${currentSymbol || 'all'}`);
+
+    } catch (error) {
+        logToTerminal(`Ã¢ÂÅ’ Failed to load full insights: ${error.message}`, 'error');
+        const container = document.getElementById('fullInsightsContent');
+        if (container) {
+            container.innerHTML = `
+                <div class="bg-red-500/20 p-6 rounded-lg text-center border border-red-500/30">
+                    <i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-3"></i>
+                    <h3 class="text-xl font-bold mb-2">Error Loading Insights</h3>
+                    <p class="text-slate-400 mb-4">${error.message}</p>
+                    <button onclick="switchPage('dashboard')" class="bg-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Go to Dashboard</button>
+                </div>
+            `;
+        }
+    }
+}
+
+// ================================================================
+// THEME
+// ================================================================
+
+function setupTheme() {
+    const savedTheme = localStorage.getItem('monix_theme');
+    const isDark = savedTheme !== 'light';
+    if (!isDark) {
+        document.body.classList.add('light-theme');
+        document.body.classList.remove('dark-theme');
+        if (themeIcon) themeIcon.className = 'fas fa-sun';
+        if (themeText) themeText.innerText = 'Light Mode';
+    }
+
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            const isLight = document.body.classList.contains('light-theme');
+            if (isLight) {
+                document.body.classList.remove('light-theme');
+                document.body.classList.add('dark-theme');
+                localStorage.setItem('monix_theme', 'dark');
+                if (themeIcon) themeIcon.className = 'fas fa-moon';
+                if (themeText) themeText.innerText = 'Dark Mode';
+                if (window.updateChartTheme) window.updateChartTheme(true);
+                logToTerminal('Ã°Å¸Å’â„¢ Theme changed to Dark');
+            } else {
+                document.body.classList.remove('dark-theme');
+                document.body.classList.add('light-theme');
+                localStorage.setItem('monix_theme', 'light');
+                if (themeIcon) themeIcon.className = 'fas fa-sun';
+                if (themeText) themeText.innerText = 'Light Mode';
+                if (window.updateChartTheme) window.updateChartTheme(false);
+                logToTerminal('Ã¢Ëœâ‚¬Ã¯Â¸Â Theme changed to Light');
+            }
+        });
+    }
+}
+
+function updateServerTime() {
+    const serverTimeEl = document.getElementById('serverTime');
+    if (serverTimeEl) {
+        serverTimeEl.innerHTML = `Server: ${new Date().toLocaleTimeString()}`;
+    }
+}
+
+// ================================================================
+// MAIN APP FUNCTIONS
+// ================================================================
+
+function showApp() {
+    logToTerminal('ðŸš€ Showing main application');
+    if (authModal) authModal.classList.add('hidden');
+    if (appContainer) appContainer.classList.remove('hidden');
+
+    setTimeout(() => {
+        if (window.initChart) window.initChart(document.body.classList.contains('light-theme'));
+        if (window.initTrading) window.initTrading();
+        if (window.initAdmin && currentUser?.is_admin) window.initAdmin();
+        if (window.connectWebSocket) window.connectWebSocket();
+    }, 100);
+
+    loadUserData();
+    if (window.loadRecentTrades) window.loadRecentTrades();
+    loadLeaderboard();
+
+    setupNavigation();
+    setupModals();
+    setupTheme();
+
+    updateServerTime();
+    setInterval(updateServerTime, 1000);
+
+    startAutoBalanceRefresh();
+}
+
+function showAuthModal() {
+    logToTerminal('Ã°Å¸â€Â Showing auth modal');
+    if (authModal) authModal.classList.remove('hidden');
+    if (appContainer) appContainer.classList.add('hidden');
+}
+
+// ================================================================
+// INITIALIZATION
+// ================================================================
+
+async function initApp() {
+    logToTerminal('ðŸš€ MONIX Trading Platform v6.0 Initializing...');
+
+    initMobileDrawer();
+    setupAuthModal();
+
+    // Ã°Å¸Å½Â¬ SHOW LOADING SCREEN FIRST
+    showLoadingScreen();
+
+    // The rest happens in showAuthOrApp() after typing completes
+}
+
+// ================================================================
+// GLOBAL FUNCTIONS
+// ================================================================
+
+window.switchPageToDashboard = function() { switchPage('dashboard'); };
+window.switchPage = switchPage;
+window.loadFullInsights = loadFullInsights;
+window.refreshBalance = refreshBalance;
+
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        logToTerminal('Ã°Å¸Å¡Âª User logout');
+        stopAutoBalanceRefresh();
+        window.api.logout();
+    });
+}
+
+// ================================================================
+// START APP
+// ================================================================
+
+initApp();
+
+================================================================================
+FILE: frontend/js/api.js
+SIZE: 7.8 KB
+================================================================================
+const API_BASE = window.location.origin;
+let authToken = localStorage.getItem('monix_token');
+
+// Send debug log to backend
+function sendDebugLog(message, type = 'info') {
+    console.log(`[UI] ${message}`);
+    fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, type, timestamp: new Date().toISOString() })
+    }).catch(() => {});
+}
+
+async function apiRequest(endpoint, options = {}) {
+    const url = `${API_BASE}${endpoint}`;
+    const headers = { 'Content-Type': 'application/json', ...options.headers };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    const method = options.method || 'GET';
+    const startTime = Date.now();
+    sendDebugLog(`ðŸ”„ ${method} ${endpoint}`);
+
+    try {
+        const response = await fetch(url, { ...options, headers, credentials: 'same-origin' });
+        const data = await response.json();
+        const duration = Date.now() - startTime;
+
+        if (!response.ok) {
+            sendDebugLog(`âŒ ${method} ${endpoint} â†’ ${response.status}: ${data.error || 'Failed'}`, 'error');
+            if (response.status === 401 && endpoint !== '/api/auth/verify') {
+                localStorage.removeItem('monix_token');
+                authToken = null;
+                window.location.reload();
+            }
+            throw new Error(data.error || 'Request failed');
+        }
+
+        sendDebugLog(`âœ… ${method} ${endpoint} â†’ ${response.status} (${duration}ms)`);
+        return data;
+    } catch (error) {
+        sendDebugLog(`âŒ ${method} ${endpoint}: ${error.message}`, 'error');
+        throw error;
+    }
+}
+
+async function login(email, password) {
+    sendDebugLog(`ðŸ” Login attempt: ${email}`);
+    const data = await apiRequest('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    if (data.token) { authToken = data.token; localStorage.setItem('monix_token', data.token); }
+    sendDebugLog(data.success ? `âœ… Login: ${email}` : `âŒ Login failed: ${email}`, data.success ? 'info' : 'error');
+    return data;
+}
+
+async function register(username, email, password, voucher_code) {
+    sendDebugLog(`ðŸ“ Register: ${email} (${username})`);
+    const data = await apiRequest('/api/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password, voucher_code }) });
+    if (data.token) { authToken = data.token; localStorage.setItem('monix_token', data.token); }
+    sendDebugLog(data.success ? `âœ… Registered: ${email}` : `âŒ Register failed: ${email}`, data.success ? 'info' : 'error');
+    return data;
+}
+
+async function verifyToken() {
+    try { return await apiRequest('/api/auth/verify', { method: 'POST' }); }
+    catch (error) { return { valid: false }; }
+}
+
+async function getUserProfile() { return apiRequest('/api/user/profile'); }
+async function updateUserSettings(settings) {
+    sendDebugLog(`âš™ï¸ Settings updated`);
+    return apiRequest('/api/user/settings', { method: 'PUT', body: JSON.stringify(settings) });
+}
+async function updateApiKeys(demo_token, real_token) {
+    sendDebugLog(`ðŸ”‘ API keys updated`);
+    return apiRequest('/api/user/api-keys', { method: 'PUT', body: JSON.stringify({ demo_token, real_token }) });
+}
+async function switchMode(mode) {
+    sendDebugLog(`ðŸ”„ Switch mode: ${mode}`);
+    return apiRequest('/api/user/switch-mode', { method: 'POST', body: JSON.stringify({ mode }) });
+}
+async function reconnectDeriv() { return apiRequest('/api/user/reconnect', { method: 'POST' }); }
+async function getTradeHistory(limit = 50, offset = 0, status = '', symbol = '') {
+    let url = `/api/trades/history?limit=${limit}&offset=${offset}`;
+    if (status) url += `&status=${status}`;
+    if (symbol) url += `&symbol=${symbol}`;
+    return apiRequest(url);
+}
+async function getTradeStats(days = 30) { return apiRequest(`/api/trades/stats?days=${days}`); }
+async function executeTrade(tradeData) {
+    sendDebugLog(`ðŸ’¸ Trade: ${tradeData.action} ${tradeData.symbol} @ $${tradeData.stake}`);
+    return apiRequest('/api/trades/execute', { method: 'POST', body: JSON.stringify(tradeData) });
+}
+async function getLockedBalance() { return apiRequest('/api/trades/locked-balance'); }
+async function generateSignal(symbol) {
+    sendDebugLog(`ðŸ§  Generate signal: ${symbol}`);
+    return apiRequest('/api/signals/generate', { method: 'POST', body: JSON.stringify({ symbol }) });
+}
+async function getSignalHistory() { return apiRequest('/api/signals/history'); }
+async function getAIInsights(symbol = null) {
+    const url = symbol ? `/api/signals/insights?symbol=${encodeURIComponent(symbol)}` : '/api/signals/insights';
+    return apiRequest(url);
+}
+async function changeAISymbol(symbol) {
+    sendDebugLog(`ðŸ”„ AI symbol â†’ ${symbol}`);
+    return apiRequest('/api/ai/symbol', { method: 'POST', body: JSON.stringify({ symbol }) });
+}
+async function getAISymbol() { return apiRequest('/api/ai/symbol'); }
+async function getAIAnalysis() { return apiRequest('/api/ai/analysis'); }
+async function setAIMode(mode) { return apiRequest('/api/ai/mode', { method: 'POST', body: JSON.stringify({ mode }) }); }
+async function setConfidenceThreshold(threshold) { return apiRequest('/api/ai/threshold', { method: 'POST', body: JSON.stringify({ threshold }) }); }
+async function startAITrader(symbol = 'R_75', mode = 'AUTO') { return apiRequest('/api/ai/start', { method: 'POST', body: JSON.stringify({ symbol, mode }) }); }
+async function stopAITrader() { return apiRequest('/api/ai/stop', { method: 'POST' }); }
+async function getLeaderboard() { return apiRequest('/api/user/leaderboard'); }
+async function adminGenerateVoucher(days, trades) { return apiRequest('/api/admin/vouchers/generate', { method: 'POST', body: JSON.stringify({ days, trades }) }); }
+async function adminGetVouchers() { return apiRequest('/api/admin/vouchers'); }
+async function adminGetUsers() { return apiRequest('/api/admin/users'); }
+async function adminBlockUser(userId) { return apiRequest(`/api/admin/users/${userId}/block`, { method: 'POST' }); }
+async function adminUnblockUser(userId) { return apiRequest(`/api/admin/users/${userId}/unblock`, { method: 'POST' }); }
+async function adminResetTrades(userId, trades) { return apiRequest(`/api/admin/users/${userId}/reset-trades`, { method: 'POST', body: JSON.stringify({ trades }) }); }
+async function adminAddAdmin(userId) { return apiRequest(`/api/admin/users/${userId}/add-admin`, { method: 'POST' }); }
+async function adminSendBroadcast(subject, message) { return apiRequest('/api/admin/broadcast', { method: 'POST', body: JSON.stringify({ subject, message }) }); }
+async function adminGetStats() { return apiRequest('/api/admin/stats'); }
+async function adminRevokeVoucher(code) { return apiRequest(`/api/admin/vouchers/${code}`, { method: 'DELETE' }); }
+
+// âœ… UPDATED: Soft delete - hide trades from UI, keep in DB
+async function hideTradeHistory() {
+    sendDebugLog(`ðŸ‘ï¸ Hiding all trade history from UI (kept for AI learning)`);
+    return apiRequest('/api/trades/history/hide-all', { method: 'DELETE' });
+}
+
+function logout() {
+    sendDebugLog('ðŸšª Logout');
+    localStorage.removeItem('monix_token');
+    authToken = null;
+    window.location.reload();
+}
+
+window.api = {
+    login, register, verifyToken, getUserProfile, updateUserSettings, updateApiKeys,
+    switchMode, reconnectDeriv, getTradeHistory, getTradeStats, executeTrade,
+    getLockedBalance, generateSignal, getSignalHistory, getAIInsights, getLeaderboard,
+    changeAISymbol, getAISymbol, getAIAnalysis, setAIMode, setConfidenceThreshold,
+    startAITrader, stopAITrader, adminGenerateVoucher, adminGetVouchers, adminGetUsers,
+    adminBlockUser, adminUnblockUser, adminResetTrades, adminAddAdmin,
+    adminSendBroadcast, adminGetStats, adminRevokeVoucher, logout,
+    hideTradeHistory  // âœ… updated
+};
+
+================================================================================
+FILE: frontend/js/trading.js
+SIZE: 54.9 KB
+================================================================================
+let currentSignal = null;
+let isProcessingTrade = false;
+let autoModeInterval = null;
+let liveMonitoringInterval = null;
+let activeTradeInterval = null;
+let currentActiveTrade = null;
+let recentTradesRefreshInterval = null;
+
+const getSignalBtn = document.getElementById('getSignalBtn');
+const yesBtn = document.getElementById('yesBtn');
+const noBtn = document.getElementById('noBtn');
+const stakeSlider = document.getElementById('stakeSlider');
+const stakeValue = document.getElementById('stakeValue');
+const pushSignalsToggle = document.getElementById('pushSignalsToggle');
+const autoModeToggle = document.getElementById('autoModeToggle');
+const jackpotToggle = document.getElementById('jackpotToggle');
+const demoBtn = document.getElementById('demoBtn');
+const realBtn = document.getElementById('realBtn');
+const switchModeBtn = document.getElementById('switchModeBtn');
+const symbolSelect = document.getElementById('symbolSelect');
+const refreshTradesBtn = document.getElementById('refreshTradesBtn');
+
+// Debug log helper
+function uiLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`ðŸ–±ï¸ [${timestamp}] ${message}`);
+    fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `ðŸ–±ï¸ ${message}`, type, timestamp: new Date().toISOString() })
+    }).catch(() => {});
+}
+
+function playSound(type) {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        switch(type) {
+            case 'signal':
+                oscillator.frequency.value = 880;
+                gainNode.gain.value = 0.3;
+                oscillator.start();
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+                oscillator.stop(audioContext.currentTime + 0.5);
+                setTimeout(() => {
+                    const osc2 = audioContext.createOscillator();
+                    const gain2 = audioContext.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(audioContext.destination);
+                    osc2.frequency.value = 660;
+                    gain2.gain.value = 0.2;
+                    osc2.start();
+                    gain2.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+                    osc2.stop(audioContext.currentTime + 0.3);
+                }, 200);
+                break;
+            case 'win':
+                oscillator.frequency.value = 880;
+                gainNode.gain.value = 0.4;
+                oscillator.start();
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.8);
+                oscillator.stop(audioContext.currentTime + 0.8);
+                break;
+            case 'loss':
+                oscillator.frequency.value = 220;
+                gainNode.gain.value = 0.3;
+                oscillator.start();
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.8);
+                oscillator.stop(audioContext.currentTime + 0.8);
+                break;
+            case 'execute':
+                oscillator.frequency.value = 523.25;
+                gainNode.gain.value = 0.3;
+                oscillator.start();
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+                oscillator.stop(audioContext.currentTime + 0.3);
+                break;
+        }
+    } catch(e) { console.log('Audio not supported'); }
+}
+
+function sendNotification(title, body, tag = 'trade') {
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body, tag, icon: '/favicon.ico' });
+    }
+}
+
+function showAIReasonModal(signal) {
+    uiLog(`Opening AI Reason Modal: ${signal.symbol} action=${signal.action}`);
+    const modal = document.getElementById('aiReasonModal');
+    if (!modal) return;
+
+    const isAutoMode = autoModeToggle && autoModeToggle.checked;
+    const isWaiting = signal.is_waiting;
+
+    const modalAction = document.getElementById('modalAction');
+    const modalSymbol = document.getElementById('modalSymbol');
+    const modalPrice = document.getElementById('modalPrice');
+    const modalMarketFeeling = document.getElementById('modalMarketFeeling');
+    const modalPattern = document.getElementById('modalPattern');
+    const modalEntryTime = document.getElementById('modalEntryTime');
+    const modalExitTime = document.getElementById('modalExitTime');
+    const modalTakeProfit = document.getElementById('modalTakeProfit');
+    const modalStopLoss = document.getElementById('modalStopLoss');
+    const modalReason = document.getElementById('modalReason');
+    const modalConfidence = document.getElementById('modalConfidence');
+    const modalConfidenceBar = document.getElementById('modalConfidenceBar');
+    const buttonsDiv = document.getElementById('modalButtons');
+    const autoModeNote = document.getElementById('autoModeNote');
+
+    if (modalAction) {
+        modalAction.innerHTML = signal.action === 'BUY' ? 'ðŸ“ˆ BUY (Price will go UP)' : (signal.action === 'SELL' ? 'ðŸ“‰ SELL (Price will go DOWN)' : 'â³ WAITING FOR SETUP');
+        modalAction.className = `text-2xl font-bold ${signal.action === 'BUY' ? 'text-emerald-400' : signal.action === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`;
+    }
+
+    if (modalSymbol) modalSymbol.innerHTML = signal.symbol || 'R_75';
+    if (modalPrice) modalPrice.innerHTML = `$${signal.entry_price?.toFixed(2) || signal.support?.toFixed(2) || '0.00'}`;
+    if (modalMarketFeeling) modalMarketFeeling.innerHTML = signal.market_feeling || (signal.rsi > 65 ? 'Price is high' : (signal.rsi < 35 ? 'Price is low' : 'Market is stable'));
+    if (modalPattern) modalPattern.innerHTML = signal.pattern || 'Pattern detected';
+    if (modalEntryTime) modalEntryTime.innerHTML = signal.entry_time || 'Waiting...';
+    if (modalExitTime) modalExitTime.innerHTML = signal.exit_time || '5 minutes after entry';
+
+    const defaultStake = parseFloat(stakeSlider ? stakeSlider.value : 0.50);
+    const profitDollars = (defaultStake * (signal.confidence / 100) * 1.0).toFixed(2);
+    const lossDollars = defaultStake.toFixed(2);
+
+    if (modalTakeProfit) modalTakeProfit.innerHTML = signal.take_profit ? `$${signal.take_profit.toFixed(2)} (make +$${profitDollars})` : 'Calculating...';
+    if (modalStopLoss) modalStopLoss.innerHTML = signal.stop_loss ? `$${signal.stop_loss.toFixed(2)} (lose -$${lossDollars})` : 'Calculating...';
+    if (modalReason) modalReason.innerHTML = signal.simple_reason || signal.reasoning || 'AI analysis complete';
+    if (modalConfidence) modalConfidence.innerHTML = `${signal.confidence}%`;
+    if (modalConfidenceBar) modalConfidenceBar.style.width = `${signal.confidence}%`;
+
+    if (isWaiting || signal.action === 'WAIT') {
+        if (buttonsDiv) buttonsDiv.classList.add('hidden');
+        if (autoModeNote) {
+            autoModeNote.innerHTML = `â³ No active setup. AI watching ${signal.symbol || 'R_75'}... Need ${signal.confidence_threshold || 55}%+ confidence.`;
+            autoModeNote.classList.remove('hidden');
+        }
+    } else if (isAutoMode) {
+        if (buttonsDiv) buttonsDiv.classList.add('hidden');
+        if (autoModeNote) {
+            autoModeNote.innerHTML = 'ðŸ¤– AUTO MODE ACTIVE - Trade will execute automatically when conditions are met';
+            autoModeNote.classList.remove('hidden');
+        }
+    } else {
+        if (buttonsDiv) buttonsDiv.classList.remove('hidden');
+        if (autoModeNote) autoModeNote.classList.add('hidden');
+    }
+
+    modal.classList.remove('hidden');
+    window.currentModalSignal = signal;
+}
+
+function closeAIReasonModal() {
+    const modal = document.getElementById('aiReasonModal');
+    if (modal) modal.classList.add('hidden');
+    window.currentModalSignal = null;
+    uiLog('AI Reason Modal closed');
+}
+
+function acceptTradeFromModal() {
+    if (window.currentModalSignal && !isProcessingTrade && window.currentModalSignal.action !== 'WAIT') {
+        uiLog(`Accept trade from modal: ${window.currentModalSignal.action}`);
+        closeAIReasonModal();
+        currentSignal = window.currentModalSignal;
+        executeTrade();
+    }
+}
+
+window.showAIReasonModal = showAIReasonModal;
+window.closeAIReasonModal = closeAIReasonModal;
+window.acceptTradeFromModal = acceptTradeFromModal;
+
+async function updateLockedBalance() {
+    try {
+        const result = await window.api.getLockedBalance();
+        const profile = await window.api.getUserProfile();
+        const totalBalance = profile.derivBalance?.balance || 0;
+        const locked = result.locked || 0;
+        const available = totalBalance - locked;
+
+        const panel = document.getElementById('lockedBalancePanel');
+        if (panel) {
+            panel.classList.remove('hidden');
+            const totalEl = document.getElementById('totalBalance');
+            const lockedEl = document.getElementById('lockedBalance');
+            const availableEl = document.getElementById('availableBalance');
+            if (totalEl) totalEl.innerText = `$${totalBalance.toFixed(2)}`;
+            if (lockedEl) lockedEl.innerText = `$${locked.toFixed(2)}`;
+            if (availableEl) availableEl.innerText = `$${available.toFixed(2)}`;
+        }
+    } catch(e) { console.log('Locked balance error:', e); }
+}
+
+function showActiveTradePanel(contractId, entryPrice, action, stake, exitTimestamp) {
+    currentActiveTrade = { contractId, entryPrice, action, stake, exitTimestamp };
+
+    let panel = document.getElementById('activeTradePanel');
+    if (!panel) {
+        const container = document.querySelector('.lg\\:col-span-4');
+        if (container) {
+            container.insertAdjacentHTML('beforeend', `
+                <div id="activeTradePanel" class="glass-card p-4 rounded-xl mt-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-sm"><i class="fas fa-hourglass-half text-yellow-400 mr-2"></i>ACTIVE TRADE</h4>
+                        <span id="tradeActionBadge" class="text-xs px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400">BUY</span>
+                    </div>
+                    <div class="text-center mb-3">
+                        <p class="text-2xl font-bold" id="currentPrice">$${entryPrice.toFixed(2)}</p>
+                        <p class="text-xs" id="tradePandL">P&L: $0.00</p>
+                    </div>
+                    <div class="mb-3">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>Time remaining</span>
+                            <span id="tradeTimer" class="font-mono">5:00</span>
+                        </div>
+                        <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                            <div id="tradeProgress" class="bg-indigo-500 h-full w-0 rounded-full transition-all"></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div><span class="text-slate-500">Entry:</span> <span class="font-mono">$${entryPrice.toFixed(2)}</span></div>
+                        <div><span class="text-slate-500">Exit:</span> <span id="exitTime" class="font-mono">${new Date(exitTimestamp).toLocaleTimeString()}</span></div>
+                    </div>
+                </div>
+            `);
+            panel = document.getElementById('activeTradePanel');
+        }
+    }
+
+    if (panel) {
+        panel.classList.remove('hidden');
+        const badge = document.getElementById('tradeActionBadge');
+        if (badge) {
+            badge.innerHTML = action === 'BUY' ? 'BUY ðŸ“ˆ' : 'SELL ðŸ“‰';
+            badge.className = `text-xs px-2 py-1 rounded-full ${action === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`;
+        }
+    }
+
+    if (activeTradeInterval) clearInterval(activeTradeInterval);
+
+    activeTradeInterval = setInterval(async () => {
+        const now = Date.now();
+        const timeLeft = exitTimestamp - now;
+
+        if (timeLeft <= 0) {
+            clearInterval(activeTradeInterval);
+            activeTradeInterval = null;
+            if (panel) panel.classList.add('hidden');
+            currentActiveTrade = null;
+            await updateLockedBalance();
+            return;
+        }
+
+        const minutes = Math.floor(timeLeft / 60000);
+        const seconds = Math.floor((timeLeft % 60000) / 1000);
+        const percent = ((5 * 60000 - timeLeft) / (5 * 60000)) * 100;
+
+        const timerEl = document.getElementById('tradeTimer');
+        const progressEl = document.getElementById('tradeProgress');
+        if (timerEl) timerEl.innerHTML = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        if (progressEl) progressEl.style.width = `${percent}%`;
+
+        const livePriceEl = document.getElementById('livePrice');
+        if (livePriceEl && currentActiveTrade) {
+            const currentPrice = parseFloat(livePriceEl.innerText.replace('$', ''));
+            const pnl = action === 'BUY' ? currentPrice - entryPrice : entryPrice - currentPrice;
+            const pnlAmount = pnl * stake;
+            const pnlEl = document.getElementById('tradePandL');
+            if (pnlEl) {
+                pnlEl.innerHTML = `P&L: ${pnlAmount >= 0 ? '+' : ''}$${pnlAmount.toFixed(2)}`;
+                pnlEl.className = `text-xs ${pnlAmount >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+            }
+        }
+    }, 1000);
+}
+
+function displaySignal(signal) {
+    currentSignal = signal;
+    uiLog(`Signal displayed: ${signal.action} ${signal.confidence}% on ${signal.symbol}`);
+
+    const signalAction = document.getElementById('signalAction');
+    const signalConfidence = document.getElementById('signalConfidence');
+    const signalPattern = document.getElementById('signalPattern');
+    const signalEntry = document.getElementById('signalEntry');
+    const signalTP = document.getElementById('signalTP');
+    const signalSL = document.getElementById('signalSL');
+    const signalReasoning = document.getElementById('signalReasoning');
+    const supportLevel = document.getElementById('supportLevel');
+    const resistanceLevel = document.getElementById('resistanceLevel');
+    const rsiValue = document.getElementById('rsiValue');
+    const signalExit = document.getElementById('signalExit');
+
+    if (signalAction) {
+        signalAction.innerHTML = signal.action === 'BUY' ? 'ðŸ“ˆ BUY' : 'ðŸ”» SELL';
+        signalAction.className = `text-4xl font-black ${signal.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}`;
+    }
+    if (signalConfidence) signalConfidence.innerHTML = `${signal.confidence}%`;
+    if (signalPattern) signalPattern.innerHTML = signal.pattern || 'â€”';
+    if (signalEntry) signalEntry.innerHTML = `$${signal.entry_price.toFixed(2)}`;
+    if (signalTP) signalTP.innerHTML = `$${signal.take_profit?.toFixed(2) || 'â€”'}`;
+    if (signalSL) signalSL.innerHTML = `$${signal.stop_loss?.toFixed(2) || 'â€”'}`;
+    if (signalReasoning) {
+        signalReasoning.innerHTML = signal.simple_reason || signal.reasoning || 'AI analysis complete';
+        signalReasoning.style.cursor = 'pointer';
+        signalReasoning.style.textDecoration = 'underline';
+        signalReasoning.onclick = () => window.showAIReasonModal(signal);
+    }
+    if (supportLevel && signal.support) supportLevel.innerHTML = `$${signal.support.toFixed(2)}`;
+    if (resistanceLevel && signal.resistance) resistanceLevel.innerHTML = `$${signal.resistance.toFixed(2)}`;
+    if (rsiValue && signal.rsi) rsiValue.innerHTML = signal.rsi;
+    if (signalExit && signal.exit_time) signalExit.innerHTML = signal.exit_time;
+
+    if (window.updateConfidenceBars) window.updateConfidenceBars(signal.confidence);
+
+    if (yesBtn) {
+        yesBtn.disabled = false;
+        yesBtn.classList.remove('cursor-not-allowed', 'bg-emerald-500/50');
+        yesBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+        yesBtn.innerHTML = 'ðŸ’° BUY';
+    }
+    if (noBtn) {
+        noBtn.disabled = false;
+        noBtn.classList.remove('cursor-not-allowed');
+        noBtn.classList.add('cursor-pointer');
+        noBtn.innerHTML = 'ðŸ”» SELL';
+    }
+
+    playSound('signal');
+    sendNotification('New AI Signal', `${signal.action} ${signal.symbol || 'signal'} with ${signal.confidence}% confidence`);
+
+    if (autoModeToggle && autoModeToggle.checked) {
+        uiLog('Auto Mode: Auto-executing trade from signal');
+        setTimeout(() => executeTrade(), 2000);
+    }
+}
+
+function clearSignal() {
+    currentSignal = null;
+    uiLog('Signal cleared');
+
+    const signalAction = document.getElementById('signalAction');
+    const signalConfidence = document.getElementById('signalConfidence');
+    const signalPattern = document.getElementById('signalPattern');
+    const signalEntry = document.getElementById('signalEntry');
+    const signalTP = document.getElementById('signalTP');
+    const signalSL = document.getElementById('signalSL');
+    const signalReasoning = document.getElementById('signalReasoning');
+    const signalExit = document.getElementById('signalExit');
+
+    if (signalAction) signalAction.innerHTML = 'â€”';
+    if (signalConfidence) signalConfidence.innerHTML = '0%';
+    if (signalPattern) signalPattern.innerHTML = 'â€”';
+    if (signalEntry) signalEntry.innerHTML = '$0.00';
+    if (signalTP) signalTP.innerHTML = '$0.00';
+    if (signalSL) signalSL.innerHTML = '$0.00';
+    if (signalReasoning) {
+        signalReasoning.innerHTML = 'Click AI REASONING to view market analysis';
+        signalReasoning.style.cursor = 'pointer';
+        signalReasoning.style.textDecoration = 'underline';
+    }
+    if (signalExit) signalExit.innerHTML = '5 min';
+
+    if (window.updateConfidenceBars) window.updateConfidenceBars(0);
+
+    if (yesBtn) {
+        yesBtn.disabled = false;
+        yesBtn.classList.remove('cursor-not-allowed', 'bg-emerald-500/50');
+        yesBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+        yesBtn.innerHTML = 'ðŸ’° BUY';
+    }
+    if (noBtn) {
+        noBtn.disabled = false;
+        noBtn.classList.remove('cursor-not-allowed');
+        noBtn.classList.add('bg-red-500/20', 'hover:bg-red-500/30', 'cursor-pointer');
+        noBtn.innerHTML = 'ðŸ”» SELL';
+    }
+}
+
+async function executeTrade() {
+    if (!currentSignal || isProcessingTrade) return;
+
+    if (currentSignal.action === 'WAIT') {
+        if (window.showToast) window.showToast('No Setup', 'AI is waiting for market conditions. No active trade setup.', 'info');
+        return;
+    }
+
+    uiLog(`Executing trade: ${currentSignal.action} on ${symbolSelect?.value || 'R_75'}`);
+    isProcessingTrade = true;
+    if (yesBtn) {
+        yesBtn.disabled = true;
+        yesBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>EXECUTING...';
+    }
+
+    let stake = stakeSlider ? parseFloat(stakeSlider.value) : 0.50;
+    if (stake < 0.50) {
+        stake = 0.50;
+        if (stakeSlider) stakeSlider.value = 0.50;
+        if (stakeValue) stakeValue.innerText = '$0.50';
+    }
+
+    try {
+        const result = await window.api.executeTrade({
+            symbol: symbolSelect ? symbolSelect.value : 'R_75',
+            action: currentSignal.action,
+            stake: stake,
+            entry_price: currentSignal.entry_price,
+            take_profit: currentSignal.take_profit,
+            stop_loss: currentSignal.stop_loss,
+            confidence: currentSignal.confidence,
+            pattern: currentSignal.pattern,
+            reasoning: currentSignal.reasoning,
+            rsi: currentSignal.rsi,
+            macd: currentSignal.macd,
+            is_auto: autoModeToggle && autoModeToggle.checked ? 1 : 0
+        });
+
+        if (result.success) {
+            uiLog(`Trade executed successfully: ${result.contract_id}`);
+            playSound('execute');
+            sendNotification('Trade Executed', `${currentSignal.action} on ${symbolSelect?.value}`);
+            if (window.showToast) window.showToast('Trade Executed', `Contract ID: ${String(result.contract_id).substring(0, 8)}...`, 'success');
+
+            const exitTime = Date.now() + (5 * 60 * 1000);
+            showActiveTradePanel(result.contract_id, currentSignal.entry_price, currentSignal.action, stake, exitTime);
+
+            clearSignal();
+            await loadRecentTrades();
+            await refreshUserData();
+            await updateLockedBalance();
+        } else {
+            uiLog(`Trade failed: ${result.error}`, 'error');
+            if (window.showToast) window.showToast('Trade Failed', result.error || 'Unknown error', 'error');
+        }
+    } catch (error) {
+        uiLog(`Trade error: ${error.message}`, 'error');
+        if (window.showToast) window.showToast('Trade Failed', error.message, 'error');
+    } finally {
+        isProcessingTrade = false;
+        if (yesBtn) {
+            yesBtn.disabled = false;
+            yesBtn.innerHTML = 'ðŸ’° BUY';
+        }
+    }
+}
+
+function saveSymbolPreference(symbol) {
+    const token = localStorage.getItem('monix_token') || '';
+    if (!token || !symbol) return;
+
+    fetch('/api/user/symbol', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ symbol: symbol })
+    }).catch(() => {});
+}
+
+async function loadSavedSymbol() {
+    try {
+        const token = localStorage.getItem('monix_token');
+        if (!token) return;
+
+        const response = await fetch('/api/user/profile', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (data.user && data.user.default_symbol) {
+            const savedSymbol = data.user.default_symbol;
+            if (symbolSelect) {
+                symbolSelect.value = savedSymbol;
+                console.log('ðŸ’¾ Frontend loaded saved symbol:', savedSymbol);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load saved symbol:', e);
+    }
+}
+
+async function changeSymbol(symbol) {
+    uiLog(`Changing symbol to: ${symbol}`);
+    try {
+        const response = await fetch('/api/ai/symbol', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('monix_token')}`
+            },
+            body: JSON.stringify({ symbol: symbol })
+        });
+        const data = await response.json();
+        if (data.success) {
+            uiLog(`Symbol changed successfully: ${symbol}`);
+            saveSymbolPreference(symbol);
+            if (window.showToast) window.showToast('Symbol Changed', `AI now analyzing ${symbol}`, 'success');
+            setTimeout(() => fetchAIAnalysis(), 1000);
+        } else {
+            uiLog(`Symbol change failed: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        uiLog(`Symbol change error: ${error.message}`, 'error');
+    }
+}
+
+async function fetchAIAnalysis() {
+    if (!getSignalBtn) return;
+
+    const symbol = symbolSelect ? symbolSelect.value : 'R_75';
+    uiLog(`Fetching AI analysis for: ${symbol}`);
+    getSignalBtn.disabled = true;
+    getSignalBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>FETCHING ANALYSIS...';
+
+    try {
+        const result = await window.api.generateSignal(symbol);
+        if (result.success && result.signal) {
+            uiLog(`AI analysis received for: ${result.signal.symbol}`);
+            showAIReasonModal(result.signal);
+        } else if (result.success === false) {
+            uiLog(`AI analysis: ${result.message}`, 'info');
+            if (window.showToast) window.showToast('AI Analysis', result.message, 'info');
+        }
+    } catch (error) {
+        uiLog(`AI analysis error: ${error.message}`, 'error');
+        if (window.showToast) window.showToast('Error', error.message, 'error');
+    } finally {
+        getSignalBtn.disabled = false;
+        getSignalBtn.innerHTML = 'ðŸ§  AI REASONING';
+    }
+}
+
+function startLiveMonitoring() {
+    uiLog('Live monitoring started (30s interval)');
+    if (liveMonitoringInterval) clearInterval(liveMonitoringInterval);
+    liveMonitoringInterval = setInterval(() => {
+        fetchAIAnalysis();
+    }, 30000);
+}
+
+async function switchMode(mode) {
+    uiLog(`Switching mode to: ${mode}`);
+    try {
+        const result = await window.api.switchMode(mode);
+        if (result.success) {
+            if (mode === 'demo') {
+                if (demoBtn) demoBtn.className = 'px-3 py-1 rounded-lg text-xs bg-emerald-500 text-white shadow-lg';
+                if (realBtn) realBtn.className = 'px-3 py-1 rounded-lg text-xs bg-slate-700 text-slate-400';
+            } else {
+                if (realBtn) realBtn.className = 'px-3 py-1 rounded-lg text-xs bg-emerald-500 text-white shadow-lg';
+                if (demoBtn) demoBtn.className = 'px-3 py-1 rounded-lg text-xs bg-slate-700 text-slate-400';
+            }
+            await refreshUserData();
+            await updateLockedBalance();
+            if (window.showToast) window.showToast(`Switched to ${mode.toUpperCase()} mode`, result.message, 'success');
+        }
+    } catch (error) {
+        uiLog(`Mode switch error: ${error.message}`, 'error');
+        if (window.showToast) window.showToast('Error', error.message, 'error');
+    }
+}
+
+async function updateSetting(setting, value) {
+    uiLog(`Updating setting: ${setting} = ${value}`);
+    try {
+        await window.api.updateUserSettings({ [setting]: value });
+        if (setting === 'auto_mode' && value) {
+            startLiveMonitoring();
+            setTimeout(() => fetchAIAnalysis(), 2000);
+        } else if (setting === 'auto_mode' && !value) {
+            if (liveMonitoringInterval) clearInterval(liveMonitoringInterval);
+        }
+    } catch (error) {
+        uiLog(`Setting update error: ${error.message}`, 'error');
+    }
+}
+
+// ============================================================
+// PENDING ORDERS DISPLAY
+// ============================================================
+let pendingOrdersInterval = null;
+
+function updatePendingOrdersDisplay(pendingOrders) {
+    const container = document.getElementById('pendingOrdersContainer');
+    const countBadge = document.getElementById('pendingOrdersCount');
+    if (!container) return;
+
+    if (!pendingOrders || pendingOrders.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-3">No pending limit orders</p>';
+        if (countBadge) countBadge.innerText = '(0)';
+        return;
+    }
+
+    if (countBadge) countBadge.innerText = `(${pendingOrders.length})`;
+
+    const currentPrice = parseFloat(document.getElementById('livePrice')?.innerText?.replace('$', '') || '0');
+
+    container.innerHTML = pendingOrders.map(order => {
+        const distance = currentPrice > 0 ? Math.abs(currentPrice - order.entryPrice) : 0;
+        const distancePercent = currentPrice > 0 ? ((distance / order.entryPrice) * 100).toFixed(2) : '0';
+        const timeLeft = order.expires ? Math.max(0, Math.floor((order.expires - Date.now()) / 60000)) : 45;
+        const isApproaching = parseFloat(distancePercent) < 0.3;
+        const borderColor = isApproaching ? 'border-yellow-500' : 'border-slate-600';
+        const bgColor = isApproaching ? 'bg-yellow-500/10' : '';
+
+        return `
+            <div class="p-3 rounded-lg border ${borderColor} ${bgColor} mb-2 hover:border-indigo-400 transition">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-sm ${order.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}">${order.action} LIMIT</span>
+                    <span class="text-xs text-slate-500">â° ${timeLeft}min left</span>
+                </div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-400">Entry: <span class="text-white font-mono">$${order.entryPrice?.toFixed(2) || '0.00'}</span></span>
+                    <span class="text-slate-400">Stake: <span class="text-white">$${order.stake?.toFixed(2) || '2.00'}</span></span>
+                </div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-400">Current: <span class="text-white font-mono">$${currentPrice.toFixed(2)}</span></span>
+                    <span class="${isApproaching ? 'text-yellow-400 font-bold' : 'text-slate-500'}">${distancePercent}% away</span>
+                </div>
+                <div class="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden mt-2">
+                    <div class="bg-indigo-500 h-full rounded-full transition-all" style="width: ${Math.min(100, Math.max(0, 100 - (parseFloat(distancePercent) * 200)))}%"></div>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">ðŸŽ¯ ${order.reason || 'Waiting for price level'}</p>
+                <p class="text-xs text-slate-600 mt-1">Confidence: ${order.confidence || 0}% | Pattern: ${order.pattern || 'N/A'}</p>
+            </div>
+        `;
+    }).join('');
+}
+
+function startPendingOrdersPolling() {
+    if (pendingOrdersInterval) clearInterval(pendingOrdersInterval);
+    pendingOrdersInterval = setInterval(async () => {
+        try {
+            const response = await fetch('/api/ai/analysis', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('monix_token')}` }
+            });
+            const data = await response.json();
+            if (data.watch_state?.pending_orders) {
+                updatePendingOrdersDisplay(data.watch_state.pending_orders);
+            }
+            if (data.pending_orders) {
+                updatePendingOrdersDisplay(data.pending_orders);
+            }
+        } catch(e) {}
+    }, 5000);
+}
+
+// ============================================================
+// COPY & DELETE FUNCTIONS
+// ============================================================
+function copyTradeToClipboard(trade) {
+    const text = `${trade.action} ${trade.symbol} @ $${trade.entry_price?.toFixed(2)} | Exit: $${trade.exit_price?.toFixed(2) || 'PENDING'} | ${trade.profit >= 0 ? '+' : ''}$${trade.profit?.toFixed(2)} | ${trade.status} | Pattern: ${trade.pattern || 'N/A'} | RSI: ${trade.rsi || 'N/A'} | ${new Date(trade.executed_at).toLocaleString()}`;
+    navigator.clipboard.writeText(text).then(() => {
+        uiLog(`Copied trade: ${trade.action} ${trade.symbol}`);
+        if (window.showToast) window.showToast('Copied!', 'Trade details copied to clipboard', 'success');
+    }).catch(() => {
+        if (window.showToast) window.showToast('Copy Failed', 'Could not copy to clipboard', 'error');
+    });
+}
+
+async function copyAllTrades() {
+    const trades = await window.api.getTradeHistory(100);
+    if (!trades || trades.length === 0) {
+        if (window.showToast) window.showToast('No Trades', 'No trades to copy', 'info');
+        return;
+    }
+    let text = 'MONIX TRADING PLATFORM - TRADE HISTORY\n';
+    text += 'â•'.repeat(80) + '\n';
+    text += 'TIME'.padEnd(12) + 'SYMBOL'.padEnd(8) + 'ACTION'.padEnd(8) + 'ENTRY'.padEnd(14) + 'EXIT'.padEnd(14) + 'PROFIT'.padEnd(12) + 'STATUS'.padEnd(8) + 'PATTERN\n';
+    text += 'â”€'.repeat(80) + '\n';
+    trades.forEach(t => {
+        text += new Date(t.executed_at).toLocaleTimeString().padEnd(12);
+        text += (t.symbol || '').padEnd(8);
+        text += (t.action || '').padEnd(8);
+        text += `$${t.entry_price?.toFixed(2) || '--'}`.padEnd(14);
+        text += `$${t.exit_price?.toFixed(2) || '--'}`.padEnd(14);
+        text += `${t.profit >= 0 ? '+' : ''}$${t.profit?.toFixed(2) || '0.00'}`.padEnd(12);
+        text += (t.status || 'PENDING').padEnd(8);
+        text += (t.pattern || 'N/A');
+        text += '\n';
+    });
+    text += 'â”€'.repeat(80) + '\n';
+    const totalProfit = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
+    const wins = trades.filter(t => t.status === 'WIN').length;
+    text += `Total: ${trades.length} trades | ${wins} wins | Net: ${totalProfit >= 0 ? '+' : ''}$${totalProfit.toFixed(2)}\n`;
+    text += 'â•'.repeat(80) + '\n';
+    navigator.clipboard.writeText(text).then(() => {
+        uiLog(`Copied all ${trades.length} trades`);
+        if (window.showToast) window.showToast('Copied!', `${trades.length} trades copied to clipboard`, 'success');
+    }).catch(() => {
+        if (window.showToast) window.showToast('Copy Failed', 'Could not copy to clipboard', 'error');
+    });
+}
+
+// SOFT DELETE - Hide trades from UI only, keep for AI learning
+async function deleteAllTrades() {
+    if (!confirm('âš ï¸ This will REMOVE trades from YOUR VIEW only.\n\nYour trading history will still be used by AI for learning and pattern recognition.\n\nAre you sure you want to hide all trades from the UI?')) {
+        return;
+    }
+    try {
+        const result = await window.api.hideTradeHistory();
+        if (result.success) {
+            uiLog(`Hidden ${result.hiddenCount} trades from UI (kept for AI learning)`);
+            if (window.showToast) window.showToast('History Hidden', `Trades hidden from view. AI can still learn from them.`, 'success');
+            await loadRecentTrades();
+            if (typeof loadFullHistory === 'function') await loadFullHistory();
+            if (typeof loadPerformanceStats === 'function') await loadPerformanceStats();
+            if (typeof refreshUserData === 'function') await refreshUserData();
+        } else {
+            throw new Error(result.error || 'Hide failed');
+        }
+    } catch (error) {
+        uiLog(`Hide trades error: ${error.message}`, 'error');
+        if (window.showToast) window.showToast('Hide Failed', error.message, 'error');
+    }
+}
+
+window.copyTradeById = async function(tradeId) {
+    const trades = await window.api.getTradeHistory(50);
+    const trade = trades.find(t => t._id === tradeId);
+    if (trade) copyTradeToClipboard(trade);
+};
+
+// ============================================================
+// LOAD RECENT TRADES (with collapsible state preserved)
+// ============================================================
+async function loadRecentTrades() {
+    try {
+        const tbody = document.getElementById('recentTradesBody');
+        const countBadge = document.getElementById('recentTradesCount');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">Loading...</td></tr>';
+
+        const trades = await window.api.getTradeHistory(20);
+
+        if (!trades || trades.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-500">No trades yet</td></tr>';
+            if (countBadge) countBadge.innerText = '(0)';
+            return;
+        }
+
+        if (countBadge) countBadge.innerText = `(${trades.length})`;
+
+        tbody.innerHTML = trades.map(trade => `
+            <tr class="hover:bg-slate-700/20">
+                <td class="p-4 text-xs">${new Date(trade.executed_at).toLocaleTimeString()}</td>
+                <td class="p-4 font-bold">${trade.symbol}</td>
+                <td class="p-4 ${trade.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}">${trade.action}</td>
+                <td class="p-4">$${trade.entry_price?.toFixed(2)}</td>
+                <td class="p-4">$${trade.exit_price?.toFixed(2) || '--'}</td>
+                <td class="p-4 text-right ${trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.profit >= 0 ? '+' : ''}$${trade.profit?.toFixed(2)}</td>
+                <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-[10px] ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : trade.status === 'LOSS' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}">${trade.status || 'PENDING'}</span></td>
+                <td class="p-4 text-center">
+                    <button onclick="window.copyTradeById('${trade._id}')" class="text-slate-400 hover:text-white transition text-lg" title="Copy trade details">ðŸ“‹</button>
+                </td>
+            </tr>
+        `).join('');
+        uiLog(`Recent trades: Loaded ${trades.length} trades`);
+        
+        // Re-apply collapsible state after DOM update
+        if (typeof initCollapsibles === 'function') initCollapsibles();
+    } catch (error) {
+        uiLog(`Recent trades error: ${error.message}`, 'error');
+        const tbody = document.getElementById('recentTradesBody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-red-400">Error loading trades</td></tr>';
+    }
+}
+
+async function refreshUserData() {
+    try {
+        const profile = await window.api.getUserProfile();
+        if (profile && profile.user) {
+            const welcomeName = document.getElementById('welcomeName');
+            const userName = document.getElementById('userName');
+            const userEmail = document.getElementById('userEmail');
+            if (welcomeName) welcomeName.innerHTML = profile.user.username;
+            if (userName) userName.innerHTML = profile.user.username;
+            if (userEmail) userEmail.innerHTML = profile.user.email;
+
+            const balanceEl = document.getElementById('balanceAmount');
+            if (balanceEl && profile.derivBalance?.authorized) {
+                balanceEl.innerHTML = `$${profile.derivBalance.balance.toFixed(2)}`;
+            }
+
+            const winRateEl = document.getElementById('winRateDisplay');
+            if (winRateEl && profile.stats) winRateEl.innerHTML = `Win Rate: ${profile.stats.win_rate || 0}%`;
+
+            const voucherCode = document.getElementById('voucherCode');
+            const tradesRemaining = document.getElementById('tradesRemaining');
+            if (voucherCode && profile.user.voucher_code) voucherCode.innerHTML = profile.user.voucher_code;
+            if (tradesRemaining) tradesRemaining.innerHTML = `Trades Left: ${profile.user.trades_remaining || 0}`;
+
+            if (pushSignalsToggle) pushSignalsToggle.checked = profile.user.push_signals === 1;
+            if (autoModeToggle) autoModeToggle.checked = profile.user.auto_mode === 1;
+            if (jackpotToggle) jackpotToggle.checked = profile.user.jackpot_mode === 1;
+            if (stakeSlider && profile.user.base_stake) stakeSlider.value = Math.max(profile.user.base_stake, 0.50);
+            if (stakeValue) stakeValue.innerText = `$${Math.max(profile.user.base_stake || 0.50, 0.50).toFixed(2)}`;
+
+            const adminLink = document.getElementById('adminLink');
+            if (adminLink && profile.user.is_admin) adminLink.classList.remove('hidden');
+
+            // Fix DEMO/REAL button styling based on actual mode
+            if (profile.user.is_demo === true || profile.user.is_demo === 1) {
+                if (demoBtn) demoBtn.className = 'px-3 py-1 rounded-lg text-xs bg-emerald-500 text-white shadow-lg';
+                if (realBtn) realBtn.className = 'px-3 py-1 rounded-lg text-xs bg-slate-700 text-slate-400';
+                if (window.marketStatus) {
+                    const marketStatus = document.getElementById('marketStatus');
+                    if (marketStatus) marketStatus.innerHTML = 'DEMO ACTIVE';
+                }
+            } else {
+                if (realBtn) realBtn.className = 'px-3 py-1 rounded-lg text-xs bg-emerald-500 text-white shadow-lg';
+                if (demoBtn) demoBtn.className = 'px-3 py-1 rounded-lg text-xs bg-slate-700 text-slate-400';
+                if (window.marketStatus) {
+                    const marketStatus = document.getElementById('marketStatus');
+                    if (marketStatus) marketStatus.innerHTML = 'REAL ACTIVE';
+                }
+            }
+
+            await updateLockedBalance();
+        }
+    } catch (error) {
+        uiLog(`Refresh user data error: ${error.message}`, 'error');
+    }
+}
+
+function addTradeToTable(trade) {
+    const tbody = document.getElementById('recentTradesBody');
+    if (!tbody) return;
+
+    const newRow = document.createElement('tr');
+    newRow.className = 'hover:bg-slate-700/20';
+    newRow.innerHTML = `
+        <td class="p-4 text-xs">${new Date().toLocaleTimeString()}</td>
+        <td class="p-4 font-bold">${trade.symbol}</td>
+        <td class="p-4 ${trade.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}">${trade.action}</td>
+        <td class="p-4">$${trade.entry_price?.toFixed(2)}</td>
+        <td class="p-4">${trade.exit_price ? `$${trade.exit_price.toFixed(2)}` : '--'}</td>
+        <td class="p-4 text-right ${trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.profit ? (trade.profit >= 0 ? '+' : '') + trade.profit.toFixed(2) : '--'}</td>
+        <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-[10px] ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : trade.status === 'LOSS' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}">${trade.status || 'PENDING'}</span></td>
+        <td class="p-4 text-center"><button onclick="window.copyTradeById('${trade._id || trade.id}')" class="text-slate-400 hover:text-white transition text-lg" title="Copy trade details">ðŸ“‹</button></td>
+    `;
+
+    tbody.insertBefore(newRow, tbody.firstChild);
+    if (tbody.children.length > 20) tbody.removeChild(tbody.lastChild);
+
+    uiLog(`Trade added to table: ${trade.action} ${trade.status}`);
+
+    if (trade.status === 'WIN') {
+        playSound('win');
+        sendNotification('Trade WIN!', `${trade.action} on ${trade.symbol}: +$${trade.profit?.toFixed(2)}`);
+    } else if (trade.status === 'LOSS') {
+        playSound('loss');
+        sendNotification('Trade LOSS', `${trade.action} on ${trade.symbol}: -$${Math.abs(trade.profit || 0).toFixed(2)}`);
+    }
+}
+
+function updateBalanceInUI(balance) {
+    const balanceEl = document.getElementById('balanceAmount');
+    if (balanceEl) balanceEl.innerHTML = `$${balance.toFixed(2)}`;
+}
+
+// ============================================================
+// FIXED: updateAIDisplay - Live AI Signal Panel Updates
+// ============================================================
+function updateAIDisplay(aiData) {
+    console.log('ðŸ–¥ï¸ [UI] updateAIDisplay called with:', aiData);
+
+    const watchState = aiData.watch_state || aiData;
+    if (!watchState) {
+        console.warn('âš ï¸ [UI] No watch_state in aiData');
+        return;
+    }
+
+    console.log(`ðŸ–¥ï¸ [UI] Updating: action=${watchState.action}, confidence=${watchState.confidence}, rsi=${watchState.market_rsi}, symbol=${watchState.symbol}`);
+
+    // Update Signal Action
+    const signalAction = document.getElementById('signalAction');
+    if (signalAction) {
+        if (watchState.action === 'BUY') {
+            signalAction.innerHTML = 'ðŸ“ˆ BUY';
+            signalAction.className = 'text-4xl font-black text-emerald-400';
+        } else if (watchState.action === 'SELL') {
+            signalAction.innerHTML = 'ðŸ”» SELL';
+            signalAction.className = 'text-4xl font-black text-red-400';
+        } else {
+            signalAction.innerHTML = 'â³ WAITING';
+            signalAction.className = 'text-2xl font-bold text-yellow-400';
+        }
+    }
+
+    // Update Confidence
+    const signalConfidence = document.getElementById('signalConfidence');
+    if (signalConfidence && watchState.confidence !== undefined) {
+        signalConfidence.innerHTML = `${watchState.confidence}%`;
+    }
+
+    // Update Pattern
+    const signalPattern = document.getElementById('signalPattern');
+    if (signalPattern && watchState.pattern) {
+        signalPattern.innerHTML = watchState.pattern;
+    } else if (signalPattern) {
+        signalPattern.innerHTML = 'â€”';
+    }
+
+    // Update Entry Price
+    const signalEntry = document.getElementById('signalEntry');
+    if (signalEntry && watchState.entry_price) {
+        signalEntry.innerHTML = `$${watchState.entry_price.toFixed(2)}`;
+    } else if (signalEntry && watchState.market_price) {
+        signalEntry.innerHTML = `$${watchState.market_price.toFixed(2)}`;
+    }
+
+    // Update Take Profit
+    const signalTP = document.getElementById('signalTP');
+    if (signalTP && watchState.take_profit) {
+        signalTP.innerHTML = `$${watchState.take_profit.toFixed(2)}`;
+    }
+
+    // Update Stop Loss
+    const signalSL = document.getElementById('signalSL');
+    if (signalSL && watchState.stop_loss) {
+        signalSL.innerHTML = `$${watchState.stop_loss.toFixed(2)}`;
+    }
+
+    // Update RSI
+    const rsiValue = document.getElementById('rsiValue');
+    if (rsiValue && watchState.market_rsi !== undefined) {
+        rsiValue.innerHTML = watchState.market_rsi;
+    }
+
+    // Update Support
+    const supportLevel = document.getElementById('supportLevel');
+    if (supportLevel && watchState.market_support !== undefined) {
+        supportLevel.innerHTML = `$${watchState.market_support.toFixed(2)}`;
+    } else if (supportLevel) {
+        supportLevel.innerHTML = '$0.00';
+    }
+
+    // Update Resistance
+    const resistanceLevel = document.getElementById('resistanceLevel');
+    if (resistanceLevel && watchState.market_resistance !== undefined) {
+        resistanceLevel.innerHTML = `$${watchState.market_resistance.toFixed(2)}`;
+    } else if (resistanceLevel) {
+        resistanceLevel.innerHTML = '$0.00';
+    }
+
+    // Update AI Reason text
+    const signalReasoning = document.getElementById('signalReasoning');
+    if (signalReasoning && watchState.reason) {
+        signalReasoning.innerHTML = watchState.reason;
+        signalReasoning.style.cursor = 'pointer';
+        signalReasoning.style.textDecoration = 'underline';
+        signalReasoning.onclick = () => {
+            if (window.showAIReasonModal) {
+                window.showAIReasonModal({
+                    symbol: watchState.symbol || 'R_75',
+                    action: watchState.action === 'BUY' ? 'BUY' : (watchState.action === 'SELL' ? 'SELL' : 'WAIT'),
+                    confidence: watchState.confidence,
+                    pattern: watchState.pattern,
+                    entry_price: watchState.entry_price || watchState.market_price,
+                    take_profit: watchState.take_profit,
+                    stop_loss: watchState.stop_loss,
+                    reasoning: watchState.reason,
+                    simple_reason: watchState.reason,
+                    rsi: watchState.market_rsi,
+                    support: watchState.market_support,
+                    resistance: watchState.market_resistance,
+                    market_feeling: watchState.market_feeling,
+                    entry_time: watchState.estimated_entry_time === 'Now' ? new Date().toLocaleTimeString() : watchState.estimated_entry_time,
+                    exit_time: '5 min after entry'
+                });
+            }
+        };
+    }
+
+    // Update Exit Time
+    const signalExit = document.getElementById('signalExit');
+    if (signalExit && watchState.estimated_entry_time === 'Now') {
+        signalExit.innerHTML = new Date(Date.now() + 5*60000).toLocaleTimeString();
+    } else if (signalExit && watchState.exit_time) {
+        signalExit.innerHTML = watchState.exit_time;
+    }
+
+    // Store current signal for modal
+    window.currentDisplaySignal = watchState;
+
+    // Update confidence bars
+    if (window.updateConfidenceBars && watchState.confidence) {
+        window.updateConfidenceBars(watchState.confidence);
+    }
+
+    // Update pending orders count and display (from root or watch_state)
+    const pendingCount = document.getElementById('pendingOrdersCount');
+    const pendingOrders = aiData.pending_orders || watchState.pending_orders;
+    if (pendingCount && pendingOrders) {
+        pendingCount.innerText = `(${pendingOrders.length})`;
+        if (window.updatePendingOrdersDisplay) {
+            window.updatePendingOrdersDisplay(pendingOrders);
+        }
+    }
+
+    console.log(`âœ… [UI] Display updated for ${watchState.symbol}`);
+}
+
+// ============================================================
+// Collapsible Drawer - Stays Open
+// ============================================================
+function initCollapsibles() {
+    const pendingState = localStorage.getItem('pendingOrdersOpen');
+    const recentState = localStorage.getItem('recentTradesOpen');
+
+    const pendingContent = document.getElementById('pendingOrdersContent');
+    const recentContent = document.getElementById('recentTradesContent');
+    const pendingIcon = document.getElementById('pendingOrdersIcon');
+    const recentIcon = document.getElementById('recentTradesIcon');
+
+    if (pendingContent && pendingIcon) {
+        if (pendingState === 'closed') {
+            pendingContent.style.display = 'none';
+            pendingIcon.style.transform = 'rotate(0deg)';
+        } else {
+            pendingContent.style.display = 'block';
+            pendingIcon.style.transform = 'rotate(180deg)';
+        }
+    }
+
+    if (recentContent && recentIcon) {
+        if (recentState === 'closed') {
+            recentContent.style.display = 'none';
+            recentIcon.style.transform = 'rotate(0deg)';
+        } else {
+            recentContent.style.display = 'block';
+            recentIcon.style.transform = 'rotate(180deg)';
+        }
+    }
+}
+
+window.toggleCollapsible = function(contentId, iconId) {
+    const content = document.getElementById(contentId);
+    const icon = document.getElementById(iconId);
+    if (!content || !icon) return;
+
+    const isHidden = content.style.display === 'none' || !content.style.display;
+    content.style.display = isHidden ? 'block' : 'none';
+    icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+
+    if (contentId === 'pendingOrdersContent') {
+        localStorage.setItem('pendingOrdersOpen', isHidden ? 'open' : 'closed');
+    }
+    if (contentId === 'recentTradesContent') {
+        localStorage.setItem('recentTradesOpen', isHidden ? 'open' : 'closed');
+    }
+};
+
+// ============================================================
+// INIT TRADING
+// ============================================================
+function initTrading() {
+    uiLog('Initializing trading module v6.0 Professional...');
+
+    loadSavedSymbol();
+    initCollapsibles();
+
+    if (stakeSlider) {
+        stakeSlider.min = 0.50;
+        stakeSlider.max = 20;
+        stakeSlider.step = 0.50;
+        stakeSlider.value = 2.00;
+        if (stakeValue) stakeValue.innerText = '$2.00';
+        stakeSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value).toFixed(2);
+            if (stakeValue) stakeValue.innerText = `$${val}`;
+        });
+    }
+
+    if (getSignalBtn) {
+        getSignalBtn.innerHTML = 'ðŸ§  AI REASONING';
+        getSignalBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            uiLog('Button clicked: AI REASONING');
+            fetchAIAnalysis();
+        });
+    }
+
+    if (yesBtn) {
+        yesBtn.innerHTML = 'ðŸ’° BUY';
+        yesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            uiLog('Button clicked: BUY');
+            if (currentSignal && !isProcessingTrade && currentSignal.action !== 'WAIT') {
+                executeTrade();
+            } else if (currentSignal && currentSignal.action === 'WAIT') {
+                if (window.showToast) window.showToast('No Setup', 'AI is waiting for market conditions. No active trade setup.', 'info');
+            }
+        });
+    }
+    if (noBtn) {
+        noBtn.innerHTML = 'ðŸ”» SELL';
+        noBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            uiLog('Button clicked: DECLINE/SELL');
+            clearSignal();
+            if (window.showToast) window.showToast('Signal Declined', 'You declined this trade', 'info');
+        });
+    }
+
+    if (demoBtn) demoBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: DEMO'); switchMode('demo'); });
+    if (realBtn) realBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REAL'); switchMode('real'); });
+    if (switchModeBtn) switchModeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        uiLog('Button clicked: SWITCH MODE');
+        const isDemo = demoBtn && demoBtn.classList.contains('bg-emerald-500');
+        switchMode(isDemo ? 'real' : 'demo');
+    });
+
+    // Refresh button removed - no event listener needed
+    if (refreshTradesBtn) refreshTradesBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REFRESH TRADES'); loadRecentTrades(); });
+
+    if (symbolSelect) {
+        symbolSelect.addEventListener('change', () => {
+            const newSymbol = symbolSelect.value;
+            uiLog(`Symbol select changed: ${newSymbol}`);
+            clearSignal();
+            saveSymbolPreference(newSymbol);
+            if (window.showToast) window.showToast('Symbol Changed', `AI analyzing ${newSymbol}...`, 'info');
+            changeSymbol(newSymbol);
+        });
+    }
+
+    if (pushSignalsToggle) pushSignalsToggle.addEventListener('change', (e) => { uiLog(`Toggle: push_signals = ${e.target.checked}`); updateSetting('push_signals', e.target.checked); });
+    if (autoModeToggle) autoModeToggle.addEventListener('change', (e) => { uiLog(`Toggle: auto_mode = ${e.target.checked}`); updateSetting('auto_mode', e.target.checked); });
+    if (jackpotToggle) jackpotToggle.addEventListener('change', (e) => { uiLog(`Toggle: jackpot_mode = ${e.target.checked}`); updateSetting('jackpot_mode', e.target.checked); });
+
+    if (Notification.permission === 'default') Notification.requestPermission();
+
+    refreshUserData();
+    loadRecentTrades();
+    startPendingOrdersPolling();
+
+    if (recentTradesRefreshInterval) clearInterval(recentTradesRefreshInterval);
+    recentTradesRefreshInterval = setInterval(() => {
+        loadRecentTrades();
+    }, 10000);
+
+    setInterval(() => { if (currentActiveTrade) updateLockedBalance(); }, 10000);
+    uiLog('Trading module v6.0 Professional initialized');
+}
+
+// Make all functions globally available
+window.initTrading = initTrading;
+window.loadRecentTrades = loadRecentTrades;
+window.refreshUserData = refreshUserData;
+window.executeTrade = executeTrade;
+window.fetchAIAnalysis = fetchAIAnalysis;
+window.addTradeToTable = addTradeToTable;
+window.updateBalanceInUI = updateBalanceInUI;
+window.clearSignal = clearSignal;
+window.showAIReasonModal = showAIReasonModal;
+window.closeAIReasonModal = closeAIReasonModal;
+window.acceptTradeFromModal = acceptTradeFromModal;
+window.changeSymbol = changeSymbol;
+window.copyAllTrades = copyAllTrades;
+window.copyTradeToClipboard = copyTradeToClipboard;
+window.updatePendingOrdersDisplay = updatePendingOrdersDisplay;
+window.saveSymbolPreference = saveSymbolPreference;
+window.loadSavedSymbol = loadSavedSymbol;
+window.toggleCollapsible = toggleCollapsible;
+window.updateAIDisplay = updateAIDisplay;
+window.deleteAllTrades = deleteAllTrades;
+
+================================================================================
+FILE: frontend/js/chart.js
+SIZE: 9.1 KB
+================================================================================
+let chart = null;
+let chartData = [];
+let liveInterval = null;
+let currentPrice = 0;
+
+function generateCandleData(count = 100, startPrice = 32500) {
+    let data = [];
+    let price = startPrice;
+    const now = new Date();
+    
+    for (let i = count; i > 0; i--) {
+        const date = new Date(now);
+        date.setMinutes(now.getMinutes() - i);
+        
+        const open = price;
+        const change = (Math.random() - 0.5) * 30;
+        const close = open + change;
+        const high = Math.max(open, close) + Math.random() * 15;
+        const low = Math.min(open, close) - Math.random() * 15;
+        price = close;
+        
+        data.push({
+            x: date.getTime(),
+            y: [parseFloat(open.toFixed(2)), parseFloat(high.toFixed(2)), parseFloat(low.toFixed(2)), parseFloat(close.toFixed(2))]
+        });
+    }
+    currentPrice = price;
+    return data;
+}
+
+function initChart(isDark = true) {
+    const chartElement = document.querySelector("#candlestick-chart");
+    if (!chartElement) return;
+    
+    chartData = generateCandleData(100);
+    currentPrice = chartData[chartData.length - 1].y[3];
+    
+    const options = {
+        series: [{ name: 'candlestick', data: chartData }],
+        chart: {
+            type: 'candlestick',
+            height: 400,
+            background: 'transparent',
+            toolbar: { show: false, tools: { download: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: false } },
+            animations: { enabled: true, dynamicAnimation: { enabled: true, speed: 500 } },
+            zoom: { enabled: false }
+        },
+        plotOptions: {
+            candlestick: {
+                colors: { upward: '#22c55e', downward: '#ef4444' },
+                wick: { useFillColor: true }
+            }
+        },
+        xaxis: {
+            type: 'datetime',
+            labels: { style: { colors: isDark ? '#94a3b8' : '#475569', fontSize: '10px' }, datetimeFormatter: { hour: 'HH:mm' } },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+            crosshairs: { show: true, width: 1, stroke: { color: isDark ? '#475569' : '#cbd5e1', width: 1 } }
+        },
+        yaxis: {
+            labels: { style: { colors: isDark ? '#94a3b8' : '#475569', fontSize: '10px' }, formatter: (value) => `$${value.toFixed(2)}` },
+            opposite: true,
+            tooltip: { enabled: true },
+            crosshairs: { show: true, stroke: { color: isDark ? '#475569' : '#cbd5e1', width: 1 } }
+        },
+        grid: {
+            show: true,
+            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            strokeDashArray: 0,
+            position: 'back',
+            xaxis: { lines: { show: true } },
+            yaxis: { lines: { show: true } }
+        },
+        tooltip: {
+            theme: isDark ? 'dark' : 'light',
+            enabled: true,
+            x: { format: 'HH:mm:ss' },
+            y: { formatter: (value) => `$${value.toFixed(2)}` }
+        },
+        responsive: [{
+            breakpoint: 768,
+            options: { chart: { height: 300 } }
+        }]
+    };
+    
+    if (chart) {
+        chart.destroy();
+    }
+    
+    chart = new ApexCharts(chartElement, options);
+    chart.render();
+    
+    // Update live price display
+    const livePriceEl = document.getElementById('livePrice');
+    if (livePriceEl) livePriceEl.innerHTML = `$${currentPrice.toFixed(2)}`;
+    
+    // Start live updates if not already running
+    if (liveInterval) clearInterval(liveInterval);
+    liveInterval = setInterval(() => {
+        if (!chartData.length) return;
+        
+        const lastCandle = chartData[chartData.length - 1];
+        const now = Date.now();
+        const change = (Math.random() - 0.5) * 8;
+        const newClose = lastCandle.y[3] + change;
+        
+        if (now - lastCandle.x > 60000) {
+            // Create new candle
+            const newCandle = {
+                x: now - (now % 60000),
+                y: [lastCandle.y[3], lastCandle.y[3], lastCandle.y[3], newClose]
+            };
+            newCandle.y[1] = Math.max(newCandle.y[1], newClose) + Math.random() * 5;
+            newCandle.y[2] = Math.min(newCandle.y[2], newClose) - Math.random() * 5;
+            chartData.push(newCandle);
+            if (chartData.length > 200) chartData.shift();
+            currentPrice = newCandle.y[3];
+        } else {
+            // Update current candle
+            const updatedCandle = { ...lastCandle };
+            updatedCandle.y[3] = newClose;
+            updatedCandle.y[1] = Math.max(updatedCandle.y[1], newClose);
+            updatedCandle.y[2] = Math.min(updatedCandle.y[2], newClose);
+            chartData[chartData.length - 1] = updatedCandle;
+            currentPrice = newClose;
+        }
+        
+        chart.updateSeries([{ data: chartData }]);
+        
+        const livePriceEl = document.getElementById('livePrice');
+        if (livePriceEl) livePriceEl.innerHTML = `$${currentPrice.toFixed(2)}`;
+        
+    }, 2000);
+    
+    return chart;
+}
+
+function updateChartTheme(isDark) {
+    if (chart) {
+        chart.updateOptions({
+            grid: { borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+            xaxis: { labels: { style: { colors: isDark ? '#94a3b8' : '#475569' } }, crosshairs: { stroke: { color: isDark ? '#475569' : '#cbd5e1' } } },
+            yaxis: { labels: { style: { colors: isDark ? '#94a3b8' : '#475569' } }, crosshairs: { stroke: { color: isDark ? '#475569' : '#cbd5e1' } } },
+            tooltip: { theme: isDark ? 'dark' : 'light' }
+        });
+    }
+}
+
+function changeTimeframe(tf) {
+    let granularity = 60;
+    let count = 100;
+    
+    switch(tf) {
+        case '1m':
+            granularity = 60;
+            count = 100;
+            break;
+        case '5m':
+            granularity = 300;
+            count = 100;
+            break;
+        case '15m':
+            granularity = 900;
+            count = 100;
+            break;
+        case '1h':
+            granularity = 3600;
+            count = 100;
+            break;
+        case '4h':
+            granularity = 14400;
+            count = 100;
+            break;
+        case '1d':
+            granularity = 86400;
+            count = 50;
+            break;
+        default:
+            granularity = 60;
+            count = 100;
+    }
+    
+    // Generate new mock data with different granularity
+    chartData = generateCandleData(count, currentPrice);
+    chart.updateSeries([{ data: chartData }]);
+    
+    showToast(`Timeframe changed to ${tf}`, 'info');
+    
+    // If connected to Deriv, fetch real candles
+    if (window.wsConnected && window.wsConnected()) {
+        fetchRealCandles(granularity, count);
+    }
+}
+
+async function fetchRealCandles(granularity, count) {
+    try {
+        const symbol = document.getElementById('symbolSelect')?.value || 'R_75';
+        const token = localStorage.getItem('monix_token');
+        const response = await fetch(`/api/market/candles?symbol=${symbol}&granularity=${granularity}&count=${count}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (data.success && data.candles && data.candles.length > 0) {
+            chartData = data.candles;
+            chart.updateSeries([{ data: chartData }]);
+        }
+    } catch (error) {
+        console.error('Failed to fetch real candles:', error);
+    }
+}
+
+function updateConfidenceBars(confidence) {
+    const container = document.getElementById('confidenceBars');
+    if (!container) return;
+    container.innerHTML = '';
+    const filledCount = Math.floor(confidence / 10);
+    for (let i = 0; i < 10; i++) {
+        const filled = i < filledCount;
+        container.innerHTML += `<div class="h-2 rounded-sm ${filled ? 'bg-emerald-500' : 'bg-slate-700'}"></div>`;
+    }
+}
+
+function updateChartPrice(price) {
+    currentPrice = price;
+    const livePriceEl = document.getElementById('livePrice');
+    if (livePriceEl) livePriceEl.innerHTML = `$${price.toFixed(2)}`;
+}
+
+// Initialize timeframe buttons after DOM load
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.tf-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tf = btn.dataset.tf;
+            if (typeof changeTimeframe === 'function') {
+                changeTimeframe(tf);
+            }
+            
+            // Update active button style
+            document.querySelectorAll('.tf-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white');
+                b.classList.add('hover:bg-slate-700');
+            });
+            btn.classList.add('bg-indigo-600', 'text-white');
+            btn.classList.remove('hover:bg-slate-700');
+        });
+    });
+});
+
+// Expose functions globally
+window.initChart = initChart;
+window.updateChartTheme = updateChartTheme;
+window.changeTimeframe = changeTimeframe;
+window.updateConfidenceBars = updateConfidenceBars;
+window.updateChartPrice = updateChartPrice;
+
+================================================================================
+FILE: frontend/js/admin.js
+SIZE: 11.2 KB
+================================================================================
+let currentAdminUserList = [];
+
+function initAdmin() {
+    const adminLink = document.getElementById('adminLink');
+    if (adminLink) {
+        adminLink.addEventListener('click', () => openAdminModal());
+    }
+    
+    const generateVoucherBtn = document.getElementById('generateVoucherBtn');
+    if (generateVoucherBtn) {
+        generateVoucherBtn.addEventListener('click', generateVoucher);
+    }
+    
+    const sendBroadcastBtn = document.getElementById('sendBroadcastBtn');
+    if (sendBroadcastBtn) {
+        sendBroadcastBtn.addEventListener('click', sendBroadcast);
+    }
+    
+    // Admin tab switching
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchAdminTab(tab.dataset.tab));
+    });
+}
+
+async function openAdminModal() {
+    const modal = document.getElementById('adminModal');
+    if (!modal) return;
+    
+    modal.classList.remove('hidden');
+    await loadAdminVouchers();
+    await loadAdminUsers();
+    await loadAdminStats();
+}
+
+function switchAdminTab(tabId) {
+    // Update tab buttons
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+        if (tab.dataset.tab === tabId) {
+            tab.classList.add('active');
+            tab.classList.remove('text-slate-400');
+        } else {
+            tab.classList.remove('active');
+            tab.classList.add('text-slate-400');
+        }
+    });
+    
+    // Update panes
+    document.querySelectorAll('.admin-tab-pane').forEach(pane => {
+        pane.classList.add('hidden');
+    });
+    document.getElementById(`${tabId}Tab`).classList.remove('hidden');
+}
+
+async function generateVoucher() {
+    const days = document.getElementById('voucherDays')?.value;
+    const trades = document.getElementById('voucherTrades')?.value;
+    
+    if (!days || !trades || days < 1 || trades < 1) {
+        showToast('Error', 'Please enter valid days and trades', 'error');
+        return;
+    }
+    
+    try {
+        const result = await window.api.adminGenerateVoucher(parseInt(days), parseInt(trades));
+        if (result.success) {
+            showToast('Voucher Generated', `Code: ${result.voucher.code}`, 'success');
+            document.getElementById('voucherDays').value = '';
+            document.getElementById('voucherTrades').value = '';
+            await loadAdminVouchers();
+        }
+    } catch (error) {
+        showToast('Error', error.message, 'error');
+    }
+}
+
+async function loadAdminVouchers() {
+    try {
+        const result = await window.api.adminGetVouchers();
+        const container = document.getElementById('vouchersList');
+        
+        if (!container) return;
+        
+        if (!result.vouchers || result.vouchers.length === 0) {
+            container.innerHTML = '<p class="text-slate-500 text-center py-4">No vouchers generated yet</p>';
+            return;
+        }
+        
+        container.innerHTML = result.vouchers.map(v => `
+            <div class="bg-slate-800/30 p-3 rounded-lg flex justify-between items-center">
+                <div>
+                    <p class="font-mono text-sm font-bold text-indigo-300">${v.code}</p>
+                    <p class="text-xs text-slate-500">${v.days_valid} days â€¢ ${v.trades_limit} trades</p>
+                    <p class="text-xs text-slate-500">Created: ${new Date(v.created_at).toLocaleDateString()}</p>
+                </div>
+                <div class="text-right">
+                    ${v.used_by ? `<p class="text-xs text-emerald-400">Used by: ${v.used_by_username || v.used_by_email}</p>` : '<p class="text-xs text-yellow-500">Unused</p>'}
+                    <button onclick="revokeVoucher('${v.code}')" class="text-xs text-red-400 hover:text-red-300 mt-1">Revoke</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Load vouchers error:', error);
+    }
+}
+
+async function revokeVoucher(code) {
+    if (!confirm(`Revoke voucher ${code}?`)) return;
+    
+    try {
+        await window.api.adminRevokeVoucher(code);
+        showToast('Voucher Revoked', `Voucher ${code} has been revoked`, 'success');
+        await loadAdminVouchers();
+    } catch (error) {
+        showToast('Error', error.message, 'error');
+    }
+}
+
+async function loadAdminUsers() {
+    try {
+        const users = await window.api.adminGetUsers();
+        currentAdminUserList = users;
+        const container = document.getElementById('usersList');
+        
+        if (!container) return;
+        
+        if (!users || users.length === 0) {
+            container.innerHTML = '<p class="text-slate-500 text-center py-4">No users found</p>';
+            return;
+        }
+        
+        container.innerHTML = users.map(user => `
+            <div class="bg-slate-800/30 p-3 rounded-lg">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-semibold">${user.username}</p>
+                        <p class="text-xs text-slate-500">${user.email}</p>
+                        <p class="text-xs text-slate-500 mt-1">Trades left: ${user.trades_remaining} | Win rate: ${user.stats?.win_rate || 0}%</p>
+                        <p class="text-xs text-slate-500">Profit: $${user.stats?.net_profit || 0}</p>
+                    </div>
+                    <div class="text-right">
+                        ${user.is_admin ? '<span class="text-xs bg-amber-500/20 text-amber-500 px-2 py-1 rounded">Admin</span>' : ''}
+                        <div class="flex gap-2 mt-2">
+                            ${!user.is_active ? `<button onclick="unblockUser(${user.id})" class="text-xs bg-emerald-600 px-2 py-1 rounded">Unblock</button>` : `<button onclick="blockUser(${user.id})" class="text-xs bg-red-600 px-2 py-1 rounded">Block</button>`}
+                            <button onclick="resetTrades(${user.id})" class="text-xs bg-blue-600 px-2 py-1 rounded">Reset Trades</button>
+                            ${!user.is_admin ? `<button onclick="makeAdmin(${user.id})" class="text-xs bg-amber-600 px-2 py-1 rounded">Make Admin</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Load users error:', error);
+    }
+}
+
+async function blockUser(userId) {
+    if (!confirm('Block this user?')) return;
+    try {
+        await window.api.adminBlockUser(userId);
+        showToast('User Blocked', 'User has been blocked', 'success');
+        await loadAdminUsers();
+    } catch (error) {
+        showToast('Error', error.message, 'error');
+    }
+}
+
+async function unblockUser(userId) {
+    try {
+        await window.api.adminUnblockUser(userId);
+        showToast('User Unblocked', 'User has been unblocked', 'success');
+        await loadAdminUsers();
+    } catch (error) {
+        showToast('Error', error.message, 'error');
+    }
+}
+
+async function resetTrades(userId) {
+    const trades = prompt('Enter number of trades to give:');
+    if (!trades || isNaN(trades)) return;
+    
+    try {
+        await window.api.adminResetTrades(userId, parseInt(trades));
+        showToast('Trades Reset', `User received ${trades} trades`, 'success');
+        await loadAdminUsers();
+    } catch (error) {
+        showToast('Error', error.message, 'error');
+    }
+}
+
+async function makeAdmin(userId) {
+    if (!confirm('Grant admin privileges to this user?')) return;
+    try {
+        await window.api.adminAddAdmin(userId);
+        showToast('Admin Granted', 'User now has admin access', 'success');
+        await loadAdminUsers();
+    } catch (error) {
+        showToast('Error', error.message, 'error');
+    }
+}
+
+async function sendBroadcast() {
+    const subject = document.getElementById('broadcastSubject')?.value;
+    const message = document.getElementById('broadcastMessage')?.value;
+    
+    if (!subject || !message) {
+        showToast('Error', 'Please enter subject and message', 'error');
+        return;
+    }
+    
+    try {
+        const result = await window.api.adminSendBroadcast(subject, message);
+        if (result.success) {
+            showToast('Broadcast Sent', result.message, 'success');
+            document.getElementById('broadcastSubject').value = '';
+            document.getElementById('broadcastMessage').value = '';
+        }
+    } catch (error) {
+        showToast('Error', error.message, 'error');
+    }
+}
+
+async function loadAdminStats() {
+    try {
+        const stats = await window.api.adminGetStats();
+        const container = document.getElementById('systemStats');
+        
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-800/30 p-3 rounded-lg text-center">
+                    <p class="text-2xl font-bold text-indigo-400">${stats.total_users || 0}</p>
+                    <p class="text-xs text-slate-500">Total Users</p>
+                </div>
+                <div class="bg-slate-800/30 p-3 rounded-lg text-center">
+                    <p class="text-2xl font-bold text-indigo-400">${stats.active_users || 0}</p>
+                    <p class="text-xs text-slate-500">Active (7d)</p>
+                </div>
+                <div class="bg-slate-800/30 p-3 rounded-lg text-center">
+                    <p class="text-2xl font-bold text-emerald-400">${stats.total_trades || 0}</p>
+                    <p class="text-xs text-slate-500">Total Trades</p>
+                </div>
+                <div class="bg-slate-800/30 p-3 rounded-lg text-center">
+                    <p class="text-2xl font-bold ${stats.total_profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">$${stats.total_profit || 0}</p>
+                    <p class="text-xs text-slate-500">Total Profit</p>
+                </div>
+                <div class="bg-slate-800/30 p-3 rounded-lg text-center">
+                    <p class="text-2xl font-bold">${stats.win_rate || 0}%</p>
+                    <p class="text-xs text-slate-500">Win Rate</p>
+                </div>
+                <div class="bg-slate-800/30 p-3 rounded-lg text-center">
+                    <p class="text-2xl font-bold text-emerald-400">$${stats.today_profit || 0}</p>
+                    <p class="text-xs text-slate-500">Today's Profit</p>
+                </div>
+            </div>
+            <div class="mt-4 bg-slate-800/30 p-3 rounded-lg">
+                <p class="text-sm"><span class="text-slate-500">Vouchers:</span> ${stats.vouchers?.total || 0} total (${stats.vouchers?.unused || 0} unused)</p>
+                <p class="text-sm mt-1"><span class="text-slate-500">System Status:</span> <span class="text-emerald-400">${stats.system_status || 'online'}</span></p>
+                <p class="text-sm mt-1"><span class="text-slate-500">Version:</span> ${stats.version || '3.0.0'}</p>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Load stats error:', error);
+    }
+}
+
+// Expose admin functions globally
+window.initAdmin = initAdmin;
+window.revokeVoucher = revokeVoucher;
+window.blockUser = blockUser;
+window.unblockUser = unblockUser;
+window.resetTrades = resetTrades;
+window.makeAdmin = makeAdmin;
+
+================================================================================
+FILE: frontend/js/websocket.js
+SIZE: 11.2 KB
+================================================================================
+let ws = null;
+let wsReconnectAttempts = 0;
+let wsReconnectInterval = null;
+
+function connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}`;
+    ws = new WebSocket(wsUrl);
+    ws.onopen = () => {
+        console.log('WebSocket connected');
+        wsReconnectAttempts = 0;
+        if (wsReconnectInterval) {
+            clearInterval(wsReconnectInterval);
+            wsReconnectInterval = null;
+        }
+        updateConnectionStatus(true);
+
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 30000);
+    };
+
+    ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+        } catch (error) {
+            console.error('WebSocket parse error:', error);
+        }
+    };
+
+    ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        updateConnectionStatus(false);
+    };
+
+    ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        updateConnectionStatus(false);
+        reconnectWebSocket();
+    };
+}
+
+function reconnectWebSocket() {
+    if (wsReconnectInterval) return;
+
+    wsReconnectInterval = setInterval(() => {
+        if (wsReconnectAttempts >= 10) {
+            console.error('Max reconnection attempts reached');
+            clearInterval(wsReconnectInterval);
+            wsReconnectInterval = null;
+            return;
+        }
+
+        wsReconnectAttempts++;
+        console.log(`Reconnecting WebSocket... Attempt ${wsReconnectAttempts}`);
+        connectWebSocket();
+    }, 3000);
+}
+
+function playBellSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = 880;
+        gainNode.gain.value = 0.3;
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+        oscillator.stop(audioContext.currentTime + 0.5);
+
+        setTimeout(() => {
+            const osc2 = audioContext.createOscillator();
+            const gain2 = audioContext.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioContext.destination);
+            osc2.frequency.value = 660;
+            gain2.gain.value = 0.2;
+            osc2.start();
+            gain2.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+            osc2.stop(audioContext.currentTime + 0.3);
+        }, 150);
+    } catch(e) {
+        console.log('Bell sound not supported');
+    }
+}
+
+function handleWebSocketMessage(data) {
+    switch (data.type) {
+        case 'price':
+            const livePriceEl = document.getElementById('livePrice');
+            if (livePriceEl && data.price) {
+                livePriceEl.innerHTML = `$${data.price.toFixed(2)}`;
+                if (window.updateChartPrice) {
+                    window.updateChartPrice(data.price);
+                }
+            }
+            break;
+
+        case 'new_setup':
+            console.log('ðŸ”” New setup detected!', data.setup);
+            playBellSound();
+
+            if (Notification.permission === 'granted') {
+                new Notification('ðŸ”” New Trading Setup!', {
+                    body: `${data.setup.action_display} on ${data.setup.symbol} at $${data.setup.entry_price?.toFixed(2)} with ${data.setup.confidence}% confidence`,
+                    icon: '/favicon.ico',
+                    tag: 'new_setup',
+                    requireInteraction: true
+                });
+            }
+
+            if (window.showToast) {
+                window.showToast(
+                    'ðŸ”” New Setup Detected!',
+                    `${data.setup.action_display} on ${data.setup.symbol} at $${data.setup.entry_price?.toFixed(2)} | Confidence: ${data.setup.confidence}%`,
+                    'info'
+                );
+            }
+
+            if (window.updateAIDisplay && data.setup) {
+                window.updateAIDisplay({ watch_state: data.setup });
+            }
+            break;
+
+        case 'signal':
+            if (data.signal && window.displaySignal) {
+                window.displaySignal(data.signal);
+                if (window.showToast) window.showToast('AI Signal', `${data.signal.action} ${data.signal.symbol} with ${data.signal.confidence}% confidence`, 'info');
+                if (window.playSound) window.playSound('signal');
+            }
+            break;
+
+        case 'notification':
+            if (window.showToast) window.showToast(data.title, data.message, data.notificationType);
+            break;
+
+        case 'trade_result':
+            if (data.trade) {
+                if (window.addTradeToTable) window.addTradeToTable(data.trade);
+                if (window.refreshUserData) window.refreshUserData();
+                if (window.updateLockedBalance) window.updateLockedBalance();
+                if (window.refreshBalance) window.refreshBalance();
+                if (data.trade.status === 'WIN') {
+                    if (window.playSound) window.playSound('win');
+                } else if (data.trade.status === 'LOSS') {
+                    if (window.playSound) window.playSound('loss');
+                }
+                if (window.showToast) window.showToast(
+                    `Trade ${data.trade.status}`,
+                    `${data.trade.action} on ${data.trade.symbol}: ${data.trade.status === 'WIN' ? '+' : ''}$${data.trade.profit?.toFixed(2)}`,
+                    data.trade.status === 'WIN' ? 'success' : 'error'
+                );
+            }
+            break;
+
+        case 'balance':
+            if (data.balance !== undefined) {
+                if (window.updateBalanceInUI) window.updateBalanceInUI(data.balance);
+                else {
+                    const balanceEl = document.getElementById('balanceAmount');
+                    if (balanceEl) balanceEl.innerHTML = `$${data.balance.toFixed(2)}`;
+                }
+            }
+            break;
+
+        case 'trade_update':
+            if (data.trade && window.loadRecentTrades) window.loadRecentTrades();
+            break;
+
+        case 'ai_update':
+            // Ensure ai_update triggers full UI update and pending orders
+            if (data.data && window.updateAIDisplay) {
+                window.updateAIDisplay(data.data);
+                // Also update pending orders if present
+                if (data.data.pending_orders && window.updatePendingOrdersDisplay) {
+                    window.updatePendingOrdersDisplay(data.data.pending_orders);
+                }
+            }
+            break;
+
+        case 'pong':
+            break;
+
+        default:
+            console.log('Unknown WebSocket message:', data);
+    }
+}
+
+function updateConnectionStatus(connected) {
+    const statusEl = document.getElementById('connectionStatus');
+    if (statusEl) {
+        if (connected) {
+            statusEl.innerHTML = 'ðŸŸ¢';
+            statusEl.title = 'Connected';
+        } else {
+            statusEl.innerHTML = 'ðŸ”´';
+            statusEl.title = 'Disconnected - Reconnecting...';
+        }
+    }
+}
+
+function showToast(title, message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    let icon = '';
+    switch (type) {
+        case 'success': icon = 'âœ…'; break;
+        case 'error': icon = 'âŒ'; break;
+        default: icon = 'â„¹ï¸';
+    }
+
+    toast.innerHTML = `
+        <div class="flex items-start gap-3">
+            <span class="text-lg">${icon}</span>
+            <div class="flex-1">
+                <p class="font-semibold text-sm">${title}</p>
+                <p class="text-xs text-slate-400 mt-1">${message}</p>
+            </div>
+            <button class="text-slate-500 hover:text-white" onclick="this.parentElement.parentElement.remove()">âœ•</button>
+        </div>
+    `;
+
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+function playSound(type) {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        if (type === 'win') {
+            oscillator.frequency.value = 880;
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+            oscillator.stop(audioContext.currentTime + 0.5);
+        } else if (type === 'loss') {
+            oscillator.frequency.value = 220;
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.8);
+            oscillator.stop(audioContext.currentTime + 0.8);
+        } else if (type === 'signal') {
+            oscillator.frequency.value = 440;
+            gainNode.gain.value = 0.2;
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+            oscillator.stop(audioContext.currentTime + 0.3);
+
+            setTimeout(() => {
+                const osc2 = audioContext.createOscillator();
+                const gain2 = audioContext.createGain();
+                osc2.connect(gain2);
+                gain2.connect(audioContext.destination);
+                osc2.frequency.value = 660;
+                gain2.gain.value = 0.2;
+                osc2.start();
+                gain2.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+                osc2.stop(audioContext.currentTime + 0.3);
+            }, 200);
+        } else if (type === 'execute') {
+            oscillator.frequency.value = 523.25;
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
+    } catch (e) {
+        console.log('Audio not supported');
+    }
+}
+
+function sendNotification(title, body, tag = 'trade') {
+    if (Notification.permission === 'granted') {
+        new Notification(title, { body, tag, icon: '/favicon.ico' });
+    }
+}
+
+if (Notification.permission === 'default') {
+    Notification.requestPermission();
+}
+
+window.connectWebSocket = connectWebSocket;
+window.wsConnected = () => ws && ws.readyState === WebSocket.OPEN;
+window.showToast = showToast;
+window.playSound = playSound;
+window.sendNotification = sendNotification;
+window.updateAIDisplay = updateAIDisplay;
+window.playBellSound = playBellSound;
+

@@ -1,0 +1,183 @@
+﻿// ================================================================
+// MONIX v7.0 — Wallet tab (guest + connected)
+// ================================================================
+
+window.renderShellTab_wallet = function() {
+  const content = document.querySelector('.app-tab[data-shell-tab="wallet"]');
+  if (!content) return;
+
+  const connected = MONIX_IS_CONNECTED();
+  const balance = MONIX_STATE.balance || 0;
+  const locked = MONIX_STATE.locked || 0;
+  const available = balance - locked;
+  const voucher = MONIX_STATE.voucher || {};
+
+  if (!connected) {
+    content.innerHTML = `
+      <div class="app-hero">
+        <div class="app-hero-title">Wallet</div>
+        <div class="app-hero-sub">Your balance, strategy, and account</div>
+      </div>
+
+      <div class="app-panel">
+        <div class="app-empty">
+          <i class="fa-solid fa-lock"></i>
+          <div class="app-empty-title">You're not connected yet</div>
+          <div class="app-empty-desc">Connect your Deriv account to see your wallet and balance.</div>
+        </div>
+        <button class="app-btn app-btn-block" style="margin-top:14px;" onclick="window.monixOpenApiKeys()">
+          <i class="fa-solid fa-key"></i> Connect Deriv account
+        </button>
+        <button class="app-btn app-btn-ghost app-btn-block" style="margin-top:10px;" onclick="window.monixOpenWaitlist()">
+          <i class="fa-solid fa-envelope"></i> Join Easy Start waitlist
+        </button>
+      </div>
+
+      <div class="app-panel">
+        <div class="app-panel-title">
+          <div class="app-panel-title-left"><i class="fa-solid fa-star"></i>What you'll get</div>
+        </div>
+        <div class="info-list">
+          <div class="info-list-item"><i class="fa-solid fa-check"></i><span>Real balance from Deriv</span></div>
+          <div class="info-list-item"><i class="fa-solid fa-check"></i><span>Auto-invest with MONIX AI</span></div>
+          <div class="info-list-item"><i class="fa-solid fa-check"></i><span>Choose your strategy</span></div>
+          <div class="info-list-item"><i class="fa-solid fa-check"></i><span>Live positions and P&L</span></div>
+          <div class="info-list-item"><i class="fa-solid fa-check"></i><span>Full investment history</span></div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // 
+  // CONNECTED
+  // 
+  const strategies = [
+    { id: 'conservative', label: 'Conservative', desc: 'Max 2% per trade · 5-10% annually' },
+    { id: 'balanced',     label: 'Balanced',     desc: 'Max 5% per trade · 15-25% annually' },
+    { id: 'aggressive',   label: 'Aggressive',   desc: 'Max 10% per trade · 30-60% annually' },
+  ];
+  const activeStrategy = MONIX_STATE.strategy || 'balanced';
+
+  content.innerHTML = `
+    <div class="app-hero">
+      <div class="app-hero-title">Wallet</div>
+      <div class="app-hero-sub">Balance, strategy, and account</div>
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-wallet"></i>Total Balance</div>
+      </div>
+      <div style="font-size:32px;font-weight:800;letter-spacing:-1px;">$${balance.toFixed(2)}</div>
+      <div style="font-size:12.5px;color:var(--meta);margin-top:4px;">From Deriv account</div>
+    </div>
+
+    <div class="app-kpi-grid">
+      <div class="app-kpi">
+        <div class="app-kpi-label">Available</div>
+        <div class="app-kpi-value" style="font-size:20px;color:var(--success);">$${available.toFixed(2)}</div>
+        <div class="app-kpi-delta">Ready to invest</div>
+      </div>
+      <div class="app-kpi">
+        <div class="app-kpi-label">In positions</div>
+        <div class="app-kpi-value" style="font-size:20px;">$${locked.toFixed(2)}</div>
+        <div class="app-kpi-delta">${(MONIX_STATE.positions || []).length} open</div>
+      </div>
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-robot"></i>Auto-trading</div>
+      </div>
+      <div class="switch-row">
+        <div>
+          <div class="switch-label">Auto-trade</div>
+          <div class="switch-sub">${MONIX_STATE.autoTrade ? 'MONIX AI places trades for you' : 'You approve each trade'}</div>
+        </div>
+        <div class="switch ${MONIX_STATE.autoTrade ? 'on' : ''}" id="walletAutoTradeSwitch"></div>
+      </div>
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-trophy"></i>Strategy</div>
+      </div>
+      <div class="strategy-grid">
+        ${strategies.map(s => `
+          <div class="strategy-card ${s.id === activeStrategy ? 'active' : ''}" data-strategy="${s.id}">
+            <div class="strategy-card-title">${s.label}</div>
+            <div class="strategy-card-desc">${s.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-key"></i>Connected Account</div>
+      </div>
+      <div class="app-act-row">
+        <div class="app-act-icon">🔑</div>
+        <div class="app-act-body">
+          <div class="app-act-title">Deriv · ${MONIX_STATE.user?.demo_token ? 'DEMO' : 'REAL'}</div>
+          <div class="app-act-meta">Connected</div>
+        </div>
+      </div>
+      <button class="app-btn app-btn-ghost app-btn-block" style="margin-top:12px;" onclick="window.monixOpenApiKeys()">
+        <i class="fa-solid fa-gear"></i> Manage API Keys
+      </button>
+    </div>
+
+    <div class="app-panel">
+      <div class="app-panel-title">
+        <div class="app-panel-title-left"><i class="fa-solid fa-plus"></i>Add or Withdraw</div>
+      </div>
+      <div style="font-size:12.5px;color:var(--meta);line-height:1.5;margin-bottom:12px;">
+        Deposits and withdrawals happen on Deriv's secure platform. Click below to open Deriv.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <a href="https://app.deriv.com/cashier/deposit" target="_blank" rel="noopener" class="app-btn app-btn-block" style="text-decoration:none;">
+          <i class="fa-solid fa-circle-plus"></i> Deposit
+        </a>
+        <a href="https://app.deriv.com/cashier/withdrawal" target="_blank" rel="noopener" class="app-btn app-btn-ghost app-btn-block" style="text-decoration:none;">
+          <i class="fa-solid fa-circle-minus"></i> Withdraw
+        </a>
+      </div>
+    </div>
+  `;
+
+  wireWalletTab();
+};
+
+function wireWalletTab() {
+  const switchEl = document.getElementById('walletAutoTradeSwitch');
+  if (switchEl) {
+    switchEl.addEventListener('click', async () => {
+      const current = MONIX_STATE.autoTrade;
+      const next = !current;
+      switchEl.classList.toggle('on', next);
+      MONIX_STATE.autoTrade = next;
+
+      if (typeof window.api !== 'undefined' && window.api.updateUserSettings) {
+        try {
+          await window.api.updateUserSettings({ auto_mode: next ? 1 : 0 });
+        } catch (e) {}
+      }
+      if (window.showToast) window.showToast('Auto-trading ' + (next ? 'enabled' : 'disabled'), '', 'success');
+    });
+  }
+
+  document.querySelectorAll('[data-strategy]').forEach(card => {
+    card.addEventListener('click', async () => {
+      const strategy = card.getAttribute('data-strategy');
+      MONIX_STATE.strategy = strategy;
+      document.querySelectorAll('[data-strategy]').forEach(c => c.classList.toggle('active', c.getAttribute('data-strategy') === strategy));
+
+      if (typeof window.api !== 'undefined' && window.api.updateUserSettings) {
+        try { await window.api.updateUserSettings({ strategy: strategy }); } catch (e) {}
+      }
+      if (window.showToast) window.showToast('Strategy changed', `Using ${strategy} strategy`, 'success');
+    });
+  });
+}

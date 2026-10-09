@@ -114,7 +114,7 @@ class AITrader {
         }
     }
 
-    //  Helper Functions 
+    // â”€â”€â”€ Helper Functions â”€â”€â”€
 
     roundStake(amount) {
         return Math.max(this.MIN_STAKE_LIMIT, Math.min(this.MAX_STAKE_LIMIT, Math.round(amount * 2) / 2));
@@ -183,7 +183,7 @@ class AITrader {
         return 'Deeply Overbought';
     }
 
-    //  Symbol Learning 
+    // â”€â”€â”€ Symbol Learning â”€â”€â”€
 
     async loadSymbolData() {
         try {
@@ -265,11 +265,11 @@ class AITrader {
                 console.log(`📊 [Symbol] ${symbol}: ${symbolMap[symbol].trades} trades, ${symbolMap[symbol].winRate.toFixed(1)}% WR, Ready: ${symbolMap[symbol].isReady}`);
             }
         } catch (error) {
-            console.error(' Failed to load symbol data:', error.message);
+            console.error('âŒ Failed to load symbol data:', error.message);
         }
     }
 
-    //  No session blocking 
+    // â”€â”€â”€ No session blocking â”€â”€â”€
 
     recordSessionTrade(session, symbol, isWin) {
         const data = this.symbolData[symbol];
@@ -282,7 +282,7 @@ class AITrader {
         data.sessionPerformance[session].total++;
     }
 
-    //  Update Daily Limits 
+    // â”€â”€â”€ Update Daily Limits â”€â”€â”€
 
     async updateDailyLimits() {
         const today = new Date().toDateString();
@@ -304,7 +304,7 @@ class AITrader {
         if (todayProfit >= targetProfit && !this.dailyProfitReached) {
             this.dailyProfitReached = true;
             this.pausedUntil = Date.now() + 86400000;
-            console.log(` [Daily Target] Target reached! +$${todayProfit.toFixed(2)}. Stopping for the day.`);
+            console.log(`ðŸŽ¯ [Daily Target] Target reached! +$${todayProfit.toFixed(2)}. Stopping for the day.`);
             broadcastNotification('Daily Target Met', `+$${todayProfit.toFixed(2)} profit. Bot paused until tomorrow.`, 'success');
             return true;
         }
@@ -312,7 +312,7 @@ class AITrader {
         if (todayProfit <= -lossLimit && !this.dailyLossReached) {
             this.dailyLossReached = true;
             this.pausedUntil = Date.now() + 86400000;
-            console.log(` [Daily Limit] Loss limit reached! -$${Math.abs(todayProfit).toFixed(2)}. Stopping for the day.`);
+            console.log(`ðŸ›‘ [Daily Limit] Loss limit reached! -$${Math.abs(todayProfit).toFixed(2)}. Stopping for the day.`);
             broadcastNotification('Daily Loss Limit Hit', `-$${Math.abs(todayProfit).toFixed(2)} loss. Bot paused until tomorrow.`, 'error');
             return true;
         }
@@ -320,7 +320,7 @@ class AITrader {
         return false;
     }
 
-    //  Trade Management 
+    // â”€â”€â”€ Trade Management â”€â”€â”€
 
     async handleContractUpdate(contract) {
         if (!this.activeTrade || contract.contract_id !== this.activeTrade.contract_id) return;
@@ -348,7 +348,7 @@ class AITrader {
         await this.closeTrade(contract.contract_id, finalProfit, status);
     }
 
-    //  FIXED: closeTrade with null check 
+    // â”€â”€â”€ FIXED: closeTrade with null check â”€â”€â”€
     async closeTrade(contractId, profit, status) {
         if (!this.activeTrade) {
             console.log(`⚠️ No active trade to close for contract ${contractId}`);
@@ -388,7 +388,7 @@ class AITrader {
 
             let exitPrice = entryPrice; // placeholder - not used for P&L
 
-            console.log(` Closing trade #${tradeId}: ${symbol} ${status} | Profit: $${finalProfit.toFixed(2)} | Exit: $${exitPrice.toFixed(2)}`);
+            console.log(`ðŸ“ Closing trade #${tradeId}: ${symbol} ${status} | Profit: $${finalProfit.toFixed(2)} | Exit: $${exitPrice.toFixed(2)}`);
 
             await Trade.updateResult(tradeId, exitPrice, finalProfit, status);
             await User.updateStats(this.userId, status, finalProfit, stake);
@@ -430,13 +430,13 @@ class AITrader {
                 this.consecutiveLosses++;
                 this.consecutiveWins = 0;
                 this.dailyLoss += Math.abs(finalProfit);
-                console.log(` LOSS #${this.consecutiveLosses} | -$${Math.abs(finalProfit).toFixed(2)}`);
+                console.log(`âŒ LOSS #${this.consecutiveLosses} | -$${Math.abs(finalProfit).toFixed(2)}`);
                 this.recordSessionTrade(this.getCurrentSession(), symbol, false);
                 this.recalculateStakes();
 
                 if (this.consecutiveLosses >= 3) {
                     this.pausedUntil = Date.now() + 900000;
-                    console.log(' HARD PAUSE 15min  3 consecutive losses');
+                    console.log('ðŸ›‘ HARD PAUSE 15min â€” 3 consecutive losses');
                 }
             }
 
@@ -472,18 +472,18 @@ class AITrader {
         }
     }
 
-    //  Analyze Symbol 
+    // â”€â”€â”€ Analyze Symbol â”€â”€â”€
 
     async analyzeSymbol(symbol) {
         if (symbol === 'XAU/USD (Gold)') return null;
 
-        //  LEARNING-BASED FILTERS (v15.0.36)
+        // ðŸ§  LEARNING-BASED FILTERS (v15.0.36)
         const __hour = new Date().getUTCHours();
         
         // Blocked symbols based on historical WR < 20%
         const __blockedSymbols = ['R_100']; // 11.8% WR over 407 trades
         if (__blockedSymbols.includes(symbol)) {
-            console.log(' [LEARN] ' + symbol + ' blocked (historical WR < 20%)');
+            console.log('ðŸ§  [LEARN] ' + symbol + ' blocked (historical WR < 20%)');
             return null;
         }
         
@@ -497,7 +497,7 @@ class AITrader {
         
         const __blockedHours = [0, 21, 22, 23]; // All 0% WR recently
         if (__blockedHours.includes(__hour)) {
-            console.log(' [LEARN] Hour ' + __hour + ':00 UTC blocked (0% WR last 100 trades)');
+            console.log('ðŸ§  [LEARN] Hour ' + __hour + ':00 UTC blocked (0% WR last 100 trades)');
             return null;
         }
         
@@ -506,11 +506,11 @@ class AITrader {
         const __mState = marketData.getMarketState(symbol);
         const __pattern = __mState.lastPattern || 'none';
         if (__blockedPatterns.includes(__pattern)) {
-            console.log(' [LEARN] Pattern ' + __pattern + ' blocked (journal WR < 30%)');
+            console.log('ðŸ§  [LEARN] Pattern ' + __pattern + ' blocked (journal WR < 30%)');
             return null;
         }
 
-        console.log(` [DEBUG-ENTRY] analyzeSymbol called for ${symbol}`);
+        console.log(`ðŸ” [DEBUG-ENTRY] analyzeSymbol called for ${symbol}`);
         try {
             const marketState = marketData.getMarketState(symbol);
             const currentPrice = marketState.price;
@@ -520,18 +520,18 @@ class AITrader {
             const hour = new Date().getUTCHours();
             const data = this.symbolData[symbol];
 
-            console.log(` [DEBUG] ${symbol}: Price=$${currentPrice?.toFixed(2) || 'N/A'} | RSI=${rsi} | Trend=${trend} | Data=${!!data}`);
+            console.log(`ðŸ” [DEBUG] ${symbol}: Price=$${currentPrice?.toFixed(2) || 'N/A'} | RSI=${rsi} | Trend=${trend} | Data=${!!data}`);
 
             if (!currentPrice || currentPrice <= 0) {
-                console.log(` [DEBUG] ${symbol}: No valid price`);
+                console.log(`âŒ [DEBUG] ${symbol}: No valid price`);
                 return null;
             }
             if (rsi === 0 || !rsi) {
-                console.log(` [DEBUG] ${symbol}: No valid RSI`);
+                console.log(`âŒ [DEBUG] ${symbol}: No valid RSI`);
                 return null;
             }
             if (!data) {
-                console.log(` [DEBUG] ${symbol}: No symbol data`);
+                console.log(`âŒ [DEBUG] ${symbol}: No symbol data`);
                 return null;
             }
 
@@ -540,13 +540,13 @@ class AITrader {
             if (data.trades === 0) {
                 // First trade: allow RSI 45-55 as well
                 if (!(rsi >= 45 && rsi <= 55) && !(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
-                    console.log(` [DEBUG] ${symbol}: RSI ${rsi} outside first-trade zones (25-45 or 45-55)`);
+                    console.log(`âŒ [DEBUG] ${symbol}: RSI ${rsi} outside first-trade zones (25-45 or 45-55)`);
                     return null;
                 }
             } else {
                 // Normal: only 25-45
                 if (!(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
-                    console.log(` [DEBUG] ${symbol}: RSI ${rsi} outside zones (25-45)`);
+                    console.log(`âŒ [DEBUG] ${symbol}: RSI ${rsi} outside zones (25-45)`);
                     return null;
                 }
             }
@@ -566,7 +566,7 @@ class AITrader {
             const minPatternWR = data.trades === 0 ? 5 : (data.trades < 3 ? 20 : 45);
             // 🚀 FIRST TRADE: Bypass pattern check if 0 trades
             if (data.trades > 0 && pattern !== 'none' && patternWR > 0 && patternWR < minPatternWR) {
-                console.log(` [DEBUG] ${symbol}: Pattern ${pattern} WR ${patternWR}% < ${minPatternWR}% minimum`);
+                console.log(`âŒ [DEBUG] ${symbol}: Pattern ${pattern} WR ${patternWR}% < ${minPatternWR}% minimum`);
                 return null;
             }
 
@@ -589,9 +589,9 @@ class AITrader {
 
             // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
             const minSetupQuality = data.trades === 0 ? 10 : (data.trades < 3 ? 30 : 50);
-            console.log(` [DEBUG] ${symbol}: SetupQuality=${setupQuality} | MinRequired=${minSetupQuality}`);
+            console.log(`ðŸ” [DEBUG] ${symbol}: SetupQuality=${setupQuality} | MinRequired=${minSetupQuality}`);
             if (setupQuality < minSetupQuality) {
-                console.log(` [DEBUG] ${symbol}: Setup quality ${setupQuality} < ${minSetupQuality} minimum`);
+                console.log(`âŒ [DEBUG] ${symbol}: Setup quality ${setupQuality} < ${minSetupQuality} minimum`);
                 return null;
             }
 
@@ -608,9 +608,9 @@ class AITrader {
 
             // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
             const minConfidence = data.trades === 0 ? 20 : (data.trades < 3 ? 35 : 50);
-            console.log(` [DEBUG] ${symbol}: Confidence=${confidence} | MinRequired=${minConfidence}`);
+            console.log(`ðŸ” [DEBUG] ${symbol}: Confidence=${confidence} | MinRequired=${minConfidence}`);
             if (confidence < minConfidence) {
-                console.log(` [DEBUG] ${symbol}: Confidence ${confidence} < ${minConfidence} minimum`);
+                console.log(`âŒ [DEBUG] ${symbol}: Confidence ${confidence} < ${minConfidence} minimum`);
                 return null;
             }
 
@@ -628,7 +628,7 @@ class AITrader {
             }
 
             if (action === 'WAIT') {
-                console.log(` [DEBUG] ${symbol}: Action is WAIT`);
+                console.log(`âŒ [DEBUG] ${symbol}: Action is WAIT`);
                 return null;
             }
 
@@ -637,7 +637,7 @@ class AITrader {
 
             // 🚀 SIGNAL GENERATED!
             console.log(`✅ [SIGNAL] ${symbol}: ${action} | RSI: ${rsi} | Quality: ${setupQuality} | Confidence: ${confidence} | Pattern: ${pattern} | WR: ${patternWR}`);
-            console.log(` [SIGNAL] Entry: $${currentPrice.toFixed(2)} | TP: $${takeProfit.toFixed(2)} | SL: $${stopLoss.toFixed(2)}`);
+            console.log(`ðŸŽ¯ [SIGNAL] Entry: $${currentPrice.toFixed(2)} | TP: $${takeProfit.toFixed(2)} | SL: $${stopLoss.toFixed(2)}`);
             
             return {
                 symbol,
@@ -656,12 +656,12 @@ class AITrader {
             };
 
         } catch (error) {
-            console.error(` Analyze ${symbol} error:`, error.message);
+            console.error(`âŒ Analyze ${symbol} error:`, error.message);
             return null;
         }
     }
 
-    //  Find Best Setup 
+    // â”€â”€â”€ Find Best Setup â”€â”€â”€
 
     async findBestSetup() {
         let bestSignal = null;
@@ -681,7 +681,7 @@ class AITrader {
         return bestSignal;
     }
 
-    //  Execute Entry 
+    // â”€â”€â”€ Execute Entry â”€â”€â”€
 
     async executeEntry(signal) {
         if (this.isExecuting || this.activeTrade) return;
@@ -750,7 +750,7 @@ class AITrader {
             console.log(`✅ Trade #${tradeId} OPEN | ${signal.symbol} ${signal.action} | $${stake}`);
 
         } catch (error) {
-            console.error(' Execute error:', error.message);
+            console.error('âŒ Execute error:', error.message);
         } finally {
             this.isExecuting = false;
         }
@@ -764,7 +764,7 @@ class AITrader {
         }
 
         if (this.consecutiveWins >= 3 && confidence >= 75) {
-            console.log(`🚀 Win streak ${this.consecutiveWins} + High confidence  Using CONFIDENT stake`);
+            console.log(`🚀 Win streak ${this.consecutiveWins} + High confidence â†’ Using CONFIDENT stake`);
             return this.CONFIDENT_STAKE;
         }
 
@@ -783,7 +783,7 @@ class AITrader {
         return stake;
     }
 
-    //  Analyze Market 
+    // â”€â”€â”€ Analyze Market â”€â”€â”€
 
     async analyzeMarket() {
         try {
@@ -825,16 +825,16 @@ class AITrader {
                         const mState = marketData.getMarketState(symbol);
                         status.push(`${symbol}: ${data?.trades || 0} trades, ${data?.winRate?.toFixed(1) || 0}% WR, RSI: ${mState.rsi || 0}`);
                     }
-                    console.log(` [Analysis] ${session} | ${status.join(' | ')}`);
+                    console.log(`ðŸ” [Analysis] ${session} | ${status.join(' | ')}`);
                     this._lastAnalysisLog = Date.now();
                 }
             }
         } catch (error) {
-            console.error(' Analysis error:', error.message);
+            console.error('âŒ Analysis error:', error.message);
         }
     }
 
-    //  Lifecycle 
+    // â”€â”€â”€ Lifecycle â”€â”€â”€
 
     async syncBalanceFromDeriv() {
         if (!derivService.authorized) return;
@@ -843,14 +843,14 @@ class AITrader {
             if (balanceResult && balanceResult.balance > 0) {
                 const newBalance = balanceResult.balance;
                 if (Math.abs(newBalance - this.currentBalance) > 0.01) {
-                    console.log(`💰 [AI Trader] Balance updated: $${this.currentBalance.toFixed(2)}  $${newBalance.toFixed(2)}`);
+                    console.log(`💰 [AI Trader] Balance updated: $${this.currentBalance.toFixed(2)} â†’ $${newBalance.toFixed(2)}`);
                     this.currentBalance = newBalance;
                     await this.updateDailyLimits();
                     this.recalculateStakes();
                 }
             }
         } catch (error) {
-            console.error(' [AI Trader] Failed to sync balance:', error.message);
+            console.error('âŒ [AI Trader] Failed to sync balance:', error.message);
         }
     }
 
@@ -874,7 +874,7 @@ class AITrader {
         }
     }
 
-    //  START 
+    // â”€â”€â”€ START â”€â”€â”€
 
     async start(userId, symbol = 'R_75', mode = 'AUTO') {
         if (this.isRunning) {
@@ -888,13 +888,13 @@ class AITrader {
         try {
             const user = await User.findById(userId);
             if (!user) {
-                console.error(` [AI Trader] User ${userId} not found`);
+                console.error(`âŒ [AI Trader] User ${userId} not found`);
                 return;
             }
 
             const token = user.is_demo ? user.demo_token : user.real_token;
             if (!token || token.trim().length < 10) {
-                console.error(` [AI Trader] No valid Deriv token found for user ${userId}`);
+                console.error(`âŒ [AI Trader] No valid Deriv token found for user ${userId}`);
                 return;
             }
 
@@ -904,12 +904,12 @@ class AITrader {
                 await derivService.connect(token, false, user.is_demo);
                 console.log(`✅ [AI Trader] Connected to Deriv successfully!`);
             } catch (connError) {
-                console.error(` [AI Trader] Failed to connect:`, connError.message);
+                console.error(`âŒ [AI Trader] Failed to connect:`, connError.message);
                 return;
             }
 
         } catch (err) {
-            console.error(` [AI Trader] Failed to get user:`, err.message);
+            console.error(`âŒ [AI Trader] Failed to get user:`, err.message);
             return;
         }
 
@@ -942,10 +942,10 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(` [AI Trader] Starting v15.0.36 (First Trade Ready)`);
+        console.log(`ðŸ¤– [AI Trader] Starting v15.0.36 (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
-        console.log(` [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
+        console.log(`ðŸŽ¯ [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
         console.log(`📊 [Stakes] MIN: $${this.MIN_STAKE} | BASE: $${this.BASE_STAKE} | CONFIDENT: $${this.CONFIDENT_STAKE} | MAX: $${this.MAX_STAKE}`);
 
         // 🚀 SYMBOL MAPPING: Map Deriv symbols to display names
@@ -989,7 +989,7 @@ class AITrader {
                 }
             }
             if (!subscribed) {
-                console.log(` [AI Trader] Failed to subscribe to ${sym} after multiple attempts`);
+                console.log(`âŒ [AI Trader] Failed to subscribe to ${sym} after multiple attempts`);
             }
         }
 
@@ -1014,7 +1014,7 @@ class AITrader {
                 this.dataReady = true;
             }
             if (this.tickCount % 100 === 0) {
-                console.log(` Tick #${this.tickCount} - ${symbol} $${tick.quote?.toFixed(2)}`);
+                console.log(`ðŸ“ˆ Tick #${this.tickCount} - ${symbol} $${tick.quote?.toFixed(2)}`);
             }
             this.onMarketUpdate();
         });
@@ -1041,7 +1041,7 @@ class AITrader {
             if (this.activeTrade) {
                 const timeOpen = Date.now() - this.activeTrade.entry_time;
                 if (timeOpen > this.MAX_TRADE_DURATION) {
-                    console.log(` Trade timeout! Closing after ${Math.floor(timeOpen / 1000)}s`);
+                    console.log(`â° Trade timeout! Closing after ${Math.floor(timeOpen / 1000)}s`);
                     try {
                         const contractResult = await derivService.getClosedContract(this.activeTrade.contract_id);
                         if (contractResult && contractResult.proposal_open_contract) {
@@ -1138,7 +1138,7 @@ class AITrader {
         if (this.tickHealthInterval) { clearInterval(this.tickHealthInterval); this.tickHealthInterval = null; }
         if (this.balanceSyncInterval) { clearInterval(this.balanceSyncInterval); this.balanceSyncInterval = null; }
         derivService.removeListener('contract_update', this.handleContractUpdate);
-        console.log(' AI Trader Stopped');
+        console.log('ðŸ¤– AI Trader Stopped');
     }
 
     setMode(mode) { this.mode = mode; console.log(`Mode: ${mode}`); }
