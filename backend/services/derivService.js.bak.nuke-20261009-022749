@@ -1,4 +1,4 @@
-﻿const WebSocket = require('ws');
+const WebSocket = require('ws');
 const EventEmitter = require('events');
 
 class DerivService extends EventEmitter {
@@ -103,13 +103,13 @@ class DerivService extends EventEmitter {
             this.currentBalance = parseFloat(account.balance);
             this.currentCurrency = account.currency || 'USD';
 
- console.log(` Account: ${this.activeAccountId} | Balance: $${this.currentBalance.toFixed(2)}`);
+            console.log(`ð° Account: ${this.activeAccountId} | Balance: $${this.currentBalance.toFixed(2)}`);
 
             const wsUrl = await this.getOtpUrl(token, this.activeAccountId);
             this.ws = new WebSocket(wsUrl);
 
             this.ws.on('open', () => {
- console.log(' Deriv WebSocket connected');
+                console.log('â Deriv WebSocket connected');
                 this.isConnected = true;
                 this.authorized = true;
                 this.isConnecting = false;
@@ -137,7 +137,7 @@ class DerivService extends EventEmitter {
             });
 
             this.ws.on('close', () => {
- console.log(' Deriv WebSocket disconnected');
+                console.log('ð Deriv WebSocket disconnected');
                 this.isConnected = false;
                 this.authorized = false;
                 this.stopHeartbeat();
@@ -145,11 +145,11 @@ class DerivService extends EventEmitter {
             });
 
             this.ws.on('error', (err) => {
- console.error(' WebSocket error:', err.message);
+                console.error('â WebSocket error:', err.message);
             });
 
         } catch (err) {
- console.error(' Connection failed:', err.message);
+            console.error('â Connection failed:', err.message);
             this.isConnecting = false;
             throw err;
         }
@@ -160,24 +160,24 @@ class DerivService extends EventEmitter {
             if (this.ws && this.ws.readyState === WebSocket.OPEN && this.authorized) {
                 try {
                     await this.subscribeToTicks(symbol);
- console.log(` Successfully subscribed to ${symbol} after ${i + 1} attempt(s)`);
+                    console.log(`â Successfully subscribed to ${symbol} after ${i + 1} attempt(s)`);
                     return true;
                 } catch (err) {
- console.log(` Subscribe attempt ${i + 1}/${retries} failed: ${err.message}`);
+                    console.log(`â ï¸ Subscribe attempt ${i + 1}/${retries} failed: ${err.message}`);
                 }
             } else {
- console.log(` WebSocket not ready for subscription (attempt ${i + 1}/${retries})`);
+                console.log(`â ï¸ WebSocket not ready for subscription (attempt ${i + 1}/${retries})`);
             }
             if (i < retries - 1) {
                 await new Promise(r => setTimeout(r, delay));
             }
         }
- console.error(` Failed to subscribe to ${symbol} after ${retries} attempts`);
+        console.error(`â Failed to subscribe to ${symbol} after ${retries} attempts`);
         return false;
     }
 
     async reconnectWithToken(token, isDemo = true) {
- console.log(' [Deriv] Reconnecting with new token...');
+        console.log('ð [Deriv] Reconnecting with new token...');
         this.currentToken = token;
         await this.connect(token, true, isDemo);
         return {
@@ -214,13 +214,13 @@ class DerivService extends EventEmitter {
                     x: c.epoch * 1000,
                     y: [c.open, c.high, c.low, c.close]
                 }));
- console.log(` [Deriv] Got ${candles.length} candles for ${derivSymbol}`);
+                console.log(`ð [Deriv] Got ${candles.length} candles for ${derivSymbol}`);
                 return { success: true, candles: candles };
             }
 
             return { success: false, candles: [] };
         } catch (error) {
- console.error(` [Deriv] Get candles failed:`, error.message);
+            console.error(`â [Deriv] Get candles failed:`, error.message);
             return { success: false, candles: [] };
         }
     }
@@ -246,13 +246,13 @@ class DerivService extends EventEmitter {
             }
             return { success: false, history: { prices: [] } };
         } catch (error) {
- console.error(` [Deriv] Get tick history failed:`, error.message);
+            console.error(`â [Deriv] Get tick history failed:`, error.message);
             return { success: false, history: { prices: [] } };
         }
     }
 
     async forceReconnectForTicks(symbol) {
- console.log(` [Deriv] Force reconnecting for ${symbol}...`);
+        console.log(`ð [Deriv] Force reconnecting for ${symbol}...`);
         if (this.ws) {
             try {
                 await this.sendRequest({ forget_all: 'ticks' });
@@ -263,10 +263,10 @@ class DerivService extends EventEmitter {
         
         try {
             await this.subscribeToTicksWithRetry(symbol, 3, 2000);
- console.log(` [Deriv] Reconnected and subscribed to ${symbol}`);
+            console.log(`â [Deriv] Reconnected and subscribed to ${symbol}`);
             return true;
         } catch (error) {
- console.error(` [Deriv] Force reconnect failed:`, error.message);
+            console.error(`â [Deriv] Force reconnect failed:`, error.message);
             return false;
         }
     }
@@ -315,7 +315,7 @@ class DerivService extends EventEmitter {
                 return;
             }
             this.reconnectAttempts++;
- console.log(` Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+            console.log(`ð Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
             try {
                 await this.connect(this.currentToken, true, true);
                 if (this.isConnected && this.reconnectInterval) {
@@ -323,7 +323,7 @@ class DerivService extends EventEmitter {
                     this.reconnectInterval = null;
                 }
             } catch (err) {
- console.error(`Reconnect failed:`, err.message);
+                console.error(`Reconnect failed:`, err.message);
             }
         }, 10000);
     }
@@ -337,20 +337,20 @@ class DerivService extends EventEmitter {
 
         if (type === 'balance') {
             this.currentBalance = msg.balance.balance;
- console.log(` [Deriv] Balance updated: $${this.currentBalance.toFixed(2)}`);
+            console.log(`ð° [Deriv] Balance updated: $${this.currentBalance.toFixed(2)}`);
             this.emit('balance', msg.balance);
         }
 
         if (type === 'buy') {
             if (msg.error) {
- console.error(' Trade error:', msg.error.message);
+                console.error('â Trade error:', msg.error.message);
                 this.emit('trade_error', msg.error);
             } else {
- console.log(` Trade executed! Contract: ${msg.buy.contract_id}`);
+                console.log(`â Trade executed! Contract: ${msg.buy.contract_id}`);
                 this.activeContractId = msg.buy.contract_id;
                 this.emit('trade_executed', msg.buy);
                 
- // Start monitoring this contract
+                // Start monitoring this contract
                 this.startContractMonitoring(msg.buy.contract_id);
             }
         }
@@ -358,7 +358,7 @@ class DerivService extends EventEmitter {
         if (type === 'proposal_open_contract') {
             const contract = msg.proposal_open_contract;
             if (contract) {
- console.log(` Contract ${contract.contract_id} update: is_sold=${contract.is_sold}, profit=${contract.profit}`);
+                console.log(`ð Contract ${contract.contract_id} update: is_sold=${contract.is_sold}, profit=${contract.profit}`);
                 this.emit('contract_update', contract);
             }
         }
@@ -384,7 +384,7 @@ class DerivService extends EventEmitter {
                 if (result && result.proposal_open_contract) {
                     const contract = result.proposal_open_contract;
                     if (contract.is_sold === 1 || contract.status === 'sold') {
- console.log(` Contract ${contractId} closed! Profit: ${contract.profit}`);
+                        console.log(`ð¯ Contract ${contractId} closed! Profit: ${contract.profit}`);
                         this.emit('contract_update', contract);
                         clearInterval(this.contractMonitorInterval);
                         this.contractMonitorInterval = null;
@@ -392,7 +392,7 @@ class DerivService extends EventEmitter {
                     }
                 }
             } catch (err) {
- // Silent fail
+                // Silent fail
             }
         }, 5000);
     }
@@ -422,10 +422,10 @@ class DerivService extends EventEmitter {
         try {
             await this.sendRequest({ ticks: derivSymbol, subscribe: 1 });
             this.subscriptions.add(derivSymbol);
- console.log(` Subscribed to ${derivSymbol}`);
+            console.log(`ð¡ Subscribed to ${derivSymbol}`);
             return true;
         } catch (err) {
- console.error(` Subscribe failed:`, err.message);
+            console.error(`â Subscribe failed:`, err.message);
             throw err;
         }
     }
@@ -437,7 +437,7 @@ class DerivService extends EventEmitter {
         const derivSymbol = this.convertSymbol(symbol);
         const contractType = action === 'BUY' ? 'CALL' : 'PUT';
 
- console.log(` Trade: ${action} ${derivSymbol} $${stake}`);
+        console.log(`ð Trade: ${action} ${derivSymbol} $${stake}`);
 
         const proposal = await this.sendRequest({
             proposal: 1,
@@ -455,14 +455,14 @@ class DerivService extends EventEmitter {
         }
 
         const proposalId = proposal.proposal.id;
- console.log(` Got proposal: ${proposalId.substring(0, 8)}...`);
+        console.log(`ð Got proposal: ${proposalId.substring(0, 8)}...`);
 
         const trade = await this.sendRequest({
             buy: proposalId,
             price: stake
         });
 
- // Subscribe to contract updates
+        // Subscribe to contract updates
         setTimeout(() => {
             this.sendRequest({ 
                 subscribe: 1, 
@@ -484,11 +484,11 @@ class DerivService extends EventEmitter {
             if (result && result.balance) {
                 this.currentBalance = result.balance.balance;
                 this.currentCurrency = result.balance.currency || 'USD';
- console.log(` [Deriv] Fresh balance: $${this.currentBalance.toFixed(2)}`);
+                console.log(`ð° [Deriv] Fresh balance: $${this.currentBalance.toFixed(2)}`);
                 return { balance: this.currentBalance, currency: this.currentCurrency, authorized: true };
             }
         } catch (error) {
- console.error(` [Deriv] Get balance failed:`, error.message);
+            console.error(`â [Deriv] Get balance failed:`, error.message);
         }
 
         return { balance: this.currentBalance, currency: this.currentCurrency, authorized: this.authorized };
@@ -516,7 +516,7 @@ class DerivService extends EventEmitter {
     }
 
     disconnect() {
- console.log(' Disconnecting...');
+        console.log('ð Disconnecting...');
         this.isClosing = true;
         this.safeClose();
     }

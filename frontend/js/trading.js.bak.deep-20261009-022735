@@ -1,4 +1,4 @@
-﻿let currentSignal = null;
+let currentSignal = null;
 let isProcessingTrade = false;
 let autoModeInterval = null;
 let liveMonitoringInterval = null;
@@ -23,11 +23,11 @@ const refreshTradesBtn = document.getElementById('refreshTradesBtn');
 // Debug log helper
 function uiLog(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
- console.log(` [${timestamp}] ${message}`);
+    console.log(`🖱️ [${timestamp}] ${message}`);
     fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: `ð±ï¸ ${message}`, type, timestamp: new Date().toISOString() })
+        body: JSON.stringify({ message: `🖱️ ${message}`, type, timestamp: new Date().toISOString() })
     }).catch(() => {});
 }
 
@@ -80,7 +80,7 @@ function playSound(type) {
                 oscillator.stop(audioContext.currentTime + 0.3);
                 break;
         }
- } catch(e) { console.log('Audio not supported'); }
+    } catch(e) { console.log('Audio not supported'); }
 }
 
 function sendNotification(title, body, tag = 'trade') {
@@ -113,7 +113,7 @@ function showAIReasonModal(signal) {
     const autoModeNote = document.getElementById('autoModeNote');
 
     if (modalAction) {
-        modalAction.innerHTML = signal.action === 'BUY' ? 'ð BUY (Price will go UP)' : (signal.action === 'SELL' ? 'ð SELL (Price will go DOWN)' : 'â³ WAITING FOR SETUP');
+        modalAction.innerHTML = signal.action === 'BUY' ? '📈 BUY (Price will go UP)' : (signal.action === 'SELL' ? '📉 SELL (Price will go DOWN)' : '⏳ WAITING FOR SETUP');
         modalAction.className = `text-2xl font-bold ${signal.action === 'BUY' ? 'text-emerald-400' : signal.action === 'SELL' ? 'text-red-400' : 'text-yellow-400'}`;
     }
 
@@ -137,13 +137,13 @@ function showAIReasonModal(signal) {
     if (isWaiting || signal.action === 'WAIT') {
         if (buttonsDiv) buttonsDiv.classList.add('hidden');
         if (autoModeNote) {
-            autoModeNote.innerHTML = `â³ No active setup. AI watching ${signal.symbol || 'R_75'}... Need ${signal.confidence_threshold || 55}%+ confidence.`;
+            autoModeNote.innerHTML = `⏳ No active setup. AI watching ${signal.symbol || 'R_75'}... Need ${signal.confidence_threshold || 55}%+ confidence.`;
             autoModeNote.classList.remove('hidden');
         }
     } else if (isAutoMode) {
         if (buttonsDiv) buttonsDiv.classList.add('hidden');
         if (autoModeNote) {
-            autoModeNote.innerHTML = 'ð¤ AUTO MODE ACTIVE - Trade will execute automatically when conditions are met';
+            autoModeNote.innerHTML = '🤖 AUTO MODE ACTIVE - Trade will execute automatically when conditions are met';
             autoModeNote.classList.remove('hidden');
         }
     } else {
@@ -193,7 +193,7 @@ async function updateLockedBalance() {
             if (lockedEl) lockedEl.innerText = `$${locked.toFixed(2)}`;
             if (availableEl) availableEl.innerText = `$${available.toFixed(2)}`;
         }
- } catch(e) { console.log('Locked balance error:', e); }
+    } catch(e) { console.log('Locked balance error:', e); }
 }
 
 function showActiveTradePanel(contractId, entryPrice, action, stake, exitTimestamp) {
@@ -236,7 +236,7 @@ function showActiveTradePanel(contractId, entryPrice, action, stake, exitTimesta
         panel.classList.remove('hidden');
         const badge = document.getElementById('tradeActionBadge');
         if (badge) {
-            badge.innerHTML = action === 'BUY' ? 'BUY ð' : 'SELL ð';
+            badge.innerHTML = action === 'BUY' ? 'BUY 📈' : 'SELL 📉';
             badge.className = `text-xs px-2 py-1 rounded-full ${action === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`;
         }
     }
@@ -296,14 +296,14 @@ function displaySignal(signal) {
     const signalExit = document.getElementById('signalExit');
 
     if (signalAction) {
-        signalAction.innerHTML = signal.action === 'BUY' ? 'ð BUY' : 'ð» SELL';
+        signalAction.innerHTML = signal.action === 'BUY' ? '📈 BUY' : '🔻 SELL';
         signalAction.className = `text-4xl font-black ${signal.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}`;
     }
     if (signalConfidence) signalConfidence.innerHTML = `${signal.confidence}%`;
-    if (signalPattern) signalPattern.innerHTML = signal.pattern || 'â';
+    if (signalPattern) signalPattern.innerHTML = signal.pattern || '—';
     if (signalEntry) signalEntry.innerHTML = `$${signal.entry_price.toFixed(2)}`;
-    if (signalTP) signalTP.innerHTML = `$${signal.take_profit?.toFixed(2) || 'â'}`;
-    if (signalSL) signalSL.innerHTML = `$${signal.stop_loss?.toFixed(2) || 'â'}`;
+    if (signalTP) signalTP.innerHTML = `$${signal.take_profit?.toFixed(2) || '—'}`;
+    if (signalSL) signalSL.innerHTML = `$${signal.stop_loss?.toFixed(2) || '—'}`;
     if (signalReasoning) {
         signalReasoning.innerHTML = signal.simple_reason || signal.reasoning || 'AI analysis complete';
         signalReasoning.style.cursor = 'pointer';
@@ -321,13 +321,13 @@ function displaySignal(signal) {
         yesBtn.disabled = false;
         yesBtn.classList.remove('cursor-not-allowed', 'bg-emerald-500/50');
         yesBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
-        yesBtn.innerHTML = 'ð° BUY';
+        yesBtn.innerHTML = '💰 BUY';
     }
     if (noBtn) {
         noBtn.disabled = false;
         noBtn.classList.remove('cursor-not-allowed');
         noBtn.classList.add('cursor-pointer');
-        noBtn.innerHTML = 'ð» SELL';
+        noBtn.innerHTML = '🔻 SELL';
     }
 
     playSound('signal');
@@ -352,9 +352,9 @@ function clearSignal() {
     const signalReasoning = document.getElementById('signalReasoning');
     const signalExit = document.getElementById('signalExit');
 
-    if (signalAction) signalAction.innerHTML = 'â';
+    if (signalAction) signalAction.innerHTML = '—';
     if (signalConfidence) signalConfidence.innerHTML = '0%';
-    if (signalPattern) signalPattern.innerHTML = 'â';
+    if (signalPattern) signalPattern.innerHTML = '—';
     if (signalEntry) signalEntry.innerHTML = '$0.00';
     if (signalTP) signalTP.innerHTML = '$0.00';
     if (signalSL) signalSL.innerHTML = '$0.00';
@@ -371,13 +371,13 @@ function clearSignal() {
         yesBtn.disabled = false;
         yesBtn.classList.remove('cursor-not-allowed', 'bg-emerald-500/50');
         yesBtn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
-        yesBtn.innerHTML = 'ð° BUY';
+        yesBtn.innerHTML = '💰 BUY';
     }
     if (noBtn) {
         noBtn.disabled = false;
         noBtn.classList.remove('cursor-not-allowed');
         noBtn.classList.add('bg-red-500/20', 'hover:bg-red-500/30', 'cursor-pointer');
-        noBtn.innerHTML = 'ð» SELL';
+        noBtn.innerHTML = '🔻 SELL';
     }
 }
 
@@ -443,7 +443,7 @@ async function executeTrade() {
         isProcessingTrade = false;
         if (yesBtn) {
             yesBtn.disabled = false;
-            yesBtn.innerHTML = 'ð° BUY';
+            yesBtn.innerHTML = '💰 BUY';
         }
     }
 }
@@ -475,11 +475,11 @@ async function loadSavedSymbol() {
             const savedSymbol = data.user.default_symbol;
             if (symbolSelect) {
                 symbolSelect.value = savedSymbol;
- console.log(' Frontend loaded saved symbol:', savedSymbol);
+                console.log('💾 Frontend loaded saved symbol:', savedSymbol);
             }
         }
     } catch (e) {
- console.error('Failed to load saved symbol:', e);
+        console.error('Failed to load saved symbol:', e);
     }
 }
 
@@ -530,7 +530,7 @@ async function fetchAIAnalysis() {
         if (window.showToast) window.showToast('Error', error.message, 'error');
     } finally {
         getSignalBtn.disabled = false;
-        getSignalBtn.innerHTML = 'ð§  AI REASONING';
+        getSignalBtn.innerHTML = '🧠 AI REASONING';
     }
 }
 
@@ -611,7 +611,7 @@ function updatePendingOrdersDisplay(pendingOrders) {
             <div class="p-3 rounded-lg border ${borderColor} ${bgColor} mb-2 hover:border-indigo-400 transition">
                 <div class="flex justify-between items-center mb-1">
                     <span class="font-bold text-sm ${order.action === 'BUY' ? 'text-emerald-400' : 'text-red-400'}">${order.action} LIMIT</span>
-                    <span class="text-xs text-slate-500">â° ${timeLeft}min left</span>
+                    <span class="text-xs text-slate-500">⏰ ${timeLeft}min left</span>
                 </div>
                 <div class="flex justify-between text-xs mb-1">
                     <span class="text-slate-400">Entry: <span class="text-white font-mono">$${order.entryPrice?.toFixed(2) || '0.00'}</span></span>
@@ -624,7 +624,7 @@ function updatePendingOrdersDisplay(pendingOrders) {
                 <div class="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden mt-2">
                     <div class="bg-indigo-500 h-full rounded-full transition-all" style="width: ${Math.min(100, Math.max(0, 100 - (parseFloat(distancePercent) * 200)))}%"></div>
                 </div>
-                <p class="text-xs text-slate-500 mt-1">ð¯ ${order.reason || 'Waiting for price level'}</p>
+                <p class="text-xs text-slate-500 mt-1">🎯 ${order.reason || 'Waiting for price level'}</p>
                 <p class="text-xs text-slate-600 mt-1">Confidence: ${order.confidence || 0}% | Pattern: ${order.pattern || 'N/A'}</p>
             </div>
         `;
@@ -669,9 +669,9 @@ async function copyAllTrades() {
         return;
     }
     let text = 'MONIX TRADING PLATFORM - TRADE HISTORY\n';
-    text += 'â'.repeat(80) + '\n';
+    text += '═'.repeat(80) + '\n';
     text += 'TIME'.padEnd(12) + 'SYMBOL'.padEnd(8) + 'ACTION'.padEnd(8) + 'ENTRY'.padEnd(14) + 'EXIT'.padEnd(14) + 'PROFIT'.padEnd(12) + 'STATUS'.padEnd(8) + 'PATTERN\n';
-    text += 'â'.repeat(80) + '\n';
+    text += '─'.repeat(80) + '\n';
     trades.forEach(t => {
         text += new Date(t.executed_at).toLocaleTimeString().padEnd(12);
         text += (t.symbol || '').padEnd(8);
@@ -683,11 +683,11 @@ async function copyAllTrades() {
         text += (t.pattern || 'N/A');
         text += '\n';
     });
-    text += 'â'.repeat(80) + '\n';
+    text += '─'.repeat(80) + '\n';
     const totalProfit = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
     const wins = trades.filter(t => t.status === 'WIN').length;
     text += `Total: ${trades.length} trades | ${wins} wins | Net: ${totalProfit >= 0 ? '+' : ''}$${totalProfit.toFixed(2)}\n`;
-    text += 'â'.repeat(80) + '\n';
+    text += '═'.repeat(80) + '\n';
     navigator.clipboard.writeText(text).then(() => {
         uiLog(`Copied all ${trades.length} trades`);
         if (window.showToast) window.showToast('Copied!', `${trades.length} trades copied to clipboard`, 'success');
@@ -698,7 +698,7 @@ async function copyAllTrades() {
 
 // SOFT DELETE - Hide trades from UI only, keep for AI learning
 async function deleteAllTrades() {
-    if (!confirm('â ï¸ This will REMOVE trades from YOUR VIEW only.\n\nYour trading history will still be used by AI for learning and pattern recognition.\n\nAre you sure you want to hide all trades from the UI?')) {
+    if (!confirm('⚠️ This will REMOVE trades from YOUR VIEW only.\n\nYour trading history will still be used by AI for learning and pattern recognition.\n\nAre you sure you want to hide all trades from the UI?')) {
         return;
     }
     try {
@@ -755,13 +755,13 @@ async function loadRecentTrades() {
                 <td class="p-4 text-right ${trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.profit >= 0 ? '+' : ''}$${trade.profit?.toFixed(2)}</td>
                 <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-[10px] ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : trade.status === 'LOSS' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}">${trade.status || 'PENDING'}</span></td>
                 <td class="p-4 text-center">
-                    <button onclick="window.copyTradeById('${trade._id}')" class="text-slate-400 hover:text-white transition text-lg" title="Copy trade details">ð</button>
+                    <button onclick="window.copyTradeById('${trade._id}')" class="text-slate-400 hover:text-white transition text-lg" title="Copy trade details">📋</button>
                 </td>
             </tr>
         `).join('');
         uiLog(`Recent trades: Loaded ${trades.length} trades`);
         
- // Re-apply collapsible state after DOM update
+        // Re-apply collapsible state after DOM update
         if (typeof initCollapsibles === 'function') initCollapsibles();
     } catch (error) {
         uiLog(`Recent trades error: ${error.message}`, 'error');
@@ -803,7 +803,7 @@ async function refreshUserData() {
             const adminLink = document.getElementById('adminLink');
             if (adminLink && profile.user.is_admin) adminLink.classList.remove('hidden');
 
- // Fix DEMO/REAL button styling based on actual mode
+            // Fix DEMO/REAL button styling based on actual mode
             if (profile.user.is_demo === true || profile.user.is_demo === 1) {
                 if (demoBtn) demoBtn.className = 'px-3 py-1 rounded-lg text-xs bg-emerald-500 text-white shadow-lg';
                 if (realBtn) realBtn.className = 'px-3 py-1 rounded-lg text-xs bg-slate-700 text-slate-400';
@@ -841,7 +841,7 @@ function addTradeToTable(trade) {
         <td class="p-4">${trade.exit_price ? `$${trade.exit_price.toFixed(2)}` : '--'}</td>
         <td class="p-4 text-right ${trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}">${trade.profit ? (trade.profit >= 0 ? '+' : '') + trade.profit.toFixed(2) : '--'}</td>
         <td class="p-4 text-center"><span class="px-2 py-1 rounded-full text-[10px] ${trade.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-500' : trade.status === 'LOSS' ? 'bg-red-500/20 text-red-500' : 'bg-yellow-500/20 text-yellow-500'}">${trade.status || 'PENDING'}</span></td>
-        <td class="p-4 text-center"><button onclick="window.copyTradeById('${trade._id || trade.id}')" class="text-slate-400 hover:text-white transition text-lg" title="Copy trade details">ð</button></td>
+        <td class="p-4 text-center"><button onclick="window.copyTradeById('${trade._id || trade.id}')" class="text-slate-400 hover:text-white transition text-lg" title="Copy trade details">📋</button></td>
     `;
 
     tbody.insertBefore(newRow, tbody.firstChild);
@@ -867,46 +867,46 @@ function updateBalanceInUI(balance) {
 // FIXED: updateAIDisplay - Live AI Signal Panel Updates
 // ============================================================
 function updateAIDisplay(aiData) {
- console.log(' [UI] updateAIDisplay called with:', aiData);
+    console.log('🖥️ [UI] updateAIDisplay called with:', aiData);
 
     const watchState = aiData.watch_state || aiData;
     if (!watchState) {
- console.warn(' [UI] No watch_state in aiData');
+        console.warn('⚠️ [UI] No watch_state in aiData');
         return;
     }
 
- console.log(` [UI] Updating: action=${watchState.action}, confidence=${watchState.confidence}, rsi=${watchState.market_rsi}, symbol=${watchState.symbol}`);
+    console.log(`🖥️ [UI] Updating: action=${watchState.action}, confidence=${watchState.confidence}, rsi=${watchState.market_rsi}, symbol=${watchState.symbol}`);
 
- // Update Signal Action
+    // Update Signal Action
     const signalAction = document.getElementById('signalAction');
     if (signalAction) {
         if (watchState.action === 'BUY') {
-            signalAction.innerHTML = 'ð BUY';
+            signalAction.innerHTML = '📈 BUY';
             signalAction.className = 'text-4xl font-black text-emerald-400';
         } else if (watchState.action === 'SELL') {
-            signalAction.innerHTML = 'ð» SELL';
+            signalAction.innerHTML = '🔻 SELL';
             signalAction.className = 'text-4xl font-black text-red-400';
         } else {
-            signalAction.innerHTML = 'â³ WAITING';
+            signalAction.innerHTML = '⏳ WAITING';
             signalAction.className = 'text-2xl font-bold text-yellow-400';
         }
     }
 
- // Update Confidence
+    // Update Confidence
     const signalConfidence = document.getElementById('signalConfidence');
     if (signalConfidence && watchState.confidence !== undefined) {
         signalConfidence.innerHTML = `${watchState.confidence}%`;
     }
 
- // Update Pattern
+    // Update Pattern
     const signalPattern = document.getElementById('signalPattern');
     if (signalPattern && watchState.pattern) {
         signalPattern.innerHTML = watchState.pattern;
     } else if (signalPattern) {
-        signalPattern.innerHTML = 'â';
+        signalPattern.innerHTML = '—';
     }
 
- // Update Entry Price
+    // Update Entry Price
     const signalEntry = document.getElementById('signalEntry');
     if (signalEntry && watchState.entry_price) {
         signalEntry.innerHTML = `$${watchState.entry_price.toFixed(2)}`;
@@ -914,25 +914,25 @@ function updateAIDisplay(aiData) {
         signalEntry.innerHTML = `$${watchState.market_price.toFixed(2)}`;
     }
 
- // Update Take Profit
+    // Update Take Profit
     const signalTP = document.getElementById('signalTP');
     if (signalTP && watchState.take_profit) {
         signalTP.innerHTML = `$${watchState.take_profit.toFixed(2)}`;
     }
 
- // Update Stop Loss
+    // Update Stop Loss
     const signalSL = document.getElementById('signalSL');
     if (signalSL && watchState.stop_loss) {
         signalSL.innerHTML = `$${watchState.stop_loss.toFixed(2)}`;
     }
 
- // Update RSI
+    // Update RSI
     const rsiValue = document.getElementById('rsiValue');
     if (rsiValue && watchState.market_rsi !== undefined) {
         rsiValue.innerHTML = watchState.market_rsi;
     }
 
- // Update Support
+    // Update Support
     const supportLevel = document.getElementById('supportLevel');
     if (supportLevel && watchState.market_support !== undefined) {
         supportLevel.innerHTML = `$${watchState.market_support.toFixed(2)}`;
@@ -940,7 +940,7 @@ function updateAIDisplay(aiData) {
         supportLevel.innerHTML = '$0.00';
     }
 
- // Update Resistance
+    // Update Resistance
     const resistanceLevel = document.getElementById('resistanceLevel');
     if (resistanceLevel && watchState.market_resistance !== undefined) {
         resistanceLevel.innerHTML = `$${watchState.market_resistance.toFixed(2)}`;
@@ -948,7 +948,7 @@ function updateAIDisplay(aiData) {
         resistanceLevel.innerHTML = '$0.00';
     }
 
- // Update AI Reason text
+    // Update AI Reason text
     const signalReasoning = document.getElementById('signalReasoning');
     if (signalReasoning && watchState.reason) {
         signalReasoning.innerHTML = watchState.reason;
@@ -977,7 +977,7 @@ function updateAIDisplay(aiData) {
         };
     }
 
- // Update Exit Time
+    // Update Exit Time
     const signalExit = document.getElementById('signalExit');
     if (signalExit && watchState.estimated_entry_time === 'Now') {
         signalExit.innerHTML = new Date(Date.now() + 5*60000).toLocaleTimeString();
@@ -985,15 +985,15 @@ function updateAIDisplay(aiData) {
         signalExit.innerHTML = watchState.exit_time;
     }
 
- // Store current signal for modal
+    // Store current signal for modal
     window.currentDisplaySignal = watchState;
 
- // Update confidence bars
+    // Update confidence bars
     if (window.updateConfidenceBars && watchState.confidence) {
         window.updateConfidenceBars(watchState.confidence);
     }
 
- // Update pending orders count and display (from root or watch_state)
+    // Update pending orders count and display (from root or watch_state)
     const pendingCount = document.getElementById('pendingOrdersCount');
     const pendingOrders = aiData.pending_orders || watchState.pending_orders;
     if (pendingCount && pendingOrders) {
@@ -1003,7 +1003,7 @@ function updateAIDisplay(aiData) {
         }
     }
 
- console.log(` [UI] Display updated for ${watchState.symbol}`);
+    console.log(`✅ [UI] Display updated for ${watchState.symbol}`);
 }
 
 // ============================================================
@@ -1078,7 +1078,7 @@ function initTrading() {
     }
 
     if (getSignalBtn) {
-        getSignalBtn.innerHTML = 'ð§  AI REASONING';
+        getSignalBtn.innerHTML = '🧠 AI REASONING';
         getSignalBtn.addEventListener('click', (e) => {
             e.preventDefault();
             uiLog('Button clicked: AI REASONING');
@@ -1087,7 +1087,7 @@ function initTrading() {
     }
 
     if (yesBtn) {
-        yesBtn.innerHTML = 'ð° BUY';
+        yesBtn.innerHTML = '💰 BUY';
         yesBtn.addEventListener('click', (e) => {
             e.preventDefault();
             uiLog('Button clicked: BUY');
@@ -1099,7 +1099,7 @@ function initTrading() {
         });
     }
     if (noBtn) {
-        noBtn.innerHTML = 'ð» SELL';
+        noBtn.innerHTML = '🔻 SELL';
         noBtn.addEventListener('click', (e) => {
             e.preventDefault();
             uiLog('Button clicked: DECLINE/SELL');
@@ -1117,7 +1117,7 @@ function initTrading() {
         switchMode(isDemo ? 'real' : 'demo');
     });
 
- // Refresh button removed - no event listener needed
+    // Refresh button removed - no event listener needed
     if (refreshTradesBtn) refreshTradesBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REFRESH TRADES'); loadRecentTrades(); });
 
     if (symbolSelect) {

@@ -1,4 +1,4 @@
-﻿let ws = null;
+let ws = null;
 let wsReconnectAttempts = 0;
 let wsReconnectInterval = null;
 
@@ -7,7 +7,7 @@ function connectWebSocket() {
     const wsUrl = `${protocol}//${window.location.host}`;
     ws = new WebSocket(wsUrl);
     ws.onopen = () => {
- console.log('WebSocket connected');
+        console.log('WebSocket connected');
         wsReconnectAttempts = 0;
         if (wsReconnectInterval) {
             clearInterval(wsReconnectInterval);
@@ -27,17 +27,17 @@ function connectWebSocket() {
             const data = JSON.parse(event.data);
             handleWebSocketMessage(data);
         } catch (error) {
- console.error('WebSocket parse error:', error);
+            console.error('WebSocket parse error:', error);
         }
     };
 
     ws.onerror = (error) => {
- console.error('WebSocket error:', error);
+        console.error('WebSocket error:', error);
         updateConnectionStatus(false);
     };
 
     ws.onclose = () => {
- console.log('WebSocket disconnected');
+        console.log('WebSocket disconnected');
         updateConnectionStatus(false);
         reconnectWebSocket();
     };
@@ -48,14 +48,14 @@ function reconnectWebSocket() {
 
     wsReconnectInterval = setInterval(() => {
         if (wsReconnectAttempts >= 10) {
- console.error('Max reconnection attempts reached');
+            console.error('Max reconnection attempts reached');
             clearInterval(wsReconnectInterval);
             wsReconnectInterval = null;
             return;
         }
 
         wsReconnectAttempts++;
- console.log(`Reconnecting WebSocket... Attempt ${wsReconnectAttempts}`);
+        console.log(`Reconnecting WebSocket... Attempt ${wsReconnectAttempts}`);
         connectWebSocket();
     }, 3000);
 }
@@ -87,7 +87,7 @@ function playBellSound() {
             osc2.stop(audioContext.currentTime + 0.3);
         }, 150);
     } catch(e) {
- console.log('Bell sound not supported');
+        console.log('Bell sound not supported');
     }
 }
 
@@ -104,11 +104,11 @@ function handleWebSocketMessage(data) {
             break;
 
         case 'new_setup':
- console.log(' New setup detected!', data.setup);
+            console.log('🔔 New setup detected!', data.setup);
             playBellSound();
 
             if (Notification.permission === 'granted') {
-                new Notification('ð New Trading Setup!', {
+                new Notification('🔔 New Trading Setup!', {
                     body: `${data.setup.action_display} on ${data.setup.symbol} at $${data.setup.entry_price?.toFixed(2)} with ${data.setup.confidence}% confidence`,
                     icon: '/favicon.ico',
                     tag: 'new_setup',
@@ -118,7 +118,7 @@ function handleWebSocketMessage(data) {
 
             if (window.showToast) {
                 window.showToast(
-                    'ð New Setup Detected!',
+                    '🔔 New Setup Detected!',
                     `${data.setup.action_display} on ${data.setup.symbol} at $${data.setup.entry_price?.toFixed(2)} | Confidence: ${data.setup.confidence}%`,
                     'info'
                 );
@@ -175,10 +175,10 @@ function handleWebSocketMessage(data) {
             break;
 
         case 'ai_update':
- // Ensure ai_update triggers full UI update and pending orders
+            // Ensure ai_update triggers full UI update and pending orders
             if (data.data && window.updateAIDisplay) {
                 window.updateAIDisplay(data.data);
- // Also update pending orders if present
+                // Also update pending orders if present
                 if (data.data.pending_orders && window.updatePendingOrdersDisplay) {
                     window.updatePendingOrdersDisplay(data.data.pending_orders);
                 }
@@ -189,7 +189,7 @@ function handleWebSocketMessage(data) {
             break;
 
         default:
- console.log('Unknown WebSocket message:', data);
+            console.log('Unknown WebSocket message:', data);
     }
 }
 
@@ -197,10 +197,10 @@ function updateConnectionStatus(connected) {
     const statusEl = document.getElementById('connectionStatus');
     if (statusEl) {
         if (connected) {
-            statusEl.innerHTML = 'ð¢';
+            statusEl.innerHTML = '🟢';
             statusEl.title = 'Connected';
         } else {
-            statusEl.innerHTML = 'ð´';
+            statusEl.innerHTML = '🔴';
             statusEl.title = 'Disconnected - Reconnecting...';
         }
     }
@@ -215,9 +215,9 @@ function showToast(title, message, type = 'info') {
 
     let icon = '';
     switch (type) {
-        case 'success': icon = 'â'; break;
-        case 'error': icon = 'â'; break;
-        default: icon = 'â¹ï¸';
+        case 'success': icon = '✅'; break;
+        case 'error': icon = '❌'; break;
+        default: icon = 'ℹ️';
     }
 
     toast.innerHTML = `
@@ -227,7 +227,7 @@ function showToast(title, message, type = 'info') {
                 <p class="font-semibold text-sm">${title}</p>
                 <p class="text-xs text-slate-400 mt-1">${message}</p>
             </div>
-            <button class="text-slate-500 hover:text-white" onclick="this.parentElement.parentElement.remove()">â</button>
+            <button class="text-slate-500 hover:text-white" onclick="this.parentElement.parentElement.remove()">✕</button>
         </div>
     `;
 
@@ -282,7 +282,7 @@ function playSound(type) {
             oscillator.stop(audioContext.currentTime + 0.3);
         }
     } catch (e) {
- console.log('Audio not supported');
+        console.log('Audio not supported');
     }
 }
 

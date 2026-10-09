@@ -1,4 +1,4 @@
-﻿let currentSignal = null;
+let currentSignal = null;
 let isProcessingTrade = false;
 let autoModeInterval = null;
 let liveMonitoringInterval = null;
@@ -23,7 +23,7 @@ const refreshTradesBtn = document.getElementById('refreshTradesBtn');
 // Debug log helper
 function uiLog(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
- console.log(` [${timestamp}] ${message}`);
+    console.log(`ð±ï¸ [${timestamp}] ${message}`);
     fetch('/api/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -80,7 +80,7 @@ function playSound(type) {
                 oscillator.stop(audioContext.currentTime + 0.3);
                 break;
         }
- } catch(e) { console.log('Audio not supported'); }
+    } catch(e) { console.log('Audio not supported'); }
 }
 
 function sendNotification(title, body, tag = 'trade') {
@@ -193,7 +193,7 @@ async function updateLockedBalance() {
             if (lockedEl) lockedEl.innerText = `$${locked.toFixed(2)}`;
             if (availableEl) availableEl.innerText = `$${available.toFixed(2)}`;
         }
- } catch(e) { console.log('Locked balance error:', e); }
+    } catch(e) { console.log('Locked balance error:', e); }
 }
 
 function showActiveTradePanel(contractId, entryPrice, action, stake, exitTimestamp) {
@@ -475,11 +475,11 @@ async function loadSavedSymbol() {
             const savedSymbol = data.user.default_symbol;
             if (symbolSelect) {
                 symbolSelect.value = savedSymbol;
- console.log(' Frontend loaded saved symbol:', savedSymbol);
+                console.log('ð¾ Frontend loaded saved symbol:', savedSymbol);
             }
         }
     } catch (e) {
- console.error('Failed to load saved symbol:', e);
+        console.error('Failed to load saved symbol:', e);
     }
 }
 
@@ -761,7 +761,7 @@ async function loadRecentTrades() {
         `).join('');
         uiLog(`Recent trades: Loaded ${trades.length} trades`);
         
- // Re-apply collapsible state after DOM update
+        // Re-apply collapsible state after DOM update
         if (typeof initCollapsibles === 'function') initCollapsibles();
     } catch (error) {
         uiLog(`Recent trades error: ${error.message}`, 'error');
@@ -803,7 +803,7 @@ async function refreshUserData() {
             const adminLink = document.getElementById('adminLink');
             if (adminLink && profile.user.is_admin) adminLink.classList.remove('hidden');
 
- // Fix DEMO/REAL button styling based on actual mode
+            // Fix DEMO/REAL button styling based on actual mode
             if (profile.user.is_demo === true || profile.user.is_demo === 1) {
                 if (demoBtn) demoBtn.className = 'px-3 py-1 rounded-lg text-xs bg-emerald-500 text-white shadow-lg';
                 if (realBtn) realBtn.className = 'px-3 py-1 rounded-lg text-xs bg-slate-700 text-slate-400';
@@ -867,17 +867,17 @@ function updateBalanceInUI(balance) {
 // FIXED: updateAIDisplay - Live AI Signal Panel Updates
 // ============================================================
 function updateAIDisplay(aiData) {
- console.log(' [UI] updateAIDisplay called with:', aiData);
+    console.log('ð¥ï¸ [UI] updateAIDisplay called with:', aiData);
 
     const watchState = aiData.watch_state || aiData;
     if (!watchState) {
- console.warn(' [UI] No watch_state in aiData');
+        console.warn('â ï¸ [UI] No watch_state in aiData');
         return;
     }
 
- console.log(` [UI] Updating: action=${watchState.action}, confidence=${watchState.confidence}, rsi=${watchState.market_rsi}, symbol=${watchState.symbol}`);
+    console.log(`ð¥ï¸ [UI] Updating: action=${watchState.action}, confidence=${watchState.confidence}, rsi=${watchState.market_rsi}, symbol=${watchState.symbol}`);
 
- // Update Signal Action
+    // Update Signal Action
     const signalAction = document.getElementById('signalAction');
     if (signalAction) {
         if (watchState.action === 'BUY') {
@@ -892,13 +892,13 @@ function updateAIDisplay(aiData) {
         }
     }
 
- // Update Confidence
+    // Update Confidence
     const signalConfidence = document.getElementById('signalConfidence');
     if (signalConfidence && watchState.confidence !== undefined) {
         signalConfidence.innerHTML = `${watchState.confidence}%`;
     }
 
- // Update Pattern
+    // Update Pattern
     const signalPattern = document.getElementById('signalPattern');
     if (signalPattern && watchState.pattern) {
         signalPattern.innerHTML = watchState.pattern;
@@ -906,7 +906,7 @@ function updateAIDisplay(aiData) {
         signalPattern.innerHTML = 'â';
     }
 
- // Update Entry Price
+    // Update Entry Price
     const signalEntry = document.getElementById('signalEntry');
     if (signalEntry && watchState.entry_price) {
         signalEntry.innerHTML = `$${watchState.entry_price.toFixed(2)}`;
@@ -914,25 +914,25 @@ function updateAIDisplay(aiData) {
         signalEntry.innerHTML = `$${watchState.market_price.toFixed(2)}`;
     }
 
- // Update Take Profit
+    // Update Take Profit
     const signalTP = document.getElementById('signalTP');
     if (signalTP && watchState.take_profit) {
         signalTP.innerHTML = `$${watchState.take_profit.toFixed(2)}`;
     }
 
- // Update Stop Loss
+    // Update Stop Loss
     const signalSL = document.getElementById('signalSL');
     if (signalSL && watchState.stop_loss) {
         signalSL.innerHTML = `$${watchState.stop_loss.toFixed(2)}`;
     }
 
- // Update RSI
+    // Update RSI
     const rsiValue = document.getElementById('rsiValue');
     if (rsiValue && watchState.market_rsi !== undefined) {
         rsiValue.innerHTML = watchState.market_rsi;
     }
 
- // Update Support
+    // Update Support
     const supportLevel = document.getElementById('supportLevel');
     if (supportLevel && watchState.market_support !== undefined) {
         supportLevel.innerHTML = `$${watchState.market_support.toFixed(2)}`;
@@ -940,7 +940,7 @@ function updateAIDisplay(aiData) {
         supportLevel.innerHTML = '$0.00';
     }
 
- // Update Resistance
+    // Update Resistance
     const resistanceLevel = document.getElementById('resistanceLevel');
     if (resistanceLevel && watchState.market_resistance !== undefined) {
         resistanceLevel.innerHTML = `$${watchState.market_resistance.toFixed(2)}`;
@@ -948,7 +948,7 @@ function updateAIDisplay(aiData) {
         resistanceLevel.innerHTML = '$0.00';
     }
 
- // Update AI Reason text
+    // Update AI Reason text
     const signalReasoning = document.getElementById('signalReasoning');
     if (signalReasoning && watchState.reason) {
         signalReasoning.innerHTML = watchState.reason;
@@ -977,7 +977,7 @@ function updateAIDisplay(aiData) {
         };
     }
 
- // Update Exit Time
+    // Update Exit Time
     const signalExit = document.getElementById('signalExit');
     if (signalExit && watchState.estimated_entry_time === 'Now') {
         signalExit.innerHTML = new Date(Date.now() + 5*60000).toLocaleTimeString();
@@ -985,15 +985,15 @@ function updateAIDisplay(aiData) {
         signalExit.innerHTML = watchState.exit_time;
     }
 
- // Store current signal for modal
+    // Store current signal for modal
     window.currentDisplaySignal = watchState;
 
- // Update confidence bars
+    // Update confidence bars
     if (window.updateConfidenceBars && watchState.confidence) {
         window.updateConfidenceBars(watchState.confidence);
     }
 
- // Update pending orders count and display (from root or watch_state)
+    // Update pending orders count and display (from root or watch_state)
     const pendingCount = document.getElementById('pendingOrdersCount');
     const pendingOrders = aiData.pending_orders || watchState.pending_orders;
     if (pendingCount && pendingOrders) {
@@ -1003,7 +1003,7 @@ function updateAIDisplay(aiData) {
         }
     }
 
- console.log(` [UI] Display updated for ${watchState.symbol}`);
+    console.log(`â [UI] Display updated for ${watchState.symbol}`);
 }
 
 // ============================================================
@@ -1117,7 +1117,7 @@ function initTrading() {
         switchMode(isDemo ? 'real' : 'demo');
     });
 
- // Refresh button removed - no event listener needed
+    // Refresh button removed - no event listener needed
     if (refreshTradesBtn) refreshTradesBtn.addEventListener('click', (e) => { e.preventDefault(); uiLog('Button clicked: REFRESH TRADES'); loadRecentTrades(); });
 
     if (symbolSelect) {

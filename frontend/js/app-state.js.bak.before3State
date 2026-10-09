@@ -1,22 +1,18 @@
 ﻿// ================================================================
-// MONIX v7.0 — Global state (3-state machine)
-//   state === 'guest'      → no account / not logged in
-//   state === 'account'    → account exists, no Deriv API key
-//   state === 'connected'  → account + Deriv API key working
+// MONIX v7.0 — Global state
 // ================================================================
 
 window.MONIX_STATE = window.MONIX_STATE || {
   activeTab: 'home',
   user: null,
-  isConnected: false,
-  hasAccount: false,
+  isConnected: false,      // has valid Deriv API key
   balance: 0,
   locked: 0,
   todayProfit: 0,
   winRate: 0,
   totalTrades: 0,
   voucher: { code: '', remaining: 0, limit: 1000000 },
-  positions: [],
+  positions: [],           // open trades
   waitlistCount: 0,
   strategy: 'balanced',
   autoTrade: true,
@@ -26,20 +22,9 @@ window.MONIX_IS_CONNECTED = function() {
   return !!(MONIX_STATE.user && MONIX_STATE.isConnected);
 };
 
-window.MONIX_HAS_ACCOUNT = function() {
-  return !!(MONIX_STATE.user && MONIX_STATE.hasAccount);
-};
-
-window.MONIX_VIEW_STATE = function() {
-  if (!MONIX_STATE.user) return 'guest';
-  if (MONIX_STATE.isConnected) return 'connected';
-  return 'account';
-};
-
 window.monixUpdateUser = function(profile) {
   if (!profile) return;
   MONIX_STATE.user = profile.user || null;
-  MONIX_STATE.hasAccount = !!MONIX_STATE.user;
 
   const hasDerivBalance = profile.derivBalance && profile.derivBalance.authorized;
   const hasDemoToken = profile.user?.demo_token && profile.user.demo_token.length > 0;
@@ -58,7 +43,7 @@ window.monixUpdateUser = function(profile) {
     limit: 1000000,
   };
 
-  // Refresh active tab
+  // Refresh whatever tab is active
   const tab = MONIX_STATE.activeTab;
   const fn = window['renderShellTab_' + tab];
   if (typeof fn === 'function') fn();
@@ -67,6 +52,7 @@ window.monixUpdateUser = function(profile) {
   if (typeof window.renderTopbar === 'function') window.renderTopbar();
 };
 
+// Positions updater
 window.monixUpdatePositions = function(positions) {
   MONIX_STATE.positions = positions || [];
   if (MONIX_STATE.activeTab === 'home') {
@@ -75,7 +61,9 @@ window.monixUpdatePositions = function(positions) {
   }
 };
 
-// Global delegation for data-shell-tab clicks
+// ================================================================
+// Auto-wire any element with data-shell-tab (delegation)
+// ================================================================
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-shell-tab]');
   if (el) {
