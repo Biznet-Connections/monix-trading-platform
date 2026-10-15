@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.23 - Removed isReady block to allow first trades
+ * v15.0.24-r75only - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -379,12 +379,7 @@ class AITrader {
             const stake = tradeData.stake;
             const symbol = tradeData.symbol;
 
-            let exitPrice = entryPrice;
-            if (status === 'WIN') {
-                exitPrice = entryPrice * (1 + (finalProfit / stake));
-            } else {
-                exitPrice = entryPrice * (1 - (Math.abs(finalProfit) / stake));
-            }
+            let exitPrice = entryPrice; // Real exit price from Deriv not available in this contract type
 
             console.log(`📝 Closing trade #${tradeId}: ${symbol} ${status} | Profit: $${finalProfit.toFixed(2)} | Exit: $${exitPrice.toFixed(2)}`);
 
@@ -471,6 +466,11 @@ class AITrader {
     // ─── Analyze Symbol ───
 
     async analyzeSymbol(symbol) {
+        // ONLY_TRADE_R75: Block everything except R_75
+        if (symbol !== 'R_75') {
+            return null;
+        }
+        
         console.log(`🔍 [DEBUG-ENTRY] analyzeSymbol called for ${symbol}`);
         try {
             const marketState = marketData.getMarketState(symbol);
@@ -903,7 +903,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.23 (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.24-r75only (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
