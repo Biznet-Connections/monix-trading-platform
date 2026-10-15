@@ -640,6 +640,11 @@ async function loadUserData() {
 
             document.getElementById('winRateDisplay').innerHTML = `Win Rate: ${profile.stats?.win_rate || 0}%`;
 
+            {
+                const __te = document.getElementById('totalTradesDisplay');
+                if (__te) __te.textContent = (profile.stats?.total_trades || 0) + ' trades';
+            }
+
             const todayProfit = profile.stats?.today_profit || 0;
             const todayProfitEl = document.getElementById('todayProfit');
             if (todayProfitEl) {
