@@ -41,7 +41,7 @@ class AITrader {
         this.consecutiveWins = 0;
         this.recentResults = [];
         this.lastTradeTime = 0;
-        this.tradeCooldown = 30000;
+        this.tradeCooldown = 10000;
         this.pausedUntil = 0;
 
         // Daily tracking
@@ -64,8 +64,8 @@ class AITrader {
         this.sessionLoss = 0;
 
         // Trade parameters
-        this.PROFIT_TARGET_PCT = 0.08;
-        this.STOP_LOSS_PCT = 0.02;
+        this.PROFIT_TARGET_PCT = 0.50;
+        this.STOP_LOSS_PCT = 0.25;
         this.MAX_TRADE_DURATION = 300000;
 
         // 🚀 DYNAMIC STAKE CONFIGURATION
@@ -303,7 +303,7 @@ class AITrader {
 
         if (todayProfit >= targetProfit && !this.dailyProfitReached) {
             this.dailyProfitReached = true;
-            this.pausedUntil = Date.now() + 86400000;
+            this.pausedUntil = Date.now() + 60000; // 1 min instead of 24h
             console.log(`🎯 [Daily Target] Target reached! +$${todayProfit.toFixed(2)}. Stopping for the day.`);
             broadcastNotification('Daily Target Met', `+$${todayProfit.toFixed(2)} profit. Bot paused until tomorrow.`, 'success');
             return true;
@@ -311,7 +311,7 @@ class AITrader {
 
         if (todayProfit <= -lossLimit && !this.dailyLossReached) {
             this.dailyLossReached = true;
-            this.pausedUntil = Date.now() + 86400000;
+            this.pausedUntil = Date.now() + 60000; // 1 min instead of 24h
             console.log(`🛑 [Daily Limit] Loss limit reached! -$${Math.abs(todayProfit).toFixed(2)}. Stopping for the day.`);
             broadcastNotification('Daily Loss Limit Hit', `-$${Math.abs(todayProfit).toFixed(2)} loss. Bot paused until tomorrow.`, 'error');
             return true;
@@ -433,7 +433,7 @@ class AITrader {
                 this.recalculateStakes();
 
                 if (this.consecutiveLosses >= 3) {
-                    this.pausedUntil = Date.now() + 900000;
+                    this.pausedUntil = Date.now() + 60000; // 1 min instead of 15
                     console.log('🛑 HARD PAUSE 15min — 3 consecutive losses');
                 }
             }
@@ -764,7 +764,7 @@ class AITrader {
                 this.dailyResetTime = now;
             }
 
-            if (this.dailyTradeCount >= 12) {
+            if (this.dailyTradeCount >= 50) {
                 if (!this._dailyLimitLog || Date.now() - this._dailyLimitLog > 3600000) {
                     console.log(`📊 [Daily Limit] Reached ${this.dailyTradeCount} trades. Pausing until tomorrow.`);
                     this._dailyLimitLog = Date.now();
