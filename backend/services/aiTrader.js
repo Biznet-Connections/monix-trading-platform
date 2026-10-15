@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.24-r75only - Removed isReady block to allow first trades
+ * v15.0.25-real-close - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -324,31 +324,29 @@ class AITrader {
 
     async handleContractUpdate(contract) {
         if (!this.activeTrade || contract.contract_id !== this.activeTrade.contract_id) return;
-
-        const rawProfit = contract.profit !== undefined && contract.profit !== null ? contract.profit : 0;
-        let currentProfit = Number(rawProfit);
-        if (isNaN(currentProfit)) currentProfit = 0;
-
-        const stake = this.activeTrade.stake;
-        const targetProfit = stake * this.PROFIT_TARGET_PCT;
-        const maxLoss = stake * this.STOP_LOSS_PCT;
-
-        console.log(`📊 [Trade Monitor] ${this.activeTrade.symbol} Contract ${contract.contract_id}: Profit=$${currentProfit.toFixed(2)} | Target=$${targetProfit.toFixed(2)} | Stop=$${maxLoss.toFixed(2)}`);
-
-        if (currentProfit >= targetProfit) {
-            console.log(`🎯 PROFIT TARGET HIT! Closing at +$${currentProfit.toFixed(2)}`);
-            await this.closeTrade(contract.contract_id, currentProfit, 'WIN');
-        } else if (currentProfit <= -maxLoss) {
-            console.log(`🛑 STOP LOSS HIT! Closing at -$${Math.abs(currentProfit).toFixed(2)}`);
-            await this.closeTrade(contract.contract_id, currentProfit, 'LOSS');
-        } else if (contract.is_sold === 1 || contract.status === 'sold') {
-            console.log(`🏁 Contract ${contract.contract_id} sold! Profit: $${currentProfit.toFixed(2)}`);
-            const status = currentProfit > 0 ? 'WIN' : 'LOSS';
-            await this.closeTrade(contract.contract_id, currentProfit, status);
+        
+        // GUARD: Only record real Deriv closes
+        if (this._closingContractId === contract.contract_id) return;
+        
+        const currentProfit = Number(contract.profit) || 0;
+        const isReallyClosed = (contract.is_sold === 1 || contract.status === 'sold');
+        
+        // Ignore unrealized P&L blips
+        if (!isReallyClosed) {
+            if (!this._lastUnrealizedLog || Date.now() - this._lastUnrealizedLog > 10000) {
+                console.log('👀 [Unrealized] ' + this.activeTrade.symbol + ' #' + contract.contract_id + ': $' + currentProfit.toFixed(2));
+                this._lastUnrealizedLog = Date.now();
+            }
+            return;
         }
+        
+        // Real close
+        this._closingContractId = contract.contract_id;
+        const status = currentProfit > 0 ? 'WIN' : 'LOSS';
+        console.log('🏁 [REAL CLOSE] ' + this.activeTrade.symbol + ' #' + contract.contract_id + ': ' + status + ' $' + currentProfit.toFixed(2));
+        await this.closeTrade(contract.contract_id, currentProfit, status);
     }
 
-    // ─── FIXED: closeTrade with null check ───
     async closeTrade(contractId, profit, status) {
         if (!this.activeTrade) {
             console.log(`⚠️ No active trade to close for contract ${contractId}`);
@@ -903,7 +901,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.24-r75only (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.25-real-close (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
