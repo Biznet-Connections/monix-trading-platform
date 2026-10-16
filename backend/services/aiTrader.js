@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.30-nopause - Removed isReady block to allow first trades
+ * v15.0.33-frozen - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -900,7 +900,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.30-nopause (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.33-frozen (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
@@ -983,7 +983,7 @@ class AITrader {
 
         this.tickHealthInterval = setInterval(async () => {
             const timeSinceLastTick = Date.now() - this.lastTickTime;
-            if (this.tickCount > 0 && timeSinceLastTick > 90000 && !this.forceReconnecting) {
+            if (this.tickCount > 0 && timeSinceLastTick > 30000 && !this.forceReconnecting) {
                 this.forceReconnecting = true;
                 try {
                     await derivService.forceReconnectForTicks('R_75');
@@ -992,6 +992,26 @@ class AITrader {
                 this.forceReconnecting = false;
             }
         }, 60000);
+
+        // FROZEN WATCHDOG
+        this.frozenCheckInterval = setInterval(async () => {
+            try {
+                const __r75 = this.symbolData && this.symbolData["R_75"];
+                if (__r75 && __r75.lastPrice) {
+                    if (this._lastR75Price === __r75.lastPrice) {
+                        this._frozenCount = (this._frozenCount || 0) + 1;
+                        if (this._frozenCount >= 2) {
+                            console.log("FROZEN: R_75 stuck for 60s - reconnecting");
+                            this._frozenCount = 0;
+                            await derivService.forceReconnectForTicks("R_75").catch(function(){});
+                        }
+                    } else {
+                        this._frozenCount = 0;
+                        this._lastR75Price = __r75.lastPrice;
+                    }
+                }
+            } catch(e) {}
+        }, 30000);
 
         this.balanceSyncInterval = setInterval(() => this.syncBalanceFromDeriv(), 30000);
 
