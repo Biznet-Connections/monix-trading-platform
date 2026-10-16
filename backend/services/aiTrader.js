@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.33-frozen - Removed isReady block to allow first trades
+ * v15.0.34-fullwatchdog - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -900,7 +900,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.33-frozen (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.34-fullwatchdog (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
@@ -1011,6 +1011,33 @@ class AITrader {
                 }
             } catch(e) {}
         }, 30000);
+
+        // STUCK TRADE WATCHDOG - clears activeTrade older than 5 min
+        this.stuckTradeInterval = setInterval(() => {
+            try {
+                if (this.activeTrade && (Date.now() - this.activeTrade.entry_time) > 300000) {
+                    const mins = Math.round((Date.now() - this.activeTrade.entry_time) / 60000);
+                    console.log('[STUCK] activeTrade for ' + mins + 'min - clearing');
+                    this.activeTrade = null;
+                    this._closingContractId = null;
+                }
+            } catch(e) {}
+        }, 30000);
+
+        // PENDING CLEANUP - voids old PENDING trades in DB
+        this.pendingCleanupInterval = setInterval(async () => {
+            try {
+                const Trade = require('../models/Trade');
+                const old = await Trade.find({ user_id: this.userId, status: 'PENDING' });
+                for (const t of old) {
+                    const age = Date.now() - new Date(t.executed_at).getTime();
+                    if (age > 600000) {
+                        console.log('[CLEANUP] Voiding PENDING trade ' + t._id + ' (' + Math.round(age/60000) + 'min old)');
+                        await Trade.updateResult(t._id, t.entry_price || 0, 0, 'VOID');
+                    }
+                }
+            } catch(e) {}
+        }, 120000);
 
         // FROZEN WATCHDOG
         this.frozenCheckInterval = setInterval(async () => {
