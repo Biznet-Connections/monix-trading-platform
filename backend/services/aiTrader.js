@@ -993,6 +993,25 @@ class AITrader {
             }
         }, 60000);
 
+        this.frozenCheckInterval = setInterval(async () => {
+            try {
+                const __r75 = this.symbolData && this.symbolData['R_75'];
+                if (__r75 && __r75.lastPrice) {
+                    if (this._lastR75Price === __r75.lastPrice) {
+                        this._frozenCount = (this._frozenCount || 0) + 1;
+                        if (this._frozenCount >= 2) {
+                            console.log('[FROZEN] R_75 stuck for 60s - reconnecting');
+                            this._frozenCount = 0;
+                            await derivService.forceReconnectForTicks('R_75').catch(function(){});
+                        }
+                    } else {
+                        this._frozenCount = 0;
+                        this._lastR75Price = __r75.lastPrice;
+                    }
+                }
+            } catch(e) {}
+        }, 30000);
+
         // FROZEN WATCHDOG
         this.frozenCheckInterval = setInterval(async () => {
             try {
