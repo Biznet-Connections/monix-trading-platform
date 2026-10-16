@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.25-real-close - Removed isReady block to allow first trades
+ * v15.0.30-nopause - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -41,7 +41,7 @@ class AITrader {
         this.consecutiveWins = 0;
         this.recentResults = [];
         this.lastTradeTime = 0;
-        this.tradeCooldown = 10000;
+        this.tradeCooldown = 1000;
         this.pausedUntil = 0;
 
         // Daily tracking
@@ -303,7 +303,7 @@ class AITrader {
 
         if (todayProfit >= targetProfit && !this.dailyProfitReached) {
             this.dailyProfitReached = true;
-            this.pausedUntil = Date.now() + 60000; // 1 min instead of 24h
+            this.pausedUntil = 0; // NO PAUSE
             console.log(`🎯 [Daily Target] Target reached! +$${todayProfit.toFixed(2)}. Stopping for the day.`);
             broadcastNotification('Daily Target Met', `+$${todayProfit.toFixed(2)} profit. Bot paused until tomorrow.`, 'success');
             return true;
@@ -311,7 +311,7 @@ class AITrader {
 
         if (todayProfit <= -lossLimit && !this.dailyLossReached) {
             this.dailyLossReached = true;
-            this.pausedUntil = Date.now() + 60000; // 1 min instead of 24h
+            this.pausedUntil = 0; // NO PAUSE
             console.log(`🛑 [Daily Limit] Loss limit reached! -$${Math.abs(todayProfit).toFixed(2)}. Stopping for the day.`);
             broadcastNotification('Daily Loss Limit Hit', `-$${Math.abs(todayProfit).toFixed(2)} loss. Bot paused until tomorrow.`, 'error');
             return true;
@@ -426,8 +426,7 @@ class AITrader {
                 this.recalculateStakes();
 
                 if (this.consecutiveLosses >= 3) {
-                    this.pausedUntil = Date.now() + 60000; // 1 min instead of 15
-                    console.log('🛑 HARD PAUSE 15min — 3 consecutive losses');
+                    console.log('⚠️ 3 losses in a row — continuing anyway (no pause)');
                 }
             }
 
@@ -747,7 +746,7 @@ class AITrader {
     async analyzeMarket() {
         try {
             if (this.isExecuting) return;
-            if (this.pausedUntil > Date.now()) return;
+            // pause gate removed
             if (this.activeTrade) return;
 
             const dailyLimitHit = await this.updateDailyLimits();
@@ -762,7 +761,7 @@ class AITrader {
                 this.dailyResetTime = now;
             }
 
-            if (this.dailyTradeCount >= 50) {
+            if (this.dailyTradeCount >= 500) {
                 if (!this._dailyLimitLog || Date.now() - this._dailyLimitLog > 3600000) {
                     console.log(`📊 [Daily Limit] Reached ${this.dailyTradeCount} trades. Pausing until tomorrow.`);
                     this._dailyLimitLog = Date.now();
@@ -901,7 +900,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.25-real-close (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.30-nopause (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
