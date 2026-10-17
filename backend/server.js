@@ -43,7 +43,7 @@ global.wss = wss;
 wss.on('connection', (ws) => {
     global.clients.add(ws);
     wsClients = global.clients.size;
-    console.log(`ðŸ”Œ WebSocket client connected. Total: ${wsClients}`);
+    console.log(`Ã°Å¸â€Å’ WebSocket client connected. Total: ${wsClients}`);
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
@@ -63,7 +63,7 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         global.clients.delete(ws);
         wsClients = global.clients.size;
-        console.log(`ðŸ”Œ WebSocket client disconnected. Total: ${wsClients}`);
+        console.log(`Ã°Å¸â€Å’ WebSocket client disconnected. Total: ${wsClients}`);
     });
     ws.send(JSON.stringify({ type: 'connected', message: 'Connected to MONIX WebSocket' }));
 });
@@ -100,7 +100,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use(helmet({ contentSecurityPolicy: false }));
-// ðŸš¨ EMERGENCY FIX: Trust proxy for rate limiting behind Render
+// Ã°Å¸Å¡Â¨ EMERGENCY FIX: Trust proxy for rate limiting behind Render
 app.set('trust proxy', 1);
 app.use(cors());
 app.use(compression());
@@ -118,7 +118,7 @@ const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500,
     message: { error: 'Too many requests, please try again later' },
-    // ðŸš¨ FIX: Skip rate limiting for trusted proxy
+    // Ã°Å¸Å¡Â¨ FIX: Skip rate limiting for trusted proxy
     skip: (req) => {
         return req.path === '/health' || req.path === '/api/log';
     }
@@ -131,6 +131,7 @@ app.use('/api/trades', tradeRoutes);
 app.use('/api/signals', signalRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/test-multiplier', require('./routes/testMultiplier'));
+app.use('/api/test-multiplier-trade', require('./routes/testMultiplierTrade'));
 app.use('/api/market', marketRoutes);
 app.use('/api/ai', aiStatusRoutes);
 
@@ -153,26 +154,26 @@ function startSelfPing() {
 async function startServer() {
     try {
         await initDatabase();
-        console.log('âœ… MongoDB connected');
+        console.log('Ã¢Å“â€¦ MongoDB connected');
 
         const session = knowledgeBase.getSessionRules();
-        console.log(`ðŸ§¬ Trading DNA loaded successfully`);
-        console.log(`ðŸ“š Session: ${session.name} | ${session.personality} | ${session.bestStrategy}`);
-        console.log(`ðŸ›¡ï¸ Risk: ${knowledgeBase.TRADING_KNOWLEDGE.riskManagement.maxRiskPerTrade * 100}% per trade | 1:2 RR | Pause after ${knowledgeBase.TRADING_KNOWLEDGE.riskManagement.maxConsecutiveLosses} losses`);
+        console.log(`Ã°Å¸Â§Â¬ Trading DNA loaded successfully`);
+        console.log(`Ã°Å¸â€œÅ¡ Session: ${session.name} | ${session.personality} | ${session.bestStrategy}`);
+        console.log(`Ã°Å¸â€ºÂ¡Ã¯Â¸Â Risk: ${knowledgeBase.TRADING_KNOWLEDGE.riskManagement.maxRiskPerTrade * 100}% per trade | 1:2 RR | Pause after ${knowledgeBase.TRADING_KNOWLEDGE.riskManagement.maxConsecutiveLosses} losses`);
 
         // Start Deriv connection without token first (will be reconnected when user logs in)
         try {
-            console.log('ðŸ”Œ Initializing Deriv connection (will wait for user token)...');
+            console.log('Ã°Å¸â€Å’ Initializing Deriv connection (will wait for user token)...');
             derivService.isConnected = false;
             derivService.authorized = false;
         } catch (error) {
-            console.error('âŒ Deriv service init error:', error.message);
+            console.error('Ã¢ÂÅ’ Deriv service init error:', error.message);
         }
 
         server.listen(process.env.PORT || 3000, () => {
             const port = process.env.PORT || 3000;
-            console.log(`âœ… MONIX Trading Platform v6.0 PROFESSIONAL TRADER running on port ${port}`);
-            console.log(`ðŸ§¬ Trading DNA: ACTIVE | ${session.name} session optimized`);
+            console.log(`Ã¢Å“â€¦ MONIX Trading Platform v6.0 PROFESSIONAL TRADER running on port ${port}`);
+            console.log(`Ã°Å¸Â§Â¬ Trading DNA: ACTIVE | ${session.name} session optimized`);
             startSelfPing();
 
             // Start AI Trader for the first active user found
@@ -192,28 +193,28 @@ async function startServer() {
                             if (hasDemoToken || hasRealToken) {
                                 const tokenToUse = activeUser.is_demo ? activeUser.demo_token : activeUser.real_token;
                                 if (tokenToUse && tokenToUse.trim().length > 10) {
-                                    console.log(`ðŸš€ Starting AI Professional Trader for: ${activeUser.username || activeUser.email}`);
-                                    console.log(`ðŸ“Š Mode: ${activeUser.is_demo ? 'DEMO' : 'REAL'} | Symbol: ${activeUser.default_symbol || 'R_75'}`);
+                                    console.log(`Ã°Å¸Å¡â‚¬ Starting AI Professional Trader for: ${activeUser.username || activeUser.email}`);
+                                    console.log(`Ã°Å¸â€œÅ  Mode: ${activeUser.is_demo ? 'DEMO' : 'REAL'} | Symbol: ${activeUser.default_symbol || 'R_75'}`);
                                     await aiTrader.start(activeUser._id, activeUser.default_symbol || 'R_75', activeUser.auto_mode ? 'AUTO' : 'MANUAL');
                                 } else {
-                                    console.log(`âš ï¸ User ${activeUser.email} has API keys but they appear invalid. Please re-enter tokens.`);
+                                    console.log(`Ã¢Å¡Â Ã¯Â¸Â User ${activeUser.email} has API keys but they appear invalid. Please re-enter tokens.`);
                                 }
                             } else {
-                                console.log(`âš ï¸ User ${activeUser.email} has no API tokens configured. AI Trader will start when user adds tokens.`);
+                                console.log(`Ã¢Å¡Â Ã¯Â¸Â User ${activeUser.email} has no API tokens configured. AI Trader will start when user adds tokens.`);
                             }
                         } else {
-                            console.log('âš ï¸ No active user found with API tokens. AI Trader waiting for user login.');
+                            console.log('Ã¢Å¡Â Ã¯Â¸Â No active user found with API tokens. AI Trader waiting for user login.');
                         }
                     } else {
-                        console.log('âš ï¸ No users found in database. AI Trader waiting for user registration.');
+                        console.log('Ã¢Å¡Â Ã¯Â¸Â No users found in database. AI Trader waiting for user registration.');
                     }
                 } catch (error) {
-                    console.error('âŒ Failed to start AI Trader:', error.message);
+                    console.error('Ã¢ÂÅ’ Failed to start AI Trader:', error.message);
                 }
             }, 5000);
         });
     } catch (error) {
-        console.error('âŒ Failed to start server:', error);
+        console.error('Ã¢ÂÅ’ Failed to start server:', error);
         process.exit(1);
     }
 }
