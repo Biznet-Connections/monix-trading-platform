@@ -1,5 +1,12 @@
 /**
- * AI Trader Service - The Professional
+ * AI Trader Service - T
+
+            // DATA-DRIVEN FILTERS
+            const __hour = new Date().getUTCHours();
+            const __allowedHours = [15, 16, 17, 20];
+            if (!__allowedHours.includes(__hour)) return null;
+            
+he Professional
  * v15.0.41-multsafe - Removed isReady block to allow first trades
  */
 
