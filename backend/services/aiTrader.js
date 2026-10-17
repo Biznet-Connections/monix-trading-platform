@@ -72,9 +72,9 @@ class AITrader {
 
         // 🚀 DYNAMIC STAKE CONFIGURATION
         this.MIN_STAKE_PCT = 0.005;
-        this.BASE_STAKE_PCT = 0.01;
-        this.CONFIDENT_STAKE_PCT = 0.02;
-        this.MAX_STAKE_PCT = 0.03;
+        this.BASE_STAKE_PCT = 0.05;
+        this.CONFIDENT_STAKE_PCT = 0.05;
+        this.MAX_STAKE_PCT = 0.05;
 
         this.MIN_STAKE_LIMIT = 1;
         this.MAX_STAKE_LIMIT = 999999;
@@ -153,8 +153,8 @@ class AITrader {
         this.CONFIDENT_STAKE = this.roundStake(confidentStake);
         this.MAX_STAKE = this.roundStake(maxStake);
 
-        if (this.MAX_STAKE > bal * 0.03) this.MAX_STAKE = this.roundStake(bal * 0.03);
-        if (this.CONFIDENT_STAKE > bal * 0.02) this.CONFIDENT_STAKE = this.roundStake(bal * 0.02);
+        if (this.MAX_STAKE > bal * 0.05) this.MAX_STAKE = this.roundStake(bal * 0.05);
+        if (this.CONFIDENT_STAKE > bal * 0.05) this.CONFIDENT_STAKE = this.roundStake(bal * 0.05);
 
         if (this.MIN_STAKE < 1) this.MIN_STAKE = 1;
         if (this.BASE_STAKE < 1) this.BASE_STAKE = 2;
