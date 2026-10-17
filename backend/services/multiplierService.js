@@ -160,7 +160,7 @@ class MultiplierService {
                 if (position.peak_pnl >= position.trailing_trigger && !position.trailing_active) {
                     // Activate trailing
                     position.trailing_active = true;
-                    const newSL = position.peak_pnl - (position.trailing_lock - position.trailing_lock) + position.trailing_lock;
+                    // activation only, SL moves in main block below
                     console.log('🎯 [Trailing] ACTIVATED at +$' + currentPnl.toFixed(2));
                 }
                 

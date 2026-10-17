@@ -1,26 +1,29 @@
 /**
  * Multiplier Trading Configuration
- * "Small losses, big wins" — asymmetric betting
+ * $10,000 account → $1,000/day target
  */
 
 module.exports = {
-    // Stake sizing
-    BASE_STAKE: 50,                  // $50 per trade (small, safe)
-    MAX_STAKE: 100,                  // Never more than $100
+    // Stake sizing - $100 per trade (1% of $10k account)
+    BASE_STAKE: 100,
+    MAX_STAKE: 150,
     
-    // Contract settings
     MULTIPLIER: 100,
     
-    // SL/TP — the asymmetric edge
-    STOP_LOSS_PCT: 0.25,             // -25% = -$12.50 on $50
-    TAKE_PROFIT_PCT: 1.00,           // +100% = +$50 on $50
+    // SL/TP - small losses, big wins
+    STOP_LOSS_PCT: 0.25,             // -$25 max loss (0.25% of account)
+    TAKE_PROFIT_PCT: 1.00,           // +$100 target (1% of account)
     
-    // Trailing stop (let winners run)
-    TRAILING_TRIGGER_PCT: 0.50,      // Activate at +50% (+$25)
-    TRAILING_LOCK_PCT: 0.30,         // Lock +30% minimum (+$15)
+    // Trailing stop
+    TRAILING_TRIGGER_PCT: 0.50,      // Activate at +$50
+    TRAILING_LOCK_PCT: 0.50,         // Lock 50% of peak
     
-    // Math: RR = 1:4
-    // Break-even WR = 20%
-    // Target WR = 30%+
-    // Expected profit = 30% WR × $50 - 70% × $12.50 = +$6.25/trade
+    // Daily targets
+    DAILY_PROFIT_TARGET: 0.10,       // +$1,000/day (stop trading)
+    DAILY_LOSS_LIMIT: 0.05,          // -$500/day (stop trading)
+    
+    // Expected per trade (at 46% WR):
+    // 46 wins × $75 avg = +$3,450
+    // 54 losses × $25 = -$1,350
+    // NET: +$2,100 per 100 trades
 };
