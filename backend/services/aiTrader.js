@@ -1,10 +1,12 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.34-fullwatchdog - Removed isReady block to allow first trades
+ * v15.0.39-multiplier - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
 const derivService = require('./derivService');
+const multiplierService = require('./multiplierService');
+const multiplierConfig = require('./multiplierConfig');
 const Trade = require('../models/Trade');
 const User = require('../models/User');
 const Pattern = require('../models/Pattern');
@@ -658,7 +660,19 @@ class AITrader {
 
             console.log(`💸 ${signal.action} ${signal.symbol} | $${signal.entry_price.toFixed(2)} | $${stake} | ${signal.confidence}%`);
 
-            const tradeResult = await derivService.placeTrade(signal.symbol, signal.action, stake, 2, 'm');
+            // USE MULTIPLIER (small losses, big wins)
+            const tradeResult = await multiplierService.placeMultiplier(
+                signal.symbol,
+                signal.action,
+                stake,
+                {
+                    multiplier: multiplierConfig.MULTIPLIER,
+                    stopLossPct: multiplierConfig.STOP_LOSS_PCT,
+                    takeProfitPct: multiplierConfig.TAKE_PROFIT_PCT,
+                    trailingTriggerPct: multiplierConfig.TRAILING_TRIGGER_PCT,
+                    trailingLockPct: multiplierConfig.TRAILING_LOCK_PCT
+                }
+            );
 
             const tradeId = await Trade.create({
                 user_id: this.userId,
@@ -900,7 +914,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.34-fullwatchdog (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.39-multiplier (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
