@@ -505,7 +505,7 @@ class AITrader {
                 }
             } else {
                 // Normal: only 25-45
-                if (!(rsi >= 25 && rsi < 35) && !(rsi >= 35 && rsi <= 45)) {
+                if (!(rsi >= 20 && rsi < 35) && !(rsi >= 35 && rsi <= 55)) {
                     console.log(`❌ [DEBUG] ${symbol}: RSI ${rsi} outside zones (25-45)`);
                     return null;
                 }
@@ -548,7 +548,7 @@ class AITrader {
             if (this.consecutiveLosses === 0) setupQuality += 5;
 
             // 🚀 LOWERED THRESHOLDS FOR FIRST TRADE
-            const minSetupQuality = data.trades === 0 ? 10 : (data.trades < 3 ? 30 : 50);
+            const minSetupQuality = data.trades === 0 ? 10 : (data.trades < 3 ? 25 : 40);
             console.log(`🔍 [DEBUG] ${symbol}: SetupQuality=${setupQuality} | MinRequired=${minSetupQuality}`);
             if (setupQuality < minSetupQuality) {
                 console.log(`❌ [DEBUG] ${symbol}: Setup quality ${setupQuality} < ${minSetupQuality} minimum`);
