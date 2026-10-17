@@ -1032,19 +1032,18 @@ class AITrader {
         }, 30000);
 
         // PENDING CLEANUP - voids old PENDING trades in DB
-        this.pendingCleanupInterval = setInterval(async () => {
+                this.pendingCleanupInterval = setInterval(async () => {
             try {
-                const Trade = require('../models/Trade');
-                const old = await Trade.find({ user_id: this.userId, status: 'PENDING' });
-                for (const t of old) {
+                const oldTrades = await Trade.find({ user_id: this.userId, status: 'PENDING' });
+                for (const t of oldTrades) {
                     const age = Date.now() - new Date(t.executed_at).getTime();
-                    if (age > 600000) {
-                        console.log('[CLEANUP] Voiding PENDING trade ' + t._id + ' (' + Math.round(age/60000) + 'min old)');
+                    if (age > 300000) {
+                        console.log('[CLEANUP] Voiding PENDING trade ' + t._id + ' (age: ' + Math.round(age/60000) + 'min)');
                         await Trade.updateResult(t._id, t.entry_price || 0, 0, 'VOID');
                     }
                 }
-            } catch(e) {}
-        }, 120000);
+            } catch(e) { console.log('[CLEANUP-ERR] ' + e.message); }
+        }, 60000);
 
         // FROZEN WATCHDOG
         this.frozenCheckInterval = setInterval(async () => {
