@@ -987,20 +987,33 @@ class AITrader {
             }
         }, 60000);
 
-        this.frozenCheckInterval = setInterval(async () => {
+                this.frozenCheckInterval = setInterval(async () => {
             try {
-                const __r75 = this.symbolData && this.symbolData['R_75'];
-                if (__r75 && __r75.lastPrice) {
-                    if (this._lastR75Price === __r75.lastPrice) {
+                const mState = marketData.getMarketState('R_75');
+                const currentPrice = mState && mState.price;
+                const currentRsi = mState && mState.rsi;
+                if (currentPrice && currentPrice > 0) {
+                    if (this._lastR75Price === currentPrice) {
                         this._frozenCount = (this._frozenCount || 0) + 1;
-                        if (this._frozenCount >= 2) {
-                            console.log('[FROZEN] R_75 stuck for 60s - reconnecting');
+                        if (this._frozenCount >= 3) {
+                            console.log('[FROZEN] R_75 stuck - reconnecting');
                             this._frozenCount = 0;
                             await derivService.forceReconnectForTicks('R_75').catch(function(){});
                         }
                     } else {
                         this._frozenCount = 0;
-                        this._lastR75Price = __r75.lastPrice;
+                        this._lastR75Price = currentPrice;
+                    }
+                    if (currentRsi === this._lastRsi && currentRsi !== undefined) {
+                        this._rsiStuckCount = (this._rsiStuckCount || 0) + 1;
+                        if (this._rsiStuckCount >= 20) {
+                            console.log('[FROZEN] RSI stuck - reconnecting');
+                            this._rsiStuckCount = 0;
+                            await derivService.forceReconnectForTicks('R_75').catch(function(){});
+                        }
+                    } else {
+                        this._rsiStuckCount = 0;
+                        this._lastRsi = currentRsi;
                     }
                 }
             } catch(e) {}
