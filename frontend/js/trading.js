@@ -786,8 +786,8 @@ async function refreshUserData() {
                 balanceEl.innerHTML = `$${profile.derivBalance.balance.toFixed(2)}`;
             }
 
-            const winRateEl = document.getElementById('winRateDisplay');
-            if (winRateEl && profile.stats) winRateEl.innerHTML = `Win Rate: ${profile.stats.win_rate || 0}%`;
+            const winRateEl = document.getElementById('profitRateDisplay');
+            if (winRateEl && profile.stats) winRateEl.innerHTML = `Profit Rate: ${profile.stats.win_rate || 0}%`;
 
             const voucherCode = document.getElementById('voucherCode');
             const tradesRemaining = document.getElementById('tradesRemaining');

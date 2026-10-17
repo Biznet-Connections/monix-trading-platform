@@ -199,9 +199,9 @@ async function refreshBalance() {
             }
 
             if (profile.stats?.win_rate !== undefined) {
-                const winRateEl = document.getElementById('winRateDisplay');
+                const winRateEl = document.getElementById('profitRateDisplay');
                 if (winRateEl) {
-                    winRateEl.innerHTML = `Win Rate: ${profile.stats.win_rate}%`;
+                    winRateEl.innerHTML = `Profit Rate: ${profile.stats.win_rate}%`;
                 }
             }
 
@@ -638,7 +638,7 @@ async function loadUserData() {
                 }
             }
 
-            document.getElementById('winRateDisplay').innerHTML = `Win Rate: ${profile.stats?.win_rate || 0}%`;
+            document.getElementById('profitRateDisplay').innerHTML = `Profit Rate: ${profile.stats?.win_rate || 0}%`;
 
             {
                 const __te = document.getElementById('totalTradesDisplay');
@@ -688,7 +688,7 @@ async function loadPerformanceStats() {
     try {
         logToTerminal('📈 Loading performance stats...');
         const stats = await window.api.getTradeStats(30);
-        document.getElementById('statWinRate').innerHTML = `${stats.overall?.win_rate || 0}%`;
+        document.getElementById('statProfitRate').innerHTML = `${stats.overall?.win_rate || 0}%`;
         document.getElementById('statTotalTrades').innerHTML = stats.overall?.total_trades || 0;
         const profit = stats.overall?.net_profit || 0;
         document.getElementById('statNetProfit').innerHTML = `$${profit.toFixed(2)}`;
@@ -820,7 +820,7 @@ async function loadFullInsights() {
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div class="text-center p-2 bg-slate-700/30 rounded-lg">
                         <div class="text-2xl font-bold text-emerald-400">${insights.user_stats.win_rate || 0}%</div>
-                        <div class="text-xs text-slate-500">Win Rate</div>
+                        <div class="text-xs text-slate-500">Profit Rate</div>
                     </div>
                     <div class="text-center p-2 bg-slate-700/30 rounded-lg">
                         <div class="text-2xl font-bold">${insights.user_stats.total_trades || 0}</div>

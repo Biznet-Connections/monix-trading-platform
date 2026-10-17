@@ -134,7 +134,7 @@ async function loadAdminUsers() {
                     <div>
                         <p class="font-semibold">${user.username}</p>
                         <p class="text-xs text-slate-500">${user.email}</p>
-                        <p class="text-xs text-slate-500 mt-1">Trades left: ${user.trades_remaining} | Win rate: ${user.stats?.win_rate || 0}%</p>
+                        <p class="text-xs text-slate-500 mt-1">Trades left: ${user.trades_remaining} | Profit rate: ${user.stats?.win_rate || 0}%</p>
                         <p class="text-xs text-slate-500">Profit: $${user.stats?.net_profit || 0}</p>
                     </div>
                     <div class="text-right">
@@ -246,7 +246,7 @@ async function loadAdminStats() {
                 </div>
                 <div class="bg-slate-800/30 p-3 rounded-lg text-center">
                     <p class="text-2xl font-bold">${stats.win_rate || 0}%</p>
-                    <p class="text-xs text-slate-500">Win Rate</p>
+                    <p class="text-xs text-slate-500">Profit Rate</p>
                 </div>
                 <div class="bg-slate-800/30 p-3 rounded-lg text-center">
                     <p class="text-2xl font-bold text-emerald-400">$${stats.today_profit || 0}</p>
