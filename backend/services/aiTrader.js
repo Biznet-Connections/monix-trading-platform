@@ -1,6 +1,6 @@
 /**
  * AI Trader Service - The Professional
- * v15.0.39-multiplier - Removed isReady block to allow first trades
+ * v15.0.40-multfix - Removed isReady block to allow first trades
  */
 
 const marketData = require('./marketData');
@@ -676,7 +676,7 @@ class AITrader {
 
             const tradeId = await Trade.create({
                 user_id: this.userId,
-                contract_id: tradeResult.buy.contract_id,
+                contract_id: tradeResult.contract_id || (tradeResult.buy && tradeResult.buy.contract_id),
                 symbol: signal.symbol,
                 action: signal.action,
                 entry_price: signal.entry_price,
@@ -695,7 +695,7 @@ class AITrader {
 
             this.activeTrade = {
                 id: tradeId,
-                contract_id: tradeResult.buy.contract_id,
+                contract_id: tradeResult.contract_id || (tradeResult.buy && tradeResult.buy.contract_id),
                 symbol: signal.symbol,
                 action: signal.action,
                 entry_price: signal.entry_price,
@@ -709,7 +709,7 @@ class AITrader {
 
             broadcastTradeResult({
                 id: tradeId,
-                contract_id: tradeResult.buy.contract_id,
+                contract_id: tradeResult.contract_id || (tradeResult.buy && tradeResult.buy.contract_id),
                 symbol: signal.symbol,
                 action: signal.action,
                 entry_price: signal.entry_price,
@@ -914,7 +914,7 @@ class AITrader {
         this.recalculateStakes();
 
         const session = this.getCurrentSession();
-        console.log(`🤖 [AI Trader] Starting v15.0.39-multiplier (First Trade Ready)`);
+        console.log(`🤖 [AI Trader] Starting v15.0.40-multfix (First Trade Ready)`);
         console.log(`📚 [AI Trader] Symbols: ${this.symbols.join(', ')} | Session: ${session}`);
         console.log(`💰 [AI Trader] Balance: $${this.currentBalance.toFixed(2)}`);
         console.log(`🎯 [AI Trader] Profit Target: ${this.PROFIT_TARGET_PCT * 100}% | Stop Loss: ${this.STOP_LOSS_PCT * 100}%`);
