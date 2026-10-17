@@ -729,18 +729,30 @@ class AITrader {
     }
 
     calculateStake(confidence, setupQuality) {
-        const balance = this.currentBalance || 1000;
-        const stakePercent = 0.05;
-        let stake = Math.round(balance * stakePercent);
-        if (stake < 1) stake = 1;
-        if (stake > balance * 0.10) stake = Math.round(balance * 0.10);
-        if (confidence >= 80 && setupQuality >= 70) {
-            stake = Math.round(stake * 1.2);
-        } else if (confidence < 60) {
-            stake = Math.round(stake * 0.7);
+        this.recalculateStakes();
+
+        if (this.consecutiveLosses >= 2) {
+            return this.MIN_STAKE;
         }
+
+        if (this.consecutiveWins >= 3 && confidence >= 75) {
+            console.log(`🚀 Win streak ${this.consecutiveWins} + High confidence → Using CONFIDENT stake`);
+            return this.CONFIDENT_STAKE;
+        }
+
+        let stake = this.BASE_STAKE;
+        if (setupQuality >= 75) stake = this.CONFIDENT_STAKE;
+        else if (setupQuality >= 60) stake = this.BASE_STAKE;
+        else stake = this.MIN_STAKE;
+
+        if (stake > this.MAX_STAKE) {
+            stake = this.MAX_STAKE;
+        }
+        if (stake < this.MIN_STAKE) {
+            stake = this.MIN_STAKE;
+        }
+
         return stake;
-    }
     }
 
     // ─── Analyze Market ───
