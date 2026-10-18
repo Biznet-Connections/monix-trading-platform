@@ -75,7 +75,7 @@ class AITrader {
         // Trade parameters
         this.PROFIT_TARGET_PCT = 0.50;
         this.STOP_LOSS_PCT = 0.25;
-        this.MAX_TRADE_DURATION = 300000;
+        this.MAX_TRADE_DURATION = 900000;
 
         // 🚀 DYNAMIC STAKE CONFIGURATION
         this.MIN_STAKE_PCT = 0.005;
@@ -1114,8 +1114,8 @@ class AITrader {
             try {
                 const contractId = this.activeTrade.contract_id;
                 const stake = this.activeTrade.stake;
-                const slAmount = stake * 0.20;
-                const tpAmount = stake * 0.80;
+                const slAmount = stake * 0.10;
+                const tpAmount = stake * 0.20;
                 const result = await derivService.sendRequest({
                     proposal_open_contract: 1,
                     contract_id: parseInt(contractId)
@@ -1128,8 +1128,21 @@ class AITrader {
                     console.log('[SL-TRIGGER] PnL: $' + pnl.toFixed(2) + ' SELLING on Deriv');
                     await this.sellOnDeriv(contractId, pnl, 'LOSS');
                 } else if (pnl >= tpAmount) {
-                    console.log('[TP-TRIGGER] PnL: $' + pnl.toFixed(2) + ' SELLING on Deriv');
+                    console.log('[TP-TRIGGER] PnL: $' + pnl.toFixed(2) + ' SELLING');
                     await this.sellOnDeriv(contractId, pnl, 'WIN');
+                } else if (!this.activeTrade.trailing_activated && pnl >= stake * 0.10) {
+                    this.activeTrade.trailing_activated = true;
+                    this.activeTrade.trailing_peak = pnl;
+                    console.log('[TRAILING] Activated at +$' + pnl.toFixed(2));
+                } else if (this.activeTrade.trailing_activated) {
+                    if (pnl > this.activeTrade.trailing_peak) {
+                        this.activeTrade.trailing_peak = pnl;
+                    }
+                    const lockAmount = this.activeTrade.trailing_peak * 0.60;
+                    if (pnl <= lockAmount) {
+                        console.log('[TRAILING-CLOSE] Locked at +$' + pnl.toFixed(2) + ' (peak: +$' + this.activeTrade.trailing_peak.toFixed(2) + ')');
+                        await this.sellOnDeriv(contractId, pnl, 'WIN');
+                    }
                 }
             } catch(e) { console.log('[SL-ERR] ' + e.message); }
         }, 1000);
