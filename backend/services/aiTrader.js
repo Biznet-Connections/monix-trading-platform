@@ -651,7 +651,10 @@ class AITrader {
     // ─── Execute Entry ───
 
     async executeEntry(signal) {
-        if (this.isExecuting || this.activeTrade) return;
+        if (this.isExecuting) return;
+        if (this.activeTrade) return;
+        if (this._closingContractId) return;
+        if (this._lastCloseTime && (Date.now() - this._lastCloseTime) < 15000) return;
         if (!signal || signal.action === 'WAIT') return;
 
         this.isExecuting = true;
@@ -737,7 +740,7 @@ class AITrader {
 
     calculateStake(confidence, setupQuality) {
         const balance = this.currentBalance || 1000;
-        let stake = Math.round(balance * 0.05);
+        let stake = Math.round(balance * 0.028);
         if (stake < 1) stake = 1;
         return stake;
     }
@@ -1107,8 +1110,8 @@ class AITrader {
             try {
                 const contractId = this.activeTrade.contract_id;
                 const stake = this.activeTrade.stake;
-                const slAmount = stake * 0.25;
-                const tpAmount = stake * 0.50;
+                const slAmount = stake * 0.20;
+                const tpAmount = stake * 0.80;
                 const result = await derivService.sendRequest({
                     proposal_open_contract: 1,
                     contract_id: parseInt(contractId)
