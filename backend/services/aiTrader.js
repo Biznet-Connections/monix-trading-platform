@@ -1074,6 +1074,32 @@ class AITrader {
 
         this.balanceSyncInterval = setInterval(() => this.syncBalanceFromDeriv(), 30000);
 
+        // 🛡️ CLIENT-SIDE SL/TP MONITOR - checks every 2 sec
+        this.slMonitorInterval = setInterval(async () => {
+            if (!this.activeTrade) return;
+            try {
+                const result = await derivService.sendRequest({
+                    proposal_open_contract: 1,
+                    contract_id: parseInt(this.activeTrade.contract_id)
+                });
+                if (!result.proposal_open_contract) return;
+                const contract = result.proposal_open_contract;
+                if (contract.is_sold === 1) return;
+                const pnl = Number(contract.profit) || 0;
+                const stake = this.activeTrade.stake;
+                const slAmount = stake * 0.25;
+                const tpAmount = stake * 0.50;
+                
+                if (pnl <= -slAmount) {
+                    console.log('[CLIENT-SL] Hit -$' + slAmount.toFixed(2) + ' (actual: $' + pnl.toFixed(2) + ') - closing');
+                    await this.closeTrade(this.activeTrade.contract_id, pnl, 'LOSS');
+                } else if (pnl >= tpAmount) {
+                    console.log('[CLIENT-TP] Hit +$' + tpAmount.toFixed(2) + ' (actual: $' + pnl.toFixed(2) + ') - closing');
+                    await this.closeTrade(this.activeTrade.contract_id, pnl, 'WIN');
+                }
+            } catch(e) {}
+        }, 2000);
+
         setInterval(async () => {
             if (this.activeTrade) {
                 const timeOpen = Date.now() - this.activeTrade.entry_time;
