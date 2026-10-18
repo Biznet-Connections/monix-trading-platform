@@ -795,6 +795,31 @@ class AITrader {
 
     // ─── Lifecycle ───
 
+        async sellOnDeriv(contractId, pnl, status) {
+        if (this._closingContractId === contractId) return;
+        this._closingContractId = contractId;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                console.log('[SELL] Attempt ' + attempt + ' for ' + contractId);
+                const res = await derivService.sendRequest({ sell: contractId, price: 0 });
+                if (res && res.error) {
+                    console.log('[SELL] Attempt ' + attempt + ' failed: ' + res.error.message);
+                    if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
+                    continue;
+                }
+                console.log('[SELL] SUCCESS attempt ' + attempt);
+                await this.closeTrade(contractId, pnl, status);
+                this._closingContractId = null;
+                return true;
+            } catch(e) {
+                console.log('[SELL] Attempt ' + attempt + ' error: ' + e.message);
+                if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+        console.log('[SELL] ALL ATTEMPTS FAILED for ' + contractId);
+        this._closingContractId = null;
+        return false;
+    }
     async syncBalanceFromDeriv() {
         if (!derivService.authorized) return;
         try {
@@ -1075,29 +1100,31 @@ class AITrader {
         this.balanceSyncInterval = setInterval(() => this.syncBalanceFromDeriv(), 30000);
 
         // 🛡️ CLIENT-SIDE SL/TP MONITOR - checks every 2 sec
+        // CLIENT-SIDE SL/TP MONITOR - ACTUALLY SELLS ON DERIV
         this.slMonitorInterval = setInterval(async () => {
             if (!this.activeTrade) return;
+            if (this._closingContractId) return;
             try {
+                const contractId = this.activeTrade.contract_id;
+                const stake = this.activeTrade.stake;
+                const slAmount = stake * 0.25;
+                const tpAmount = stake * 0.50;
                 const result = await derivService.sendRequest({
                     proposal_open_contract: 1,
-                    contract_id: parseInt(this.activeTrade.contract_id)
+                    contract_id: parseInt(contractId)
                 });
                 if (!result.proposal_open_contract) return;
                 const contract = result.proposal_open_contract;
                 if (contract.is_sold === 1) return;
                 const pnl = Number(contract.profit) || 0;
-                const stake = this.activeTrade.stake;
-                const slAmount = stake * 0.25;
-                const tpAmount = stake * 0.50;
-                
                 if (pnl <= -slAmount) {
-                    console.log('[CLIENT-SL] Hit -$' + slAmount.toFixed(2) + ' (actual: $' + pnl.toFixed(2) + ') - closing');
-                    await this.closeTrade(this.activeTrade.contract_id, pnl, 'LOSS');
+                    console.log('[SL-TRIGGER] PnL: $' + pnl.toFixed(2) + ' SELLING on Deriv');
+                    await this.sellOnDeriv(contractId, pnl, 'LOSS');
                 } else if (pnl >= tpAmount) {
-                    console.log('[CLIENT-TP] Hit +$' + tpAmount.toFixed(2) + ' (actual: $' + pnl.toFixed(2) + ') - closing');
-                    await this.closeTrade(this.activeTrade.contract_id, pnl, 'WIN');
+                    console.log('[TP-TRIGGER] PnL: $' + pnl.toFixed(2) + ' SELLING on Deriv');
+                    await this.sellOnDeriv(contractId, pnl, 'WIN');
                 }
-            } catch(e) {}
+            } catch(e) { console.log('[SL-ERR] ' + e.message); }
         }, 1000);
 
         setInterval(async () => {
