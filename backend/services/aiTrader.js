@@ -739,9 +739,13 @@ class AITrader {
     }
 
     calculateStake(confidence, setupQuality) {
-        const balance = this.currentBalance || 1000;
-        let stake = Math.round(balance * 0.028);
-        if (stake < 1) stake = 1;
+        const balance = this.currentBalance || 10000;
+        const baseStake = Math.round(balance * multiplierConfig.BASE_STAKE_PCT);
+        let mult = 1.0;
+        if (confidence >= 70) mult = multiplierConfig.CONFIDENCE_MULTIPLIERS.high;
+        else if (confidence >= 50) mult = multiplierConfig.CONFIDENCE_MULTIPLIERS.medium;
+        const stake = Math.round(baseStake * mult);
+        console.log("[Stake] Bal: $" + balance.toFixed(0) + " | Base: $" + baseStake + " | Conf: " + confidence + "% | Final: $" + stake);
         return stake;
     }
 
