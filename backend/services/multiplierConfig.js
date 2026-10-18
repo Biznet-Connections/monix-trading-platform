@@ -1,10 +1,6 @@
 ﻿module.exports = {
     BASE_STAKE_PCT: 0.015,
-    CONFIDENCE_MULTIPLIERS: {
-        low: 1.0,
-        medium: 1.1,
-        high: 1.2
-    },
+    CONFIDENCE_MULTIPLIERS: { low: 1.0, medium: 1.1, high: 1.2 },
     MULTIPLIER: 100,
     STOP_LOSS_PCT: 0.08,
     TAKE_PROFIT_PCT: 0.16,
