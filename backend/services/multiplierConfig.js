@@ -1,14 +1,10 @@
 ﻿module.exports = {
-    BASE_STAKE_PCT: 0.02,
-    CONFIDENCE_MULTIPLIERS: {
-        low: 1.0,
-        medium: 1.2,
-        high: 1.5
-    },
+    BASE_STAKE_PCT: 0.015,
+    CONFIDENCE_MULTIPLIERS: { low: 1.0, medium: 1.1, high: 1.2 },
     MULTIPLIER: 100,
-    STOP_LOSS_PCT: 0.20,
-    TAKE_PROFIT_PCT: 0.40,
-    MAX_DURATION_SEC: 300,
+    STOP_LOSS_PCT: 0.08,
+    TAKE_PROFIT_PCT: 0.16,
+    MAX_DURATION_SEC: 180,
     TRAILING_TRIGGER_PCT: 0.50,
     TRAILING_LOCK_PCT: 0.30
 };
