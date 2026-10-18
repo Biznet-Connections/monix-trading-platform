@@ -16,7 +16,7 @@ module.exports = {
     
     // SL/TP: percentages
     STOP_LOSS_PCT: 0.25,       // -25% = -$125 on $500
-    TAKE_PROFIT_PCT: 1.00,     // +100% = +$500 on $500
+    TAKE_PROFIT_PCT: 0.50,     // +100% = +$500 on $500
     
     // Trailing: DISABLED (let TP fire)
     TRAILING_TRIGGER_PCT: 999,  // Effectively disabled

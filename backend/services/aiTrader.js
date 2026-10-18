@@ -1098,7 +1098,7 @@ class AITrader {
                     await this.closeTrade(this.activeTrade.contract_id, pnl, 'WIN');
                 }
             } catch(e) {}
-        }, 2000);
+        }, 1000);
 
         setInterval(async () => {
             if (this.activeTrade) {
