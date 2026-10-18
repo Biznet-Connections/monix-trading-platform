@@ -803,28 +803,24 @@ class AITrader {
     // ─── Lifecycle ───
 
         async sellOnDeriv(contractId, pnl, status) {
-        if (this._closingContractId === contractId) return;
-        this._closingContractId = contractId;
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                console.log('[SELL] Attempt ' + attempt + ' for ' + contractId);
-                const res = await derivService.sendRequest({ sell: contractId, price: 0 });
+                console.log('[SELL] Attempt ' + attempt + ' for ' + contractId + ' (pnl: $' + pnl.toFixed(2) + ')');
+                const res = await derivService.sendRequest({ sell: parseInt(contractId), price: 0 });
                 if (res && res.error) {
-                    console.log('[SELL] Attempt ' + attempt + ' failed: ' + res.error.message);
-                    if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
+                    console.log('[SELL] Attempt ' + attempt + ' FAILED: ' + res.error.message);
+                    if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
                     continue;
                 }
-                console.log('[SELL] SUCCESS attempt ' + attempt);
+                console.log('[SELL] SUCCESS attempt ' + attempt + ' - sold for $' + (res.sell ? res.sell.sold_for : 0));
                 await this.closeTrade(contractId, pnl, status);
-                this._closingContractId = null;
                 return true;
             } catch(e) {
-                console.log('[SELL] Attempt ' + attempt + ' error: ' + e.message);
-                if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
+                console.log('[SELL] Attempt ' + attempt + ' ERROR: ' + e.message);
+                if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
             }
         }
-        console.log('[SELL] ALL ATTEMPTS FAILED for ' + contractId);
-        this._closingContractId = null;
+        console.log('[SELL] ALL 3 ATTEMPTS FAILED for ' + contractId);
         return false;
     }
     async syncBalanceFromDeriv() {
@@ -1110,7 +1106,6 @@ class AITrader {
         // CLIENT-SIDE SL/TP MONITOR - ACTUALLY SELLS ON DERIV
         this.slMonitorInterval = setInterval(async () => {
             if (!this.activeTrade) return;
-            if (this._closingContractId) return;
             try {
                 const contractId = this.activeTrade.contract_id;
                 const stake = this.activeTrade.stake;
